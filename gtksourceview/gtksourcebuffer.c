@@ -2074,14 +2074,14 @@ update_syntax_regions (GtkSourceBuffer *source_buffer,
 		       gint             delta)
 {
 	GArray *table;
-	gint region;
+	gint first_region, region;
 	gint table_index, expected_end_index;
 	gchar *slice, *head;
 	gint head_length, head_offset;
 	GtkTextIter start_iter, end_iter;
 	GtkSourceBufferMatch match;
 	SyntaxDelimiter delim;
-	gboolean mismatch, started_in_syntax;
+	gboolean mismatch;
 	
 	table = source_buffer->priv->syntax_regions;
 	g_assert (table != NULL);
@@ -2116,32 +2116,31 @@ update_syntax_regions (GtkSourceBuffer *source_buffer,
 		return;
 	}
 	
-	/* search the edited region */
-	region = bsearch_offset (table, start_offset);
-	
+	/* we shall start analyzing from the beginning of the line */
+	gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (source_buffer),
+					    &start_iter, start_offset);
+	gtk_text_iter_set_line_offset (&start_iter, 0);
+	head_offset = gtk_text_iter_get_offset (&start_iter);
+	first_region = bsearch_offset (table, head_offset);
+
 	/* initialize analyzing context */
-	started_in_syntax = FALSE;
 	delim.tag = NULL;
 	delim.offset = 0;
 	delim.depth = 0;
 	/* first expected match */
-	table_index = region;
-	/* last expected match (i.e. how far table_index is supossed to get) */
-	expected_end_index = region;
+	table_index = first_region;
 	
-	/* get the syntax region to analyze for changes */
-	if (region > 0) {
-		head_offset = g_array_index (table, SyntaxDelimiter, region - 1).offset;
+	/* calculate starting context: delim, head_offset, start_iter and table_index */
+	if (first_region > 0) {
+		head_offset = g_array_index (table, SyntaxDelimiter, first_region - 1).offset;
 		gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (source_buffer),
 						    &start_iter,
 						    head_offset);
-		if (g_array_index (table, SyntaxDelimiter, region - 1).tag) {
+		if (g_array_index (table, SyntaxDelimiter, first_region - 1).tag) {
 			/* we are inside a syntax colored region, so
 			 * we expect to see the opening delimiter
-			 * first, and up to the closing delimited */
-			started_in_syntax = TRUE;
-			table_index = region - 1;
-			expected_end_index = region + 1;
+			 * first */
+			table_index = first_region - 1;
 		}
 
 		if (table_index > 0) {
@@ -2158,9 +2157,11 @@ update_syntax_regions (GtkSourceBuffer *source_buffer,
 		gtk_text_buffer_get_start_iter (GTK_TEXT_BUFFER (source_buffer),
 						&start_iter);
 	}
-	/* we can't get past the end of the table */
-	expected_end_index = MIN (expected_end_index, table->len);
 
+	/* lookup the edited region */
+	region = bsearch_offset (table, start_offset);
+	
+	/* calculate ending context: expected_end_index and end_iter */
 	if (region < table->len) {
 		gint end_offset;
 		
@@ -2182,11 +2183,18 @@ update_syntax_regions (GtkSourceBuffer *source_buffer,
 		gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (source_buffer),
 						    &end_iter,
 						    end_offset);
-	
+
+		/* calculate expected_end_index */
+		if (g_array_index (table, SyntaxDelimiter, region).tag)
+			expected_end_index = region;
+		else
+			expected_end_index = MIN (region + 1, table->len);
+		
 	} else {
 		/* set the ending iter to the end of the buffer */
 		gtk_text_buffer_get_end_iter (GTK_TEXT_BUFFER (source_buffer),
 					      &end_iter);
+		expected_end_index = table->len;
 	}
 
 	/* get us the chunk of text to analyze */
@@ -2239,6 +2247,8 @@ update_syntax_regions (GtkSourceBuffer *source_buffer,
 		return;
 	}
 
+	/* no syntax regions changed */
+	
 	/* update trailing offsets with delta ... */
 	adjust_table_offsets (table, region, delta);
 
@@ -2256,13 +2266,10 @@ update_syntax_regions (GtkSourceBuffer *source_buffer,
 	if (delta > 0)
 		gtk_text_iter_forward_chars (&end_iter, delta);
 	
-	if (!started_in_syntax) {
-		/* we modified a non-syntax colored region, so we
-		   adjust bounds to line bounds to correctly highlight
-		   non-syntax patterns */
-		gtk_text_iter_set_line_offset (&start_iter, 0);
-		gtk_text_iter_forward_to_line_end (&end_iter);
-	}
+	/* adjust bounds to line bounds to correctly highlight
+	   non-syntax patterns */
+	gtk_text_iter_set_line_offset (&start_iter, 0);
+	gtk_text_iter_forward_to_line_end (&end_iter);
 	
 	refresh_range (source_buffer, &start_iter, &end_iter);
 }
