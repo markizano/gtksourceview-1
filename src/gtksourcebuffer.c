@@ -125,6 +125,8 @@ struct _GtkSourceBufferPrivate
 	/* views highlight requests */
 	GtkTextRegion         *highlight_requests;
 
+	GtkSourceLanguage     *language;
+
 	GtkSourceUndoManager  *undo_manager;
 };
 
@@ -468,6 +470,9 @@ gtk_source_buffer_finalize (GObject *object)
 	g_list_free (buffer->priv->syntax_items);
 	g_list_free (buffer->priv->pattern_items);
 
+	if (buffer->priv->language != NULL)
+		g_object_unref (buffer->priv->language);
+
 	g_free (buffer->priv);
 	buffer->priv = NULL;
 	
@@ -488,6 +493,19 @@ gtk_source_buffer_new (GtkSourceTagTable *table)
 	return buffer;
 }
 
+GtkSourceBuffer *
+gtk_source_buffer_new_with_language (GtkSourceLanguage *language)
+{
+	GtkSourceBuffer *buffer;
+
+	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
+
+	buffer = gtk_source_buffer_new (NULL);
+
+	gtk_source_buffer_set_language (buffer, language);
+
+	return buffer;
+}
 
 static void
 gtk_source_buffer_can_undo_handler (GtkSourceUndoManager  	*um,
@@ -2558,3 +2576,45 @@ gtk_source_buffer_remove_all_source_tags (GtkSourceBuffer   *buffer,
   
 	g_slist_free (tags);
 }
+
+void
+gtk_source_buffer_set_language (GtkSourceBuffer   *buffer, 
+				GtkSourceLanguage *language)
+{
+	GtkSourceTagTable *table;
+
+	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
+
+	if (buffer->priv->language == language)
+		return;
+
+	if (language != NULL)
+		g_object_ref (language);
+
+	if (buffer->priv->language != NULL)
+		g_object_unref (buffer->priv->language);
+
+	buffer->priv->language = language;
+
+	/* remove previous tags */
+	table = GTK_SOURCE_TAG_TABLE (gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (buffer)));
+	gtk_source_tag_table_remove_all_source_tags (table);
+
+	if (language != NULL)
+	{
+		const GSList *list = NULL;
+			
+		list = gtk_source_language_get_tags (language);		
+ 		gtk_source_tag_table_add_all (table, list);
+	}
+}
+
+const GtkSourceLanguage *
+gtk_source_buffer_get_language (GtkSourceBuffer *buffer)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
+
+	return buffer->priv->language;
+}
+
+

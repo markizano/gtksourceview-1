@@ -30,7 +30,8 @@
 #include <gtk/gtk.h>
 #include <gtksourcetag.h>
 
-#include "gtksourcetagtable.h"
+#include <gtksourcetagtable.h>
+#include <gtksourcelanguage.h>
 
 G_BEGIN_DECLS
 
@@ -77,6 +78,7 @@ GType           	 gtk_source_buffer_get_type 		(void) G_GNUC_CONST;
 
 /* Constructor */
 GtkSourceBuffer	 	*gtk_source_buffer_new 			(GtkSourceTagTable     *table);
+GtkSourceBuffer 	*gtk_source_buffer_new_with_language 	(GtkSourceLanguage     *language);
 
 /* Properties. */
 gboolean		 gtk_source_buffer_get_check_brackets   (GtkSourceBuffer       *buffer);
@@ -90,6 +92,10 @@ void			 gtk_source_buffer_set_highlight	(GtkSourceBuffer       *buffer,
 gint			 gtk_source_buffer_get_max_undo_levels	(const GtkSourceBuffer *buffer);
 void			 gtk_source_buffer_set_max_undo_levels	(GtkSourceBuffer       *buffer,
 							    	 gint                   max_undo_levels);
+
+const GtkSourceLanguage *gtk_source_buffer_get_language 	(GtkSourceBuffer       *buffer);
+void			 gtk_source_buffer_set_language 	(GtkSourceBuffer       *buffer, 
+								 GtkSourceLanguage     *language);
 
 /* Utility method */
 gboolean		 gtk_source_buffer_find_bracket_match 	(GtkTextIter           *iter);

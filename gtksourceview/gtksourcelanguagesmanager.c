@@ -374,6 +374,7 @@ build_file_listing (const gchar *directory, GSList *filenames)
 	
 	while (file_name != NULL)
 	{
+		/* FIXME: crash on PPC. Dunno why! - Paolo */
 		gchar *full_path = g_build_filename (directory, file_name);
 
 		if (!g_file_test (full_path, G_FILE_TEST_IS_DIR) && 

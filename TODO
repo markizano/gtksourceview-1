@@ -1,4 +1,4 @@
-TODO (last update: 22 March 2003)
+TODO (last update: 25 March 2003)
 =================================
 
 Before next release:
@@ -14,15 +14,30 @@ Before next release:
 [X] i18n (Gustavo)
 [ ] Creating a bugzilla product (Paolo)
 [ ] Convert .lang files to the new format (we could write a perl 
-    script to translate UltraEdit or TextPad stntax files in 
+    script to translate UltraEdit or TextPad syntax files in 
     our format) (Gustavo)
 [X] Removing gtktextsearch.[ch] files (Paolo)
 [ ] Renaming the src dir to gtksourceview (Paolo)
 [X] Moving the test programs in a tests directory
 [X] Cleaning up the test-widget demo (Gustavo)
+[ ] "escape_char" property.  We probably want to put it 
+    into the .lang file too? (Gustavo)
+[ ] gtk_source_buffer_set_bracket_tag_style (or whatever we name it :-)
+    (Gustavo)
+[ ] New properties "check_brackets", "highlight", "max_undo_levels" and "language",
+    and notification of changes in these (Gustavo)
+[ ] Auto-indentation and insert spaces instead of tabs (Paolo)
+[X] gtk_source_buffer_new_with_language and gtk_source_view_[get|set]_language
+    (Paolo)
+[ ] Properties in GtkSourceView (Paolo)
 
 Future releases:
 
+[ ] Writing documentation
+[ ] Monitor gconf values in GtkSourceLanguage (Paolo)
+[ ] Properties in GtkSourceLanguage (?) (Paolo)
+[ ] gtk_source_view_set_font and gtk_source_view_set_colors (Do we need them?)
+    (Paolo)
 [ ] Moving some of the code of gedit-view in gtksourceview (Paolo)
 [ ] Moving the gedit printing code to gtksourceview (Paolo)
 [ ] Using a stack machine for the highlight code (Gustavo)

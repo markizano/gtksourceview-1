@@ -237,14 +237,9 @@ open_file (GtkSourceBuffer *buffer, const gchar *filename)
 	GtkSourceLanguagesManager *manager;
 	GtkSourceLanguage *language = NULL;
 	gchar *mime_type;
-	GtkSourceTagTable *table;
 	GError *err = NULL;
 	gchar *uri;
-	
-	/* remove previous tags */
-	table = GTK_SOURCE_TAG_TABLE (gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (buffer)));
-	gtk_source_tag_table_remove_all_source_tags (table);
-
+		
 	/* get the new language for the file mimetype */
 	manager = g_object_get_data (G_OBJECT (buffer), "languages-manager");
 
@@ -271,17 +266,11 @@ open_file (GtkSourceBuffer *buffer, const gchar *filename)
 		language = gtk_source_languages_manager_get_language_from_mime_type (manager,
 										     mime_type);
 
-		if (language != NULL)
-		{
-			const GSList *list = NULL;
-			
-			list = gtk_source_language_get_tags (language);		
- 			gtk_source_tag_table_add_all (table, list);
-		}
-		else
-		{
+		if (language == NULL)
 			g_print ("No language found for mime type `%s'\n", mime_type);
-		}
+		
+		gtk_source_buffer_set_language (buffer, language);
+
 		g_free (mime_type);
 	}
 	else
