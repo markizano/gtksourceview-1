@@ -10,7 +10,8 @@ EXTRA_DIST = 			\
 	latex.lang		\
 	perl.lang		\
 	po.lang			\
-	python.lang
+	python.lang		\
+	xml.lang
 
 languagesdir = $(datadir)/gtksourceview-1.0/language-specs
 languages_DATA = $(EXTRA_DIST)
