@@ -39,6 +39,8 @@ typedef struct {
 	GList           *windows;
 	gboolean         show_markers;
 	gboolean         show_numbers;
+	gboolean	 auto_indent;
+	gboolean	 insert_spaces;
 	guint            tab_stop;
 	GtkItemFactory  *item_factory;
 } ViewsData;
@@ -54,7 +56,7 @@ static void       open_file_cb                   (ViewsData       *vd,
 static void       new_view_cb                    (ViewsData       *vd,
 						  guint            callback_action,
 						  GtkWidget       *widget);
-static void       show_toggled_cb                (ViewsData       *vd,
+static void       view_toggled_cb                (ViewsData       *vd,
 						  guint            callback_action,
 						  GtkWidget       *widget);
 
@@ -62,6 +64,9 @@ static void       show_toggled_cb                (ViewsData       *vd,
 
 #define SHOW_NUMBERS_PATH "/View/Show _Line Numbers"
 #define SHOW_MARKERS_PATH "/View/Show _Markers"
+#define ENABLE_AUTO_INDENT_PATH "/View/Enable _Auto Indent"
+#define INSERT_SPACES_PATH "/View/Insert _Spaces Instead of Tabs"
+
 
 static GtkItemFactoryEntry menu_items[] = {
 	{ "/_File",                   NULL,         0,               0, "<Branch>" },
@@ -72,14 +77,17 @@ static GtkItemFactoryEntry menu_items[] = {
 	{ "/_View",                   NULL,         0,               0, "<Branch>" },
 	{ "/View/_New View",          NULL,         new_view_cb,     0, "<StockItem>", GTK_STOCK_NEW },
 	{ "/View/sep1",               NULL,         0,               0, "<Separator>" },
-	{ SHOW_NUMBERS_PATH,          NULL,         show_toggled_cb, 1, "<CheckItem>" },
-	{ SHOW_MARKERS_PATH,          NULL,         show_toggled_cb, 2, "<CheckItem>" },
+	{ SHOW_NUMBERS_PATH,          NULL,         view_toggled_cb, 1, "<CheckItem>" },
+	{ SHOW_MARKERS_PATH,          NULL,         view_toggled_cb, 2, "<CheckItem>" },
+	{ "/View/sep1",               NULL,         0,               0, "<Separator>" },
+	{ ENABLE_AUTO_INDENT_PATH,    NULL,         view_toggled_cb, 3, "<CheckItem>" },
+	{ INSERT_SPACES_PATH,         NULL,         view_toggled_cb, 4, "<CheckItem>" }
 };
 
 /* Implementation */
 
 static void 
-show_toggled_cb (ViewsData *vd,
+view_toggled_cb (ViewsData *vd,
 		 guint      callback_action,
 		 GtkWidget *widget)
 {
@@ -99,6 +107,13 @@ show_toggled_cb (ViewsData *vd,
 			vd->show_markers = active;
 			set_func = gtk_source_view_set_show_line_pixmaps;
 			break;
+		case 3:
+			vd->auto_indent = active;
+			set_func = gtk_source_view_set_auto_indent;
+		case 4:
+			vd->insert_spaces = active;
+			set_func = gtk_source_view_set_insert_spaces_instead_of_tabs;
+
 		default:
 			break;
 	}
@@ -437,6 +452,8 @@ create_window (ViewsData *vd)
 
 	gtk_source_view_set_show_line_numbers (GTK_SOURCE_VIEW (view), vd->show_numbers);
 	gtk_source_view_set_show_line_pixmaps (GTK_SOURCE_VIEW (view), vd->show_markers);
+	gtk_source_view_set_auto_indent (GTK_SOURCE_VIEW (view), vd->auto_indent);
+	gtk_source_view_set_insert_spaces_instead_of_tabs (GTK_SOURCE_VIEW (view), vd->insert_spaces);
 
 	return window;
 }
@@ -485,6 +502,16 @@ create_main_window (ViewsData *vd)
 		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
 								"/View/Show Markers")),
 		vd->show_markers);
+	gtk_check_menu_item_set_active (
+		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
+								"/View/Enable Auto Indent")),
+		vd->auto_indent);
+	gtk_check_menu_item_set_active (
+		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
+								"/View/Insert Spaces Instead of Tabs")),
+		vd->insert_spaces);
+
+
 
 	/* cursor position label */
 	label = gtk_label_new ("label");
@@ -549,9 +576,12 @@ main (int argc, char *argv[])
 	vd->buffer = create_source_buffer (lm);
 	g_object_unref (lm);
 	vd->windows = NULL;
+
 	vd->show_numbers = TRUE;
 	vd->show_markers = TRUE;
-	
+	vd->auto_indent = TRUE;
+	vd->insert_spaces = FALSE;
+
 	window = create_main_window (vd);
 	if (argc > 1)
 		open_file (vd->buffer, argv [1]);

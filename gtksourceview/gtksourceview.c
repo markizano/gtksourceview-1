@@ -25,6 +25,8 @@
 #include <config.h>
 #endif
 
+#include <string.h> /* For strlen */
+
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 #include <pango/pango-tabs.h>
@@ -49,6 +51,8 @@ struct _GtkSourceViewPrivate
 	guint		 tabs_width;
 	gboolean 	 show_line_numbers;
 	gboolean	 show_line_pixmaps;
+	gboolean	 auto_indent;
+	gboolean	 insert_spaces;
 	
 	GHashTable 	*pixmap_cache;
 
@@ -56,6 +60,16 @@ struct _GtkSourceViewPrivate
 	gint		 old_lines;
 };
 
+/* Implement DnD for application/x-color drops */
+typedef enum {
+	TARGET_COLOR = 200
+} GtkSourceViewDropTypes;
+
+static GtkTargetEntry drop_types[] = {
+	{"application/x-color", 0, TARGET_COLOR}
+};
+
+static gint n_drop_types = sizeof (drop_types) / sizeof (drop_types[0]);
 
 static guint signals[LAST_SIGNAL] = { 0 };
 
@@ -100,6 +114,17 @@ static void 	gtk_source_view_get_lines 		(GtkTextView       *text_view,
 static gint     gtk_source_view_expose 			(GtkWidget         *widget,
 							 GdkEventExpose    *event);
 
+static gint	key_press_cb 				(GtkWidget         *widget, 
+							 GdkEventKey       *event, 
+							 gpointer           data);
+static void 	view_dnd_drop 				(GtkTextView       *view, 
+							 GdkDragContext    *context,
+							 gint               x,
+							 gint               y,
+							 GtkSelectionData  *selection_data,
+							 guint              info,
+							 guint              time,
+							 gpointer           data);
 
 /* Private functions. */
 static void
@@ -170,6 +195,8 @@ view_realize_cb (GtkWidget *widget, GtkSourceView *view)
 static void
 gtk_source_view_init (GtkSourceView *view)
 {
+	GtkTargetList *tl;
+
 	view->priv = g_new0 (GtkSourceViewPrivate, 1);
 
 	view->priv->tabs_width = DEFAULT_TAB_WIDTH;
@@ -179,6 +206,8 @@ gtk_source_view_init (GtkSourceView *view)
 	/* FIXME: remove when we will use properties - Paolo */
 	gtk_source_view_set_show_line_numbers (view, FALSE);
 	gtk_source_view_set_show_line_pixmaps (view, FALSE);
+	gtk_source_view_set_auto_indent (view, FALSE);
+	gtk_source_view_set_insert_spaces_instead_of_tabs (view, FALSE);
 
 	gtk_text_view_set_left_margin (GTK_TEXT_VIEW (view), 2);
 	gtk_text_view_set_right_margin (GTK_TEXT_VIEW (view), 2);
@@ -187,6 +216,22 @@ gtk_source_view_init (GtkSourceView *view)
 			  "realize",
 			  G_CALLBACK (view_realize_cb),
 			  view);
+	g_signal_connect (G_OBJECT (view),
+			  "key_press_event",
+			  G_CALLBACK (key_press_cb),
+			  NULL);
+
+	tl = gtk_drag_dest_get_target_list (GTK_WIDGET (view));
+	g_return_if_fail (tl != NULL);
+
+	gtk_target_list_add_table (tl, drop_types, n_drop_types);
+	
+	g_signal_connect (G_OBJECT (view), 
+			  "drag_data_received", 
+			  G_CALLBACK (view_dnd_drop), 
+			  NULL);
+
+	
 }
 
 static void
@@ -303,6 +348,19 @@ gtk_source_view_pixbuf_foreach_unref (gpointer key,
 }
 
 static void
+scroll_to_cursor (GtkSourceView *view)
+{
+	GtkTextBuffer* buffer = NULL;
+	
+	buffer = gtk_text_view_get_buffer (GTK_TEXT_VIEW (view));
+	g_return_if_fail (buffer != NULL);
+
+	gtk_text_view_scroll_mark_onscreen (GTK_TEXT_VIEW (view),
+				gtk_text_buffer_get_mark (buffer,
+				"insert"));
+}
+
+static void
 gtk_source_view_undo (GtkSourceView *view)
 {
 	GtkSourceBuffer *buffer;
@@ -314,7 +372,10 @@ gtk_source_view_undo (GtkSourceView *view)
 			gtk_text_view_get_buffer (GTK_TEXT_VIEW (view)));
 		
 	if (gtk_source_buffer_can_undo (buffer))
+	{
 		gtk_source_buffer_undo (buffer);
+		scroll_to_cursor (view);
+	}
 }
 
 static void
@@ -329,7 +390,10 @@ gtk_source_view_redo (GtkSourceView *view)
 			gtk_text_view_get_buffer (GTK_TEXT_VIEW (view)));
 		
 	if (gtk_source_buffer_can_redo (buffer))
+	{
 		gtk_source_buffer_redo (buffer);
+		scroll_to_cursor (view);
+	}
 }
 
 static void
@@ -1043,3 +1107,209 @@ gtk_source_view_get_pixbuf (GtkSourceView *view,
 	return g_hash_table_lookup (view->pixmap_cache, key);
 }
 */
+
+static gchar*
+compute_indentation (GtkSourceView *view, gint line)
+{
+	GtkTextIter start;
+	GtkTextIter end;
+	gunichar ch;
+
+	gtk_text_buffer_get_iter_at_line (
+			gtk_text_view_get_buffer (GTK_TEXT_VIEW (view)), 
+			&start, line);
+
+	end = start;
+
+	ch = gtk_text_iter_get_char (&end);
+	while (g_unichar_isspace (ch) && ch != '\n')
+	{
+		if (!gtk_text_iter_forward_char (&end))
+			break;
+
+		ch = gtk_text_iter_get_char (&end);
+	}
+
+	if (gtk_text_iter_equal (&start, &end))
+		return NULL;
+
+	return gtk_text_iter_get_slice (&start, &end);
+}
+
+static gint
+key_press_cb (GtkWidget *widget, GdkEventKey *event, gpointer data)
+{
+	GtkSourceView *view;
+	GtkTextBuffer *buf;
+	GtkTextIter cur;
+	GtkTextMark *mark;
+	gint key;
+
+	view = GTK_SOURCE_VIEW (widget);
+	buf = gtk_text_view_get_buffer (GTK_TEXT_VIEW (widget));
+
+	key = event->keyval;
+
+	mark = gtk_text_buffer_get_mark (buf, "insert");
+	gtk_text_buffer_get_iter_at_mark (buf, &cur, mark);
+	
+	if ((key == GDK_Return) && gtk_text_iter_ends_line (&cur) && 
+	    view->priv->auto_indent)
+	{
+		/* Auto-indent means that when you press ENTER at the end of a
+		 * line, the new line is automatically indented at the same
+		 * level as the previous line.
+		 */
+		gchar *indent = NULL;
+
+		/* Calculate line indentation and create indent string. */
+		indent = compute_indentation (view, 
+					      gtk_text_iter_get_line (&cur));
+
+		if (indent != NULL)
+		{
+			/* Insert new line and auto-indent. */
+			gtk_text_buffer_begin_user_action (buf);
+			gtk_text_buffer_insert (buf, &cur, "\n", 1);
+			gtk_text_buffer_insert (buf, &cur, indent, strlen (indent));
+			g_free (indent);
+			gtk_text_buffer_end_user_action (buf);
+			gtk_text_view_scroll_mark_onscreen (GTK_TEXT_VIEW (widget),
+							    gtk_text_buffer_get_insert (buf));
+			return TRUE;
+		}
+	}
+
+	if ((key == GDK_Tab) && view->priv->insert_spaces)
+	{
+		gint cur_pos;
+		gint num_of_equivalent_spaces;
+		gint tabs_size;
+		gint i;
+		gchar *spaces;
+
+		tabs_size = view->priv->tabs_width; 
+		
+		cur_pos = gtk_text_iter_get_line_offset (&cur);
+
+		num_of_equivalent_spaces = tabs_size - (cur_pos % tabs_size); 
+
+		spaces = g_malloc (num_of_equivalent_spaces + 1);
+		
+		for (i = 0; i < num_of_equivalent_spaces; i++)
+			spaces [i] = ' ';
+		
+		spaces [num_of_equivalent_spaces] = '\0';
+		
+		gtk_text_buffer_begin_user_action (buf);
+		gtk_text_buffer_insert (buf,  &cur, spaces, num_of_equivalent_spaces);
+		gtk_text_buffer_end_user_action (buf);
+
+		gtk_text_view_scroll_mark_onscreen (GTK_TEXT_VIEW (widget),
+						    gtk_text_buffer_get_insert (buf));
+		
+		g_free (spaces);
+
+		return TRUE;
+	}
+		
+	return FALSE;
+}
+
+gboolean
+gtk_source_view_get_auto_indent (GtkSourceView *view)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
+
+	return view->priv->auto_indent;
+}
+
+void
+gtk_source_view_set_auto_indent (GtkSourceView *view, gboolean enable)
+{
+	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
+
+	view->priv->auto_indent = enable;
+}
+
+gboolean
+gtk_source_view_get_insert_spaces_instead_of_tabs (GtkSourceView *view)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
+
+	return view->priv->insert_spaces;
+}
+
+void
+gtk_source_view_set_insert_spaces_instead_of_tabs (GtkSourceView *view, gboolean enable)
+{
+	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
+
+	view->priv->insert_spaces = enable;
+}
+
+static void 
+view_dnd_drop (GtkTextView *view, 
+	       GdkDragContext *context,
+	       gint x,
+	       gint y,
+	       GtkSelectionData *selection_data,
+	       guint info,
+	       guint time,
+	       gpointer data)
+{
+
+	GtkTextIter iter;
+
+	if (info == TARGET_COLOR) 
+	{
+		guint16 *vals;
+		gchar string[] = "#000000";
+		gint buffer_x;
+		gint buffer_y;
+		
+		if (selection_data->length < 0)
+			return;
+
+		if ((selection_data->format != 16) || (selection_data->length != 8)) 
+		{
+			g_warning ("Received invalid color data\n");
+			return;
+		}
+
+		vals = (guint16 *) selection_data->data;
+
+		vals[0] /= 256;
+	        vals[1] /= 256;
+		vals[2] /= 256;
+		
+		g_snprintf (string, sizeof (string), "#%02X%02X%02X", vals[0], vals[1], vals[2]);
+		
+		gtk_text_view_window_to_buffer_coords (view, 
+						       GTK_TEXT_WINDOW_TEXT, 
+						       x, 
+						       y, 
+						       &buffer_x, 
+						       &buffer_y);
+		gtk_text_view_get_iter_at_location (view, &iter, buffer_x, buffer_y);
+
+		if (gtk_text_view_get_editable (view))
+		{
+			gtk_text_buffer_insert (gtk_text_view_get_buffer (view), 
+						&iter, 
+						string, 
+						strlen (string));
+			gtk_text_buffer_place_cursor (gtk_text_view_get_buffer (view),
+						&iter);
+		}
+
+		/*
+		 * FIXME: Check if the iter is inside a selection
+		 * If it is, remove the selection and then insert at
+		 * the cursor position - Paolo
+		 */
+
+		return;
+	}
+}
+
