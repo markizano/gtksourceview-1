@@ -296,7 +296,8 @@ test_source (GtkSourceBuffer *buffer)
 	GtkTextTagTable *table;
 	GList *list = NULL;
 	GError *err = NULL;
-
+	GSList *keywords = NULL;
+	
 	if (!buffer)
 		buffer = GTK_SOURCE_BUFFER (gtk_source_buffer_new (NULL));
 
@@ -310,10 +311,28 @@ test_source (GtkSourceBuffer *buffer)
 	g_object_set (G_OBJECT (tag), "weight", PANGO_WEIGHT_BOLD, NULL);
 	list = g_list_append (list, (gpointer) tag);
 
+	keywords = g_slist_append (keywords, "int");
+	keywords = g_slist_append (keywords, "float");
+	keywords = g_slist_append (keywords, "enum");
+	keywords = g_slist_append (keywords, "bool");
+	keywords = g_slist_append (keywords, "char");
+	keywords = g_slist_append (keywords, "void");
+	keywords = g_slist_append (keywords, "sizeof");
+	keywords = g_slist_append (keywords, "static");
+	keywords = g_slist_append (keywords, "const");
+	keywords = g_slist_append (keywords, "typedef");
+	keywords = g_slist_append (keywords, "struct");
+	keywords = g_slist_append (keywords, "class");
+
+	tag = gtk_keyword_tag_new ("types", keywords, TRUE, TRUE, TRUE, NULL, NULL);
+	/*
 	tag = gtk_pattern_tag_new ("types",
 				   "\\b\\(int\\|float\\|enum\\|bool\\|char\\|void\\|gint\\|"
 				   "gchar\\|gpointer\\|guint\\|guchar\\|static\\|const\\|"
 				   "typedef\\|struct\\|class\\|gboolean\\|sizeof\\)\\b");
+	*/
+	g_slist_free (keywords);
+	
 	g_object_set (G_OBJECT (tag), "foreground", "blue", NULL);
 	list = g_list_append (list, (gpointer) tag);
 
@@ -324,11 +343,11 @@ test_source (GtkSourceBuffer *buffer)
 	tag = gtk_pattern_tag_new ("functions", "^[a-zA-Z_]*\\:");
 	g_object_set (G_OBJECT (tag), "foreground", "navy", NULL);
 	list = g_list_append (list, (gpointer) tag);
-
+/*
 	tag = gtk_pattern_tag_new ("macro", "\\b[A-Z_][A-Z0-9_\\-]+\\b");
 	g_object_set (G_OBJECT (tag), "foreground", "red", NULL);
 	list = g_list_append (list, (gpointer) tag);
-
+*/
 	tag = gtk_pattern_tag_new ("keywords",
 				   "\\b\\(do\\|while\\|for\\|if\\|else\\|switch\\|case\\|"
 				   "return\\|public\\|protected\\|private\\|false\\|"
@@ -346,20 +365,37 @@ test_source (GtkSourceBuffer *buffer)
 	g_object_set (G_OBJECT (tag), "foreground", "orange", NULL);
 	list = g_list_append (list, (gpointer) tag);
 
+	keywords = NULL;
+	keywords = g_slist_append (keywords, "include");
+	keywords = g_slist_append (keywords, "if");
+	keywords = g_slist_append (keywords, "ifdef");
+	keywords = g_slist_append (keywords, "ifndef");
+	keywords = g_slist_append (keywords, "else");
+	keywords = g_slist_append (keywords, "elif");
+	keywords = g_slist_append (keywords, "define");
+	keywords = g_slist_append (keywords, "endif");
+	keywords = g_slist_append (keywords, "pragma");
+	keywords = g_slist_append (keywords, "undef");
+
+	tag = gtk_keyword_tag_new ("defs", keywords, TRUE, FALSE, TRUE, "^[ \t]*#[ \t]*", NULL);
+/*
 	tag = gtk_pattern_tag_new ("defs",
 				   "^#[ \t]*\\(include\\|if\\|ifdef\\|ifndef\\|else\\|elif\\|define\\|endif\\|pragma\\|undef\\)\\b");
+*/
+	g_slist_free (keywords);
+
 	g_object_set (G_OBJECT (tag), "foreground", "tomato3", NULL);
 	list = g_list_append (list, (gpointer) tag);
 
-	tag = gtk_syntax_tag_new ("comment", "//", "\n");
+	tag = gtk_line_comment_tag_new ("comment", "//");
 	g_object_set (G_OBJECT (tag), "foreground", "gray", "style", PANGO_STYLE_ITALIC, NULL);
 	list = g_list_append (list, (gpointer) tag);
 
-	tag = gtk_syntax_tag_new ("comment_multiline", "/\\*", "\\*/");
+	tag = gtk_block_comment_tag_new ("comment_multiline", "/\\*", "\\*/");
 	g_object_set (G_OBJECT (tag), "foreground", "gray", "style", PANGO_STYLE_ITALIC, NULL);
 	list = g_list_append (list, (gpointer) tag);
 
-	tag = gtk_syntax_tag_new ("string", "\"", "\"");
+	tag = gtk_string_tag_new ("string", "\"", "\"", TRUE);
 	g_object_set (G_OBJECT (tag), "foreground", "forest green", NULL);
 	list = g_list_append (list, (gpointer) tag);
 
