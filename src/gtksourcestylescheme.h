@@ -62,10 +62,9 @@ const GtkSourceTagStyle	    *gtk_source_style_scheme_get_tag_style (const GtkSou
 const gchar		    *gtk_source_style_scheme_get_name      (const GtkSourceStyleScheme *scheme);
 
 
-/* Current scheme */
+/* Default style scheme */
 
-const GtkSourceStyleScheme  *gtk_source_get_current_style_scheme   (void);
-void                         gtk_source_set_current_style_scheme   (GtkSourceStyleScheme       *scheme);
+GtkSourceStyleScheme	    *gtk_source_style_scheme_get_default   (void);
 
 G_END_DECLS
 

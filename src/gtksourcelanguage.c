@@ -30,7 +30,6 @@
 #include "gtksourceview-i18n.h"
 #include "gtksourcelanguage.h"
 #include "gtksourcetag.h"
-#include "gtksourcestylescheme.h"
 
 static void	 	  gtk_source_language_class_init 	(GtkSourceLanguageClass 	*klass);
 static void		  gtk_source_language_init		(GtkSourceLanguage 		*lang);
@@ -184,6 +183,8 @@ static void
 gtk_source_language_init (GtkSourceLanguage *lang)
 {
 	lang->priv = g_new0 (GtkSourceLanguagePrivate, 1);
+
+	lang->priv->style_scheme = gtk_source_style_scheme_get_default ();
 }
 
 static void
@@ -217,6 +218,8 @@ gtk_source_language_finalize (GObject *object)
 			g_hash_table_destroy (lang->priv->tag_name_to_style_name);
 		
 		g_free (lang->priv->gconf_base_dir);
+
+		g_object_unref (lang->priv->style_scheme);
 
 		g_free (lang->priv); 
 	}
@@ -1103,11 +1106,7 @@ gtk_source_language_get_tag_default_style (const GtkSourceLanguage 	*language,
 
 	if (style_name != NULL)
 	{
-		const GtkSourceStyleScheme *scheme;
-		
-		scheme = gtk_source_get_current_style_scheme ();
-
-		return gtk_source_style_scheme_get_tag_style (scheme,
+		return gtk_source_style_scheme_get_tag_style (language->priv->style_scheme,
 				                              style_name);
 	}
 	else
@@ -1415,4 +1414,55 @@ gtk_source_language_set_tag_style (const GtkSourceLanguage *language,
 
 	return;
 }
+
+const GtkSourceStyleScheme *
+gtk_source_language_get_style_scheme (GtkSourceLanguage *language)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
+
+	return language->priv->style_scheme;
+
+}
+void 
+gtk_source_language_set_style_scheme (GtkSourceLanguage    *language,
+				      GtkSourceStyleScheme *scheme)
+{
+	const GSList *tag_list;
+	
+	g_return_if_fail (GTK_IS_SOURCE_LANGUAGE (language));
+	g_return_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme));
+	g_return_if_fail (language->priv->style_scheme != NULL);
+
+	if (language->priv->style_scheme == scheme)
+		return;
+
+	g_object_unref (language->priv->style_scheme);
+	
+	language->priv->style_scheme = scheme;
+	g_object_ref (language->priv->style_scheme);
+	
+	tag_list = gtk_source_language_get_tags (language);
+
+	while (tag_list != NULL)
+	{
+		GtkTextTag *tag;
+		gchar *name;
+		const GtkSourceTagStyle	*ts;
+
+		tag = GTK_TEXT_TAG (tag_list->data);
+
+		g_object_get (G_OBJECT (tag), "name", &name, NULL);
+		g_return_if_fail (name != NULL);
+		
+		ts = gtk_source_language_get_tag_style (language, name);
+
+		if (ts != NULL)
+			apply_style_to_tag (tag, ts);
+
+		g_free (name);
+
+		tag_list = g_slist_next (tag_list);
+	}
+}
+
 

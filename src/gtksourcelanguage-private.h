@@ -28,18 +28,20 @@ G_BEGIN_DECLS
 
 struct _GtkSourceLanguagePrivate 
 {
-	gchar		*lang_file_name;
+	gchar			*lang_file_name;
 
-	gchar		*name;
-	gchar		*section;
+	gchar			*name;
+	gchar			*section;
 
-	GSList		*mime_types;
+	GSList			*mime_types;
 
-	GHashTable	*tag_name_to_style_name;
-	GSList 		*tag_list;
+	GHashTable		*tag_name_to_style_name;
+	GSList			*tag_list;
 
-	GConfClient 	*gconf_client;
-	gchar		*gconf_base_dir;
+	GConfClient		*gconf_client;
+	gchar			*gconf_base_dir;
+
+	GtkSourceStyleScheme 	*style_scheme;
 };
 
 GtkSourceLanguage *_gtk_source_language_new_from_file (const gchar			*filename,

@@ -27,9 +27,6 @@
 
 static void gtk_source_style_scheme_base_init (gpointer g_class);
 
-GtkSourceStyleScheme 		*current_style_scheme;
-GtkSourceStyleScheme 		*default_style_scheme;
-
 GType
 gtk_source_style_scheme_get_type (void)
 {
@@ -278,7 +275,8 @@ gtk_source_default_style_scheme_init (GtkSourceDefaultStyleScheme *scheme)
 			     ts);
 }
 
-static void gtk_source_default_style_scheme_finalize (GObject *object)
+static void 
+gtk_source_default_style_scheme_finalize (GObject *object)
 {
 	GtkSourceDefaultStyleScheme *scheme = GTK_SOURCE_DEFAULT_STYLE_SCHEME (object);
 	
@@ -313,43 +311,24 @@ gtk_source_default_style_scheme_get_name (const GtkSourceStyleScheme *scheme)
 	return _("Default");
 }
 
-/* Current theme */
+/* Default style scheme */
 
-const GtkSourceStyleScheme *
-gtk_source_get_current_style_scheme (void)
+static GtkSourceStyleScheme* default_style_scheme = NULL;
+
+GtkSourceStyleScheme *
+gtk_source_style_scheme_get_default (void)
 {
-	if (current_style_scheme != NULL)
-		return current_style_scheme;
-
 	if (default_style_scheme == NULL)
 	{
 		default_style_scheme = g_object_new (GTK_TYPE_SOURCE_DEFAULT_STYLE_SCHEME,
 						     NULL);
+		g_object_add_weak_pointer (G_OBJECT (default_style_scheme),
+					   (gpointer *) &default_style_scheme);
+
 	}
+	else
+		g_object_ref (default_style_scheme);
 
 	return default_style_scheme;
-}
-
-void 
-gtk_source_set_current_style_scheme (GtkSourceStyleScheme *scheme)
-{
-	g_return_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme));
-	
-	if (default_style_scheme != NULL)
-	{
-		g_object_unref (default_style_scheme);
-		default_style_scheme = NULL;
-	}
-
-	if (scheme == current_style_scheme)
-		return;
-	
-	if (current_style_scheme != NULL)
-	{
-		g_object_unref (current_style_scheme);
-	}
-
-	g_object_ref (scheme);
-	current_style_scheme = scheme;
 }
 

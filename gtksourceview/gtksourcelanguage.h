@@ -25,6 +25,7 @@
 #include <gtk/gtk.h> 
 
 #include <gtksourcetagstyle.h>
+#include "gtksourcestylescheme.h"
 
 G_BEGIN_DECLS
 
@@ -63,6 +64,11 @@ const GSList		*gtk_source_language_get_tags			(const GtkSourceLanguage *language
 const GSList		*gtk_source_language_get_mime_types		(const GtkSourceLanguage *language);
 void			 gtk_source_language_set_mime_types		(GtkSourceLanguage       *language,
 								 	 GSList			 *mime_types);
+
+const GtkSourceStyleScheme 
+			*gtk_source_language_get_style_scheme		(GtkSourceLanguage       *language);
+void			 gtk_source_language_set_style_scheme		(GtkSourceLanguage       *language,
+									 GtkSourceStyleScheme    *scheme);
 
 const GtkSourceTagStyle	*gtk_source_language_get_tag_style		(const GtkSourceLanguage *language,
 									 const gchar		 *tag_name);

@@ -277,6 +277,7 @@ set_source_buffer (GtkSourceView *view, GtkTextBuffer *buffer)
 		g_object_remove_weak_pointer (G_OBJECT (view->priv->source_buffer),
 					      (gpointer *) &view->priv->source_buffer);
 	}
+
 	if (buffer && GTK_IS_SOURCE_BUFFER (buffer)) 
 	{
 		view->priv->source_buffer = GTK_SOURCE_BUFFER (buffer);
