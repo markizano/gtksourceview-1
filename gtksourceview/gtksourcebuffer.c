@@ -350,24 +350,26 @@ tag_table_changed_cb (GtkSourceTagTable *table, GtkSourceBuffer *buffer)
 	sync_with_tag_table (buffer);
 }
 
-static void
-create_empty_tag_table (GtkSourceBuffer *buffer)
-{
-	GtkSourceTagTable *tag_table;
-	
-	g_return_if_fail (GTK_TEXT_BUFFER (buffer)->tag_table == NULL);
-
-	tag_table = gtk_source_tag_table_new ();
-	g_object_set (G_OBJECT (buffer), "tag-table", tag_table, NULL);
-	g_object_unref (tag_table);
-}
-
 static GObject *
 gtk_source_buffer_constructor (GType                  type,
 			       guint                  n_construct_properties,
 			       GObjectConstructParam *construct_param)
 {
 	GObject *g_object;
+	gint i;
+
+	/* Check the construction parameters to see if the user
+	 * specified a tag-table, and create and set an empty
+	 * GtkSourceTagTable if he didn't */
+	for (i = 0; i < n_construct_properties; i++)
+	{
+		if (!strcmp ("tag-table", construct_param [i].pspec->name) &&
+		    g_value_get_object (construct_param [i].value) == NULL)
+		{
+			g_value_set_object_take_ownership (construct_param [i].value,
+							   gtk_source_tag_table_new ());
+		}
+	}
 	
 	g_object = G_OBJECT_CLASS (parent_class)->constructor (type, 
 							       n_construct_properties,
@@ -376,9 +378,6 @@ gtk_source_buffer_constructor (GType                  type,
 	if (g_object) {
 		GtkSourceBuffer *source_buffer = GTK_SOURCE_BUFFER (g_object);
 		
-		if (GTK_TEXT_BUFFER (source_buffer)->tag_table == NULL)
-			create_empty_tag_table (source_buffer);
-
 		/* we can't create the tag in gtk_source_buffer_init
 		 * since we haven't set a tag table yet, and creating
 		 * the tag forces the creation of an empty table */
