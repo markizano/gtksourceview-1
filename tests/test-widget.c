@@ -551,8 +551,8 @@ button_press_cb (GtkWidget *widget, GdkEventButton *ev, gpointer user_data)
 		else
 		{
 			/* no marker found -> create one */
-			marker = gtk_source_buffer_create_marker (buffer, NULL, &line_start);
-			gtk_source_marker_set_marker_type (marker, marker_type);
+			marker = gtk_source_buffer_create_marker (buffer, NULL,
+								  marker_type, &line_start);
 		}
 	}
 	

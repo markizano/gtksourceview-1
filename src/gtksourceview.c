@@ -92,12 +92,6 @@ struct _GtkSourceViewPrivate
 	gint		 old_lines;
 };
 
-/* internal structure to handle line markers */
-typedef struct {
-	gint             line_number;
-	gchar           *marker_type;
-} LineMarker;
-
 /* Implement DnD for application/x-color drops */
 typedef enum {
 	TARGET_COLOR = 200
@@ -750,44 +744,36 @@ gtk_source_view_get_lines (GtkTextView  *text_view,
 	*countp = count;
 }
 
-static gint
-line_marker_cmp (gconstpointer ptr_a, gconstpointer ptr_b)
-{
-	const LineMarker *a = ptr_a;
-	const LineMarker *b = ptr_b;
-
-	if (a->line_number == b->line_number)
-		return 0;
-	else if (a->line_number < b->line_number)
-		return -1;
-	else
-		return 1;
-}
-
 static GSList * 
-draw_line_markers (GtkSourceView *view, GSList *current_marker, gint x, gint y)
+draw_line_markers (GtkSourceView *view,
+		   GSList        *current_marker,
+		   gint          *line_number,
+		   gint           x,
+		   gint           y)
 {
 	GdkPixbuf *pixbuf, *composite;
-	LineMarker *lm;
-	gint line_number;
+	GtkSourceMarker *marker;
 	gint width, height;
-
+	gint next_line;
+	gchar *marker_type;
+	
 	g_assert (current_marker);
 	
 	composite = NULL;
 	width = height = 0;
-	lm = current_marker->data;
-	line_number = lm->line_number;
 
 	/* composite all the pixbufs for the markers present at the line */
 	do
 	{
-		lm = current_marker->data;
-
-		if (lm->line_number != line_number)
+		marker = current_marker->data;
+		
+		next_line = gtk_source_marker_get_line (marker);
+		if (next_line != *line_number)
 			break;
 		
-		pixbuf = gtk_source_view_get_pixbuf (view, lm->marker_type);
+		marker_type = gtk_source_marker_get_marker_type (marker);
+		pixbuf = gtk_source_view_get_pixbuf (view, marker_type);
+		
 		if (pixbuf)
 		{
 			if (!composite)
@@ -816,11 +802,14 @@ draw_line_markers (GtkSourceView *view, GSList *current_marker, gint x, gint y)
 			g_object_unref (pixbuf);
 			
 		} else
-			g_warning ("Unknown marker '%s' used", lm->marker_type);
+			g_warning ("Unknown marker '%s' used", marker_type);
 
+		g_free (marker_type);
 		current_marker = g_slist_next (current_marker);
 	}
 	while (current_marker);
+	
+	*line_number = next_line;
 	
 	/* render the result to the left window */
 	if (composite)
@@ -852,6 +841,7 @@ gtk_source_view_paint_margin (GtkSourceView *view,
 	GArray *numbers;
 	GArray *pixels;
 	GSList *markers, *current_marker;
+	gint marker_line = 0;
 	gchar str [8];  /* we don't expect more than ten million lines ;-) */
 	gint y1, y2;
 	gint count;
@@ -951,7 +941,6 @@ gtk_source_view_paint_margin (GtkSourceView *view,
 	markers = NULL;
 	if (view->priv->source_buffer && view->priv->show_line_pixmaps)
 	{
-		GSList *all_markers, *l;
 		GtkTextIter begin, end;
 
 		/* get markers in the exposed area */
@@ -964,7 +953,7 @@ gtk_source_view_paint_margin (GtkSourceView *view,
 		if (!gtk_text_iter_ends_line (&end))
 			gtk_text_iter_forward_to_line_end (&end);
 
-		all_markers = gtk_source_buffer_get_markers_in_region (
+		markers = gtk_source_buffer_get_markers_in_region (
 			view->priv->source_buffer, &begin, &end);
 
 		DEBUG ({
@@ -972,25 +961,14 @@ gtk_source_view_paint_margin (GtkSourceView *view,
 				   gtk_text_iter_get_line (&begin),
 				   gtk_text_iter_get_line (&end));
 		});
-	
-		/* create an ordered list with the markers */
-		for (l = all_markers; l; l = l->next)
-		{
-			GtkSourceMarker *marker = l->data;
-			LineMarker *lm;
-
-			lm = g_new0 (LineMarker, 1);
-			lm->line_number = gtk_source_marker_get_line (marker);
-			lm->marker_type = gtk_source_marker_get_marker_type (marker);
-
-			markers = g_slist_insert_sorted (markers, lm, line_marker_cmp);
-		}
-		
-		g_slist_free (all_markers);
 	}
 	
 	i = 0;
 	current_marker = markers;
+	if (current_marker)
+		marker_line = gtk_source_marker_get_line (
+			GTK_SOURCE_MARKER (current_marker->data));
+	
 	while (i < count) 
 	{
 		gint pos;
@@ -1023,13 +1001,12 @@ gtk_source_view_paint_margin (GtkSourceView *view,
 
 		if (view->priv->show_line_pixmaps && current_marker) 
 		{
-			LineMarker *lm = current_marker->data;
-			
-			if (lm->line_number == g_array_index (numbers, gint, i))
+			if (marker_line == g_array_index (numbers, gint, i))
 			{
 				/* draw markers for the line */
 				current_marker = draw_line_markers (view,
 								    current_marker,
+								    &marker_line,
 								    x_pixmap,
 								    pos);
 			}
@@ -1041,16 +1018,7 @@ gtk_source_view_paint_margin (GtkSourceView *view,
 	/* we should have used all markers */
 	g_assert (current_marker == NULL);
 	
-	/* free the markers list (maybe we could free the list in
-	 * draw_line_markers?) */
-	while (markers)
-	{
-		LineMarker *lm = markers->data;
-		g_free (lm->marker_type);
-		g_free (lm);
-		markers = g_slist_delete_link (markers, markers);
-	}
-	
+	g_slist_free (markers);
 	g_array_free (pixels, TRUE);
 	g_array_free (numbers, TRUE);
 

@@ -43,9 +43,15 @@ gchar                *gtk_source_marker_get_marker_type (GtkSourceMarker *marker
 gint                  gtk_source_marker_get_line        (GtkSourceMarker *marker);
 G_CONST_RETURN gchar *gtk_source_marker_get_name        (GtkSourceMarker *marker);
 GtkSourceBuffer      *gtk_source_marker_get_buffer      (GtkSourceMarker *marker);
+GtkSourceMarker      *gtk_source_marker_next            (GtkSourceMarker *marker);
+GtkSourceMarker      *gtk_source_marker_prev            (GtkSourceMarker *marker);
 
 /* Private API */
 void                  _gtk_source_marker_changed        (GtkSourceMarker *marker);
+void                  _gtk_source_marker_link           (GtkSourceMarker *marker,
+							 GtkSourceMarker *sibling,
+							 gboolean         after_sibling);
+void                  _gtk_source_marker_unlink         (GtkSourceMarker *marker);
 
 G_END_DECLS
 

@@ -111,7 +111,7 @@ struct _GtkSourceBufferPrivate
 	GtkTextTag            *bracket_match_tag;
 	GtkTextMark           *bracket_mark;
 
-	GHashTable            *markers;
+	GArray                *markers;
 
 	GList                 *syntax_items;
 	GList                 *pattern_items;
@@ -178,11 +178,6 @@ static void 	 gtk_source_buffer_real_delete_range 	(GtkTextBuffer           *buf
 
 static const GtkSyntaxTag *iter_has_syntax_tag 		(GtkTextIter             *iter);
 
-static gboolean	 iter_backward_to_tag_start 		(GtkTextIter             *iter,
-							 GtkTextTag              *tag);
-static gboolean	 iter_forward_to_tag_end 		(GtkTextIter             *iter,
-							 GtkTextTag              *tag);
-
 static void 	 get_tags_func 				(GtkTextTag              *tag, 
 		                                         gpointer                 data);
 
@@ -219,6 +214,7 @@ static void	 gtk_source_buffer_remove_all_source_tags (GtkSourceBuffer   *buffer
 					  		const GtkTextIter *end);
 
 static void	sync_with_tag_table 			(GtkSourceBuffer *buffer);
+
 
 GType
 gtk_source_buffer_get_type (void)
@@ -379,8 +375,7 @@ gtk_source_buffer_init (GtkSourceBuffer *buffer)
 	priv->check_brackets = TRUE;
 	priv->bracket_mark = NULL;
 	
-	priv->markers = g_hash_table_new_full (g_direct_hash, g_direct_equal,
-					       NULL, (GDestroyNotify) g_object_unref);
+	priv->markers = g_array_new (FALSE, FALSE, sizeof (GtkSourceMarker *));
 
 	/* highlight data */
 	priv->refresh_region =  gtk_text_region_new (GTK_TEXT_BUFFER (buffer));
@@ -500,9 +495,7 @@ gtk_source_buffer_finalize (GObject *object)
 	g_return_if_fail (buffer->priv != NULL);
 	
 	if (buffer->priv->markers)
-	{
-		g_hash_table_destroy (buffer->priv->markers);
-	}
+		g_array_free (buffer->priv->markers, TRUE);
 
 	if (buffer->priv->worker_handler) {
 		g_source_remove (buffer->priv->worker_handler);
@@ -675,42 +668,6 @@ gtk_source_buffer_can_redo_handler (GtkSourceUndoManager  	*um,
 		       can_redo);
 }
 
-static gboolean
-iter_backward_to_tag_start (GtkTextIter *iter, GtkTextTag *tag)
-{
-	gboolean ret;
-
-	g_return_val_if_fail (iter != NULL, FALSE);
-
-	if (gtk_text_iter_begins_tag (iter, tag))
-		return TRUE;
-
-	ret = gtk_text_iter_backward_to_tag_toggle (iter, tag);
-
-	if (ret && !gtk_text_iter_begins_tag (iter, tag))
-		return iter_backward_to_tag_start (iter, tag);
-	else
-		return ret;
-}
-
-static gboolean
-iter_forward_to_tag_end (GtkTextIter *iter, GtkTextTag *tag)
-{
-	gboolean ret;
-
-	g_return_val_if_fail (iter != NULL, FALSE);
-
-	if (gtk_text_iter_ends_tag (iter, tag))
-		return TRUE;
-
-	ret = gtk_text_iter_forward_to_tag_toggle (iter, tag);
-
-	if (ret && !gtk_text_iter_ends_tag (iter, tag))
-		return iter_forward_to_tag_end (iter, tag);
-	else
-		return ret;
-}
-
 static void
 get_tags_func (GtkTextTag *tag, gpointer data)
 {
@@ -825,6 +782,7 @@ gtk_source_buffer_real_delete_range (GtkTextBuffer *buffer,
 	gint delta;
 	GtkTextMark *mark;
 	GtkTextIter iter;
+	GSList *markers;
 		
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 	g_return_if_fail (start != NULL);
@@ -839,12 +797,31 @@ gtk_source_buffer_real_delete_range (GtkTextBuffer *buffer,
 	parent_class->delete_range (buffer, start, end);
 
 	mark = gtk_text_buffer_get_insert (buffer);
-	gtk_text_buffer_get_iter_at_mark (buffer, &iter, mark),
+	gtk_text_buffer_get_iter_at_mark (buffer, &iter, mark);
 		
 	gtk_source_buffer_move_cursor (buffer,
 				       &iter,
 				       mark,
 				       NULL);
+
+	/* move any markers which moved to this line because of the
+	 * deletion to the beginning of the line */
+	iter = *start;
+	if (!gtk_text_iter_ends_line (&iter))
+		gtk_text_iter_forward_to_line_end (&iter);
+	markers = gtk_source_buffer_get_markers_in_region (GTK_SOURCE_BUFFER (buffer),
+							   start, &iter);
+	if (markers)
+	{
+		GSList *m;
+		
+		gtk_text_iter_set_line_offset (&iter, 0);
+		for (m = markers; m; m = g_slist_next (m))
+			gtk_source_buffer_move_marker (GTK_SOURCE_BUFFER (buffer),
+						       GTK_SOURCE_MARKER (m->data),
+						       &iter);
+		g_slist_free (markers);
+	}
 
 	if (!GTK_SOURCE_BUFFER (buffer)->priv->highlight) 
 		return;
@@ -2643,9 +2620,206 @@ gtk_source_buffer_set_escape_char (GtkSourceBuffer *buffer,
 	}
 }
 
+/* Markers functionality */
+
+/**
+ * markers_binary_search:
+ * @buffer: the GtkSourceBuffer where the markers are
+ * @iter: the position to search for
+ * @last_cmp: where to return the value of the last comparision made (optional)
+ * 
+ * Performs a binary search among the markers in @buffer for the
+ * position of the @iter.  Returns the nearest matching marker (its
+ * index in the markers array) and optionally the value of the
+ * comparision between the returned marker and the given iter.
+ * 
+ * Return value: an index in the markers array or -1 if the array is
+ * empty
+ **/
+static gint
+markers_binary_search (GtkSourceBuffer *buffer, GtkTextIter *iter, gint *last_cmp)
+{
+	GtkTextIter check_iter;
+	GtkSourceMarker **check, **p;
+	GArray *markers = buffer->priv->markers;
+	gint n_markers = markers->len;
+	gint cmp, i;
+	
+	if (n_markers == 0)
+		return -1;
+
+	check = p = &g_array_index (markers, GtkSourceMarker *, 0);
+	p--;
+	cmp = 0;
+	while (n_markers)
+	{
+		i = (n_markers + 1) >> 1;
+		check = p + i;
+		gtk_text_buffer_get_iter_at_mark (GTK_TEXT_BUFFER (buffer),
+						  &check_iter,
+						  GTK_TEXT_MARK (*check));
+		cmp = gtk_text_iter_compare (iter, &check_iter);
+		if (cmp > 0)
+		{
+			n_markers -= i;
+			p = check;
+		}
+		else if (cmp < 0)
+			n_markers = i - 1;
+		else /* if (cmp == 0) */
+			break;
+	}
+
+	i = check - &g_array_index (markers, GtkSourceMarker *, 0);
+	if (last_cmp)
+		*last_cmp = cmp;
+
+	return i;
+}
+
+/**
+ * markers_linear_lookup:
+ * @buffer: the source buffer where the markers are
+ * @marker: which marker to search for
+ * @start: index from where to start looking
+ * @direction: direction to search for
+ * 
+ * Search the markers array of @buffer starting from @start for
+ * markers at the same position as the one at @start.  If @marker is
+ * non-NULL search for that marker specifically, otherwise return the
+ * first or the last marker at the staring position, depending on
+ * @direction.
+ *
+ * @direction < 0 means left, @direction > 0 means right,
+ * 0 means both and is mostly useful when looking for a specific
+ * @marker.
+ * 
+ * Return value: the index of the searched marker
+ **/
+static gint 
+markers_linear_lookup (GtkSourceBuffer *buffer,
+		       GtkSourceMarker *marker,
+		       gint             start,
+		       gint             direction)
+{
+	GArray *markers = buffer->priv->markers;
+	gint left, right;
+	gint cmp;
+	GtkTextIter iter;
+	GtkSourceMarker *tmp;
+
+	tmp = g_array_index (markers, GtkSourceMarker *, start);
+	if (tmp == marker)
+		return start;
+
+	gtk_text_buffer_get_iter_at_mark (GTK_TEXT_BUFFER (buffer),
+					  &iter,
+					  GTK_TEXT_MARK (tmp));
+	
+	if (direction == 0)
+	{
+		left = start - 1;
+		right = start + 1;
+	}
+	else if (direction > 0)
+	{
+		left = -1;
+		right = start + 1;
+	}
+	else
+	{
+		left = start - 1;
+		right = markers->len;
+	}
+	
+	while (left >= 0 || right < markers->len)
+	{
+		GtkTextIter iter_tmp;
+		
+		if (left >= 0)
+		{
+			tmp = g_array_index (markers, GtkSourceMarker *, left);
+			if (tmp == marker)
+				return left;
+			
+			gtk_text_buffer_get_iter_at_mark (GTK_TEXT_BUFFER (buffer),
+							  &iter_tmp,
+							  GTK_TEXT_MARK (tmp));
+			cmp = gtk_text_iter_compare (&iter, &iter_tmp);
+			if (cmp != 0)
+			{
+				if (marker)
+					/* searching for a particular marker */
+					left = -1;
+				else
+					/* searching for the first
+					 * marker at a given
+					 * position */
+					return left + 1;
+			} else
+				left--;
+		}
+
+		if (right < markers->len)
+		{
+			tmp = g_array_index (markers, GtkSourceMarker *, right);
+			if (tmp == marker)
+				return right;
+			
+			gtk_text_buffer_get_iter_at_mark (GTK_TEXT_BUFFER (buffer),
+							  &iter_tmp,
+							  GTK_TEXT_MARK (tmp));
+			cmp = gtk_text_iter_compare (&iter, &iter_tmp);
+			if (cmp != 0)
+			{
+				if (marker)
+					/* searching for a particular marker */
+					right = markers->len;
+				else
+					/* searching for the last
+					 * marker at a given
+					 * position */
+					return right - 1;
+			}
+			else
+				right++;
+		}
+	}
+	if (marker)
+		return -1;
+	else
+		return start;
+}
+
+static void
+markers_insert (GtkSourceBuffer *buffer, GtkSourceMarker *marker)
+{
+	GtkTextIter iter;
+	gint index, cmp;
+
+	gtk_text_buffer_get_iter_at_mark (GTK_TEXT_BUFFER (buffer),
+					  &iter,
+					  GTK_TEXT_MARK (marker));
+	
+	index = markers_binary_search (buffer, &iter, &cmp);
+	if (index >= 0)
+	{
+		_gtk_source_marker_link (marker, g_array_index (buffer->priv->markers,
+								GtkSourceMarker *,
+								index),	(cmp > 0));
+		if (cmp > 0)
+			index++;
+	}
+	else
+		index = 0;
+	
+	g_array_insert_val (buffer->priv->markers, index, marker);
+}
+
 GtkSourceMarker *
 gtk_source_buffer_create_marker (GtkSourceBuffer   *buffer,
 				 const gchar       *name,
+				 const gchar       *type,
 				 const GtkTextIter *where)
 {
 	GtkTextMark *text_mark;
@@ -2661,7 +2835,9 @@ gtk_source_buffer_create_marker (GtkSourceBuffer   *buffer,
 	if (text_mark)
 	{
 		g_object_ref (text_mark);
-		g_hash_table_insert (buffer->priv->markers, text_mark, text_mark);
+
+		gtk_source_marker_set_marker_type (GTK_SOURCE_MARKER (text_mark), type);
+		markers_insert (buffer, GTK_SOURCE_MARKER (text_mark));
 		_gtk_source_marker_changed (GTK_SOURCE_MARKER (text_mark));
 
 		return GTK_SOURCE_MARKER (text_mark);
@@ -2670,23 +2846,57 @@ gtk_source_buffer_create_marker (GtkSourceBuffer   *buffer,
 	return NULL;
 }
 
+static gint
+markers_lookup (GtkSourceBuffer *buffer, GtkSourceMarker *marker)
+{
+	gint index, cmp;
+	GtkTextIter iter;
+	
+	gtk_text_buffer_get_iter_at_mark (GTK_TEXT_BUFFER (buffer),
+					  &iter,
+					  GTK_TEXT_MARK (marker));
+	
+	index = markers_binary_search (buffer, &iter, &cmp);
+	if (index >= 0 && cmp == 0)
+	{
+		if (g_array_index (buffer->priv->markers,
+				   GtkSourceMarker *,
+				   index) == marker)
+			return index;
+		return markers_linear_lookup (buffer, marker, index, 0);
+	}
+	return -1;
+}
 
 void 
 gtk_source_buffer_move_marker (GtkSourceBuffer   *buffer,
 			       GtkSourceMarker   *marker,
 			       const GtkTextIter *where)
 {
+	gint index;
+	
 	g_return_if_fail (buffer != NULL && marker != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 	g_return_if_fail (GTK_IS_SOURCE_MARKER (marker));
 	g_return_if_fail (where != NULL);
 
-	g_return_if_fail (g_hash_table_lookup (buffer->priv->markers, marker));
-
+	index = markers_lookup (buffer, marker);
+	
+	g_return_if_fail (index >= 0);
+	
+	/* unlink the marker first */
 	_gtk_source_marker_changed (marker);
+	_gtk_source_marker_unlink (marker);
+	g_array_remove_index (buffer->priv->markers, index);
+
 	gtk_text_buffer_move_mark (GTK_TEXT_BUFFER (buffer),
 				   GTK_TEXT_MARK (marker),
 				   where);
+
+	/* re-link the marker using the new position */
+	markers_insert (buffer, marker);
+
+	/* FIXME: emit even the line number hasn't changed? - Gustavo */
 	_gtk_source_marker_changed (marker);
 }
 
@@ -2694,16 +2904,21 @@ void
 gtk_source_buffer_delete_marker (GtkSourceBuffer *buffer,
 				 GtkSourceMarker *marker)
 {
+	gint index;
+	
 	g_return_if_fail (buffer != NULL && marker != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 	g_return_if_fail (GTK_IS_SOURCE_MARKER (marker));
 
-	g_return_if_fail (g_hash_table_lookup (buffer->priv->markers, marker));
-
-	/* this will unref the marker */
-	g_hash_table_remove (buffer->priv->markers, marker);
-
+	index = markers_lookup (buffer, marker);
+	
+	g_return_if_fail (index >= 0);
+	
 	_gtk_source_marker_changed (marker);
+	_gtk_source_marker_unlink (marker);
+	g_array_remove_index (buffer->priv->markers, index);
+
+	g_object_unref (marker);
 	gtk_text_buffer_delete_mark (GTK_TEXT_BUFFER (buffer),
 				     GTK_TEXT_MARK (marker));
 }
@@ -2713,14 +2928,14 @@ gtk_source_buffer_get_marker (GtkSourceBuffer *buffer,
 			      const gchar     *name)
 {
 	GtkTextMark *text_mark;
-
+	
 	g_return_val_if_fail (buffer != NULL, NULL);
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
 	g_return_val_if_fail (name != NULL, NULL);
 
 	text_mark = gtk_text_buffer_get_mark (GTK_TEXT_BUFFER (buffer), name);
-
-	if (text_mark && g_hash_table_lookup (buffer->priv->markers, text_mark) == NULL)
+	
+	if (text_mark && markers_lookup (buffer, GTK_SOURCE_MARKER (text_mark)) < 0)
 		text_mark = NULL;
 
 	if (text_mark)
@@ -2729,51 +2944,176 @@ gtk_source_buffer_get_marker (GtkSourceBuffer *buffer,
 		return NULL;
 }
 
+#ifdef ENABLE_DEBUG
 static void
-mark_in_region (GtkSourceMarker *marker,
-		gpointer         value,
-		gpointer         user_data)
+marker_print (GtkSourceBuffer *buffer, GtkSourceMarker *marker)
 {
 	GtkTextIter iter;
-	struct {
-		GtkSourceBuffer *buffer;
-		GtkTextIter begin, end;
-		GSList *result;
-	} *data = user_data;
-
-	gtk_text_buffer_get_iter_at_mark (GTK_TEXT_BUFFER (data->buffer),
-					  &iter,
-					  GTK_TEXT_MARK (marker));
-	if (gtk_text_iter_compare (&iter, &data->begin) >= 0 &&
-	    gtk_text_iter_compare (&iter, &data->end) <= 0)
-		data->result = g_slist_prepend (data->result, marker);
+	gchar *type;
+	
+	type = gtk_source_marker_get_marker_type (marker);
+	gtk_text_buffer_get_iter_at_mark (GTK_TEXT_BUFFER (buffer), &iter, marker);
+	
+	g_print ("Marker [%p] at %d (type: %s)\n",
+		 marker,
+		 gtk_text_iter_get_offset (&iter),
+		 type);
+	g_free (type);
 }
 
+static void
+markers_debug (GtkSourceBuffer *buffer)
+{
+	GtkSourceMarker *marker, *tmp;
+	GArray *markers = buffer->priv->markers;
+	gint i;
+	
+	if (markers->len == 0)
+	{
+		g_print ("No markers\n");
+		return;
+	}
+	
+	g_print ("Array contents:\n");
+	for (i = 0; i < markers->len; i++)
+		marker_print (buffer, g_array_index (markers, GtkSourceMarker *, i));
+
+	g_print ("Linked list:\n");
+	marker = g_array_index (markers, GtkSourceMarker *, 0);
+	
+	while ((tmp = gtk_source_marker_prev (marker)) != NULL)
+		marker = tmp;
+	while (marker)
+	{
+		marker_print (buffer, marker);
+		marker = gtk_source_marker_next (marker);
+	}
+}
+#endif
+
+/**
+ * gtk_source_buffer_get_markers_in_region:
+ * @buffer: the GtkSourceBuffer to get the markers from
+ * @begin: region delimiter
+ * @end: region delimiter
+ * 
+ * Returns an <emphasis>ordered</emphasis> (by position) list of
+ * markers inside the region given by @begin and @end.  The iters can
+ * be unorder.
+ * 
+ * Return value: a GSList of the GtkSourceMarker's inside the region
+ **/
 GSList * 
 gtk_source_buffer_get_markers_in_region (GtkSourceBuffer   *buffer,
 					 const GtkTextIter *begin,
 					 const GtkTextIter *end)
 {
-	struct {
-		GtkSourceBuffer *buffer;
-		GtkTextIter begin, end;
-		GSList *result;
-	} data;
+	GSList *result;
+	GtkTextIter iter1, iter2;
+	gint i, j, cmp;
+	GArray *markers;
 	
 	g_return_val_if_fail (buffer != NULL, NULL);
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
 	g_return_val_if_fail (begin != NULL && end != NULL, NULL);
 
-	data.buffer = buffer;
-	data.begin = *begin;
-	data.end = *end;
-	data.result = NULL;
+	DEBUG (g_print ("Getting markers for [%d,%d]\n",
+			gtk_text_iter_get_offset (begin),
+			gtk_text_iter_get_offset (end)));
+	DEBUG (markers_debug (buffer));
+
+	iter1 = *begin;
+	iter2 = *end;
+	gtk_text_iter_order (&iter1, &iter2);
+
+	result = NULL;
+	markers = buffer->priv->markers;
+
+	i = markers_binary_search (buffer, &iter1, &cmp);
+	if (i < 0)
+		return NULL;
 	
-	gtk_text_iter_order (&data.begin, &data.end);
+	if (cmp == 0)
+		/* we got an exact match, which means the iter was at
+		 * the position of the returned marker.  now we have
+		 * to search backward for other markers at the same
+		 * position */
+		i = markers_linear_lookup (buffer, NULL, i, -1);
+	else if (cmp > 0)
+		i++;
 
-	g_hash_table_foreach (buffer->priv->markers, (GHFunc) mark_in_region, &data);
+	if (i >= markers->len)
+		/* no markers to return */
+		return NULL;
 
-	return data.result;
+	j = markers_binary_search (buffer, &iter2, &cmp);
+	if (cmp == 0)
+		/* we got an exact match, which means the iter was at
+		 * the position of the returned marker.  now we have
+		 * to search forward for other markers at the same
+		 * position */
+		j = markers_linear_lookup (buffer, NULL, j, 1);
+	else if (cmp < 0)
+		j--;
+
+	if (j < 0 || i > j)
+		/* no markers to return */
+		return NULL;
+
+	/* build the resulting list */
+	while (j >= i)
+	{
+		result = g_slist_prepend (result, g_array_index (markers, GtkSourceMarker *, j));
+		j--;
+	}
+
+	DEBUG({
+		GSList *l;
+		
+		g_print ("Returned list:\n");
+		for (l = result; l; l = l->next)
+			marker_print (buffer, l->data);
+	});
+
+	return result;
 }
 
+GtkSourceMarker *
+gtk_source_buffer_get_first_marker (GtkSourceBuffer *buffer)
+{
+	g_return_val_if_fail (buffer != NULL, NULL);
+	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
 
+	if (buffer->priv->markers->len == 0)
+		return NULL;
+
+	return g_array_index (buffer->priv->markers, GtkSourceMarker *, 0);
+}
+
+GtkSourceMarker *
+gtk_source_buffer_get_last_marker (GtkSourceBuffer *buffer)
+{
+	g_return_val_if_fail (buffer != NULL, NULL);
+	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
+
+	if (buffer->priv->markers->len == 0)
+		return NULL;
+
+	return g_array_index (buffer->priv->markers,
+			      GtkSourceMarker *,
+			      buffer->priv->markers->len - 1);
+}
+
+void 
+gtk_source_buffer_get_iter_at_marker (GtkSourceBuffer *buffer,
+				      GtkTextIter     *iter,
+				      GtkSourceMarker *marker)
+{
+	g_return_if_fail (buffer != NULL && marker != NULL);
+	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
+	g_return_if_fail (GTK_IS_SOURCE_MARKER (marker));
+
+	gtk_text_buffer_get_iter_at_mark (GTK_TEXT_BUFFER (buffer),
+					  iter,
+					  GTK_TEXT_MARK (marker));
+}

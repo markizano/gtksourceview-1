@@ -116,6 +116,7 @@ void			 gtk_source_buffer_end_not_undoable_action   (GtkSourceBuffer  *buffer);
 /* marker methods. */
 GtkSourceMarker         *gtk_source_buffer_create_marker        (GtkSourceBuffer       *buffer,
 								 const gchar           *name,
+								 const gchar           *type,
 								 const GtkTextIter     *where);
 
 void                     gtk_source_buffer_move_marker          (GtkSourceBuffer       *buffer,
@@ -129,6 +130,11 @@ GSList                  *gtk_source_buffer_get_markers_in_region
                                                                 (GtkSourceBuffer       *buffer,
 								 const GtkTextIter     *begin,
 								 const GtkTextIter     *end);
+GtkSourceMarker         *gtk_source_buffer_get_first_marker     (GtkSourceBuffer       *buffer);
+GtkSourceMarker         *gtk_source_buffer_get_last_marker      (GtkSourceBuffer       *buffer);
+void                     gtk_source_buffer_get_iter_at_marker   (GtkSourceBuffer       *buffer,
+								 GtkTextIter           *iter,
+								 GtkSourceMarker       *marker);
 
 /* INTERNAL private stuff - not even exported from the library on
  * many platforms

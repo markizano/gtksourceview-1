@@ -25,6 +25,11 @@
 #include "gtksourcebuffer.h"
 #include "gtksourcemarker.h"
 
+static GQuark quark_marker_type = 0;
+static GQuark quark_next_marker = 0;
+static GQuark quark_prev_marker = 0;
+
+
 GType 
 gtk_source_marker_get_type (void)
 {
@@ -36,6 +41,10 @@ gtk_source_marker_get_type (void)
 	 * runtime) */
 	if (!our_type) {
 		our_type = GTK_TYPE_TEXT_MARK;
+
+		quark_marker_type = g_quark_from_static_string ("gtk-source-marker-type");
+		quark_next_marker = g_quark_from_static_string ("gtk-source-marker-next");
+		quark_prev_marker = g_quark_from_static_string ("gtk-source-marker-prev");
 	}
 	
 	return our_type;
@@ -48,8 +57,8 @@ gtk_source_marker_set_marker_type (GtkSourceMarker *marker,
 	g_return_if_fail (marker != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_MARKER (marker));
 	
-	g_object_set_data_full (G_OBJECT (marker), "marker_type",
-				g_strdup (type), (GDestroyNotify) g_free);
+	g_object_set_qdata_full (G_OBJECT (marker), quark_marker_type,
+				 g_strdup (type), (GDestroyNotify) g_free);
 	_gtk_source_marker_changed (marker);
 }
 
@@ -59,7 +68,7 @@ gtk_source_marker_get_marker_type (GtkSourceMarker *marker)
 	g_return_val_if_fail (marker != NULL, NULL);
 	g_return_val_if_fail (GTK_IS_SOURCE_MARKER (marker), NULL);
 	
-	return g_strdup (g_object_get_data (G_OBJECT (marker), "marker_type"));
+	return g_strdup (g_object_get_qdata (G_OBJECT (marker), quark_marker_type));
 }
 
 gint
@@ -119,3 +128,78 @@ _gtk_source_marker_changed (GtkSourceMarker *marker)
 
 	g_signal_emit_by_name (buffer, "marker_updated", &iter);
 }
+
+void
+_gtk_source_marker_link (GtkSourceMarker *marker,
+			 GtkSourceMarker *sibling,
+			 gboolean         after_sibling)
+{
+	GtkSourceMarker *tmp;
+	
+	g_return_if_fail (marker != NULL);
+	g_return_if_fail (GTK_IS_SOURCE_MARKER (marker));
+
+	if (!sibling)
+		return;
+	
+	g_return_if_fail (GTK_IS_SOURCE_MARKER (sibling));
+
+	if (after_sibling)
+	{
+		tmp = g_object_get_qdata (G_OBJECT (sibling), quark_next_marker);
+
+		g_object_set_qdata (G_OBJECT (marker), quark_next_marker, tmp);
+		g_object_set_qdata (G_OBJECT (marker), quark_prev_marker, sibling);
+
+		g_object_set_qdata (G_OBJECT (sibling), quark_next_marker, marker);
+		if (tmp)
+			g_object_set_qdata (G_OBJECT (tmp), quark_prev_marker, marker);
+	}
+	else
+	{
+		tmp = g_object_get_qdata (G_OBJECT (sibling), quark_prev_marker);
+
+		g_object_set_qdata (G_OBJECT (marker), quark_next_marker, sibling);
+		g_object_set_qdata (G_OBJECT (marker), quark_prev_marker, tmp);
+
+		g_object_set_qdata (G_OBJECT (sibling), quark_prev_marker, marker);
+		if (tmp)
+			g_object_set_qdata (G_OBJECT (tmp), quark_next_marker, marker);
+	}
+}
+
+void
+_gtk_source_marker_unlink (GtkSourceMarker *marker)
+{
+	GtkSourceMarker *m1, *m2;
+	
+	g_return_if_fail (marker != NULL);
+	g_return_if_fail (GTK_IS_SOURCE_MARKER (marker));
+
+	m1 = g_object_steal_qdata (G_OBJECT (marker), quark_prev_marker);
+	m2 = g_object_steal_qdata (G_OBJECT (marker), quark_next_marker);
+
+	if (m1)
+		g_object_set_qdata (G_OBJECT (m1), quark_next_marker, m2);
+	if (m2)
+		g_object_set_qdata (G_OBJECT (m2), quark_prev_marker, m1);
+}
+
+GtkSourceMarker *
+gtk_source_marker_next (GtkSourceMarker *marker)
+{
+	g_return_val_if_fail (marker != NULL, NULL);
+	g_return_val_if_fail (GTK_IS_SOURCE_MARKER (marker), NULL);
+	
+	return g_object_get_qdata (G_OBJECT (marker), quark_next_marker);
+}
+
+GtkSourceMarker *
+gtk_source_marker_prev (GtkSourceMarker *marker)
+{
+	g_return_val_if_fail (marker != NULL, NULL);
+	g_return_val_if_fail (GTK_IS_SOURCE_MARKER (marker), NULL);
+	
+	return g_object_get_qdata (G_OBJECT (marker), quark_prev_marker);
+}
+
