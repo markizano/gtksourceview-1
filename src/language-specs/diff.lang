@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- <!DOCTYPE language SYSTEM "language.dtd"> -->
+<language name="Diff" version="1.0" section="Others" mimetypes="text/x-diff;text/x-patch">
+
+	<syntax-item name = "File versions" style = "Data Type">
+		<start-regex>^\(\(\+\+\+\)\|\(---\)\|\(\*\*\*\)\) </start-regex>
+		<end-regex>\(\n\)</end-regex>
+	</syntax-item>
+
+	<syntax-item name = "Removed line" style = "Others 3">
+		<start-regex>^\(&lt;\|-[^\-]\)</start-regex>
+		<end-regex>\(\n\)</end-regex>
+	</syntax-item>
+
+	<syntax-item name = "Added line" style = "Others 2">
+		<start-regex>^\(\+[^\+]\|&gt;\|\!\)</start-regex>
+		<end-regex>\(\n\)</end-regex>
+	</syntax-item>
+
+	<syntax-item name = "Location" style = "Keyword">
+		<start-regex>^\(\(\@\@\)\|[0-9]\)</start-regex>
+		<end-regex>\(\n\)</end-regex>
+	</syntax-item>
+
+	<syntax-item name = "File name" style = "Data Type">
+		<start-regex>^\(Index\|diff\)</start-regex>
+		<end-regex>\(\n\)</end-regex>
+	</syntax-item>
+
+</language>
+
+
+

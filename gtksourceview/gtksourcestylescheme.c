@@ -253,12 +253,7 @@ gtk_source_default_style_scheme_init (GtkSourceDefaultStyleScheme *scheme)
 	g_hash_table_insert (scheme->styles, 
 			     g_strdup (N_("Keyword")),
 			     ts);
-
-	ts = new_tag_style ("#2E8B57", NULL, TRUE, FALSE, TRUE);
-	g_hash_table_insert (scheme->styles, 
-			     g_strdup (N_("Others")),
-			     ts);
-
+	
 	ts = new_tag_style ("#A020F0", NULL, FALSE, FALSE, TRUE);
 	g_hash_table_insert (scheme->styles, 
 			     g_strdup (N_("Preprocessor")),
@@ -273,6 +268,23 @@ gtk_source_default_style_scheme_init (GtkSourceDefaultStyleScheme *scheme)
 	g_hash_table_insert (scheme->styles, 
 			     g_strdup (N_("Specials")),
 			     ts);
+
+	ts = new_tag_style ("#2E8B57", NULL, TRUE, FALSE, TRUE);
+	g_hash_table_insert (scheme->styles, 
+			     g_strdup (N_("Others")),
+			     ts);
+
+	ts = new_tag_style ("#008B8B", NULL, FALSE, FALSE, TRUE);
+	g_hash_table_insert (scheme->styles, 
+			     g_strdup (N_("Others 2")),
+			     ts);
+
+	ts = new_tag_style ("#6A5ACD", NULL, FALSE, FALSE, TRUE);
+	g_hash_table_insert (scheme->styles, 
+			     g_strdup (N_("Others 3")),
+			     ts);
+
+
 }
 
 static void 

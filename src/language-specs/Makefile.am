@@ -2,6 +2,7 @@ EXTRA_DIST = 			\
 	ada.lang		\
 	c.lang			\
 	cpp.lang		\
+	diff.lang		\
 	html.lang		\
 	idl.lang		\
 	java.lang		\
