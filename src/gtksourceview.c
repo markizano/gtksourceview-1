@@ -4,6 +4,8 @@
  *  Copyright (C) 2001 - Mikael Hermansson <tyan@linux.se> and
  *  Chris Phelps <chicane@reninet.com>
  *
+ *  Copyright (C) 2002 - Jeroen Zwartepoorte
+ *
  *  Copyright (C) 2003 - Gustavo Giráldez and Paolo Maggi 
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -72,7 +74,8 @@ enum {
 	PROP_AUTO_INDENT,
 	PROP_INSERT_SPACES,
 	PROP_SHOW_MARGIN,
-	PROP_MARGIN
+	PROP_MARGIN,
+	PROP_SMART_HOME_END
 };
 
 
@@ -86,6 +89,7 @@ struct _GtkSourceViewPrivate
 	gboolean	 show_margin;
 	guint		 margin;
 	gint             cached_margin_width;
+	gboolean	 smart_home_end;
 	
 	GHashTable 	*pixmap_cache;
 
@@ -121,6 +125,11 @@ static void 	set_source_buffer 			(GtkSourceView      *view,
 
 static void	gtk_source_view_populate_popup 		(GtkTextView        *view,
 					    		 GtkMenu            *menu);
+
+static void	gtk_source_view_move_cursor		(GtkTextView        *text_view,
+							 GtkMovementStep     step,
+							 gint                count,
+							 gboolean            extend_selection);
 
 static void 	menu_item_activate_cb 			(GtkWidget          *menu_item,
 				  			 GtkTextView        *text_view);
@@ -185,6 +194,7 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 	widget_class->style_set = gtk_source_view_style_set;
 	
 	textview_class->populate_popup = gtk_source_view_populate_popup;
+	textview_class->move_cursor = gtk_source_view_move_cursor;
 	
 	klass->undo = gtk_source_view_undo;
 	klass->redo = gtk_source_view_redo;
@@ -247,6 +257,14 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 							    MAX_MARGIN,
 							    DEFAULT_MARGIN,
 							    G_PARAM_READWRITE));
+
+	g_object_class_install_property (object_class,
+					 PROP_SMART_HOME_END,
+					 g_param_spec_boolean ("smart_home_end",
+							       _("Use smart home/end"),
+							       _("HOME and END keys move to first/last characters on line first before going to the start/end of the line"),
+							       TRUE,
+							       G_PARAM_READWRITE));
 
 	signals [UNDO] =
 		g_signal_new ("undo",
@@ -330,7 +348,12 @@ gtk_source_view_set_property (GObject      *object,
 			gtk_source_view_set_margin (view, 
 						    g_value_get_uint (value));
 			break;
-
+		
+		case PROP_SMART_HOME_END:
+			gtk_source_view_set_smart_home_end (view,
+							    g_value_get_boolean (value));
+			break;
+		
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 			break;
@@ -391,6 +414,10 @@ gtk_source_view_get_property (GObject    *object,
 					  gtk_source_view_get_margin (view));
 			break;
 
+		case PROP_SMART_HOME_END:
+			g_value_set_boolean (value,
+					     gtk_source_view_get_smart_home_end (view));
+			break;
 			
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -408,6 +435,7 @@ gtk_source_view_init (GtkSourceView *view)
 	view->priv->tabs_width = DEFAULT_TAB_WIDTH;
 	view->priv->margin = DEFAULT_MARGIN;
 	view->priv->cached_margin_width = -1;
+	view->priv->smart_home_end = TRUE;
 	
 	view->priv->pixmap_cache = g_hash_table_new_full (g_str_hash, g_str_equal,
 							  (GDestroyNotify) g_free,
@@ -667,6 +695,100 @@ gtk_source_view_populate_popup (GtkTextView *text_view,
 				  gtk_source_buffer_can_undo (GTK_SOURCE_BUFFER (buffer)));
 	gtk_widget_show (menu_item);
 
+}
+
+static void
+move_cursor (GtkTextView       *text_view,
+	     const GtkTextIter *new_location,
+	     gboolean           extend_selection)
+{
+	GtkTextBuffer *buffer = text_view->buffer;
+
+	if (extend_selection)
+		gtk_text_buffer_move_mark_by_name (buffer, "insert",
+						   new_location);
+	else
+		gtk_text_buffer_place_cursor (buffer, new_location);
+
+	gtk_text_view_scroll_mark_onscreen (text_view,
+					    gtk_text_buffer_get_insert (buffer));
+}
+
+static void
+gtk_source_view_move_cursor (GtkTextView    *text_view,
+			     GtkMovementStep step,
+			     gint            count,
+			     gboolean        extend_selection)
+{
+	GtkSourceView *source_view = GTK_SOURCE_VIEW (text_view);
+	GtkTextBuffer *buffer = text_view->buffer;
+	GtkTextMark *mark;
+	GtkTextIter cur, iter;
+
+	mark = gtk_text_buffer_get_insert (buffer);
+	gtk_text_buffer_get_iter_at_mark (buffer, &cur, mark);
+	iter = cur;
+
+	if (step == GTK_MOVEMENT_DISPLAY_LINE_ENDS &&
+	    source_view->priv->smart_home_end && count == -1)
+	{
+		/* Find the iter of the first character on the line. */
+		gtk_text_iter_set_line_offset (&cur, 0);
+		while (!gtk_text_iter_ends_line (&cur))
+		{
+			gunichar c = gtk_text_iter_get_char (&cur);
+			if (g_unichar_isspace (c))
+				gtk_text_iter_forward_char (&cur);
+			else
+				break;
+		}
+
+		if (gtk_text_iter_starts_line (&iter) ||
+		    !gtk_text_iter_equal (&cur, &iter))
+		{
+			move_cursor (text_view, &cur, extend_selection);
+		}
+		else
+		{
+			gtk_text_iter_set_line_offset (&cur, 0);
+			move_cursor (text_view, &cur, extend_selection);
+		}
+	}
+	else if (step == GTK_MOVEMENT_DISPLAY_LINE_ENDS &&
+		 source_view->priv->smart_home_end && count == 1)
+	{
+		/* Find the iter of the last character on the line. */
+		if (!gtk_text_iter_ends_line (&cur))
+			gtk_text_iter_forward_to_line_end (&cur);
+		while (!gtk_text_iter_starts_line (&cur))
+		{
+			gtk_text_iter_backward_char (&cur);
+			gunichar c = gtk_text_iter_get_char (&cur);
+			if (!g_unichar_isspace (c))
+			{
+				/* We've gone one character too far. */
+				gtk_text_iter_forward_char (&cur);
+				break;
+			}
+		}
+
+		if (gtk_text_iter_ends_line (&iter) ||
+		    !gtk_text_iter_equal (&cur, &iter))
+		{
+			move_cursor (text_view, &cur, extend_selection);
+		}
+		else
+		{
+			gtk_text_iter_forward_to_line_end (&cur);
+			move_cursor (text_view, &cur, extend_selection);
+		}
+	}
+	else
+	{
+		GTK_TEXT_VIEW_CLASS (parent_class)->move_cursor (text_view,
+								 step, count,
+								 extend_selection);
+	}
 }
 
 static void
@@ -1154,7 +1276,6 @@ calculate_real_tab_width (GtkSourceView *view, guint tab_size, gchar c)
 {
 	PangoLayout *layout;
 	gchar *tab_string;
-	gint counter = 0;
 	gint tab_width = 0;
 
 	if (tab_size == 0)
@@ -1525,7 +1646,6 @@ key_press_cb (GtkWidget *widget, GdkEventKey *event, gpointer data)
 		gint cur_pos;
 		gint num_of_equivalent_spaces;
 		gint tabs_size;
-		gint i;
 		gchar *spaces;
 
 		tabs_size = view->priv->tabs_width; 
@@ -1711,6 +1831,29 @@ gtk_source_view_get_margin  (GtkSourceView *view)
 
 	return view->priv->margin;
 
+}
+
+void
+gtk_source_view_set_smart_home_end (GtkSourceView *view, gboolean enable)
+{
+	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
+
+	enable = (enable != FALSE);
+
+	if (view->priv->smart_home_end == enable)
+		return;
+
+	view->priv->smart_home_end = enable;
+
+	g_object_notify (G_OBJECT (view), "smart_home_end");
+}
+
+gboolean
+gtk_source_view_get_smart_home_end (GtkSourceView *view)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
+
+	return view->priv->smart_home_end;
 }
 
 static void 

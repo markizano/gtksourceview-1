@@ -108,5 +108,9 @@ void             gtk_source_view_set_marker_pixbuf      (GtkSourceView   *view,
 GdkPixbuf	*gtk_source_view_get_marker_pixbuf      (GtkSourceView   *view,
 				       			 const gchar     *marker_type);
 
+void		 gtk_source_view_set_smart_home_end	(GtkSourceView   *view,
+							 gboolean         enable);
+gboolean	 gtk_source_view_get_smart_home_end	(GtkSourceView   *view);
+
 G_END_DECLS
 #endif				/* end of SOURCE_VIEW_H__ */
