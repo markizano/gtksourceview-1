@@ -412,10 +412,10 @@ gtk_keyword_list_tag_new (const gchar  *name,
 			
 			keywords = g_slist_next (keywords);
 			
-			if (keywords != NULL)
-				g_string_append (str, "\\|");
-			
 			keyword_count++;
+
+			if (keywords != NULL && keyword_count < 200)
+				g_string_append (str, "\\|");
 		}
 
 		g_string_append (str, "\\)");
