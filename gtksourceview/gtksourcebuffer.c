@@ -1728,11 +1728,9 @@ build_syntax_regions_table (GtkSourceBuffer *source_buffer,
 		source_buffer->priv->old_syntax_regions = NULL;
 	}
 	
-	DEBUG ({
-		g_message ("ended worker batch, %g ms elapsed",
-			   g_timer_elapsed (timer, NULL) * 1000);
-		g_message ("table has %u entries", table->len);
-	});
+	PROFILE (g_message ("ended worker batch, %g ms elapsed",
+			    g_timer_elapsed (timer, NULL) * 1000));
+	DEBUG (g_message ("table has %u entries", table->len));
 
 	g_timer_destroy (timer);
 }
@@ -2011,7 +2009,7 @@ search_patterns (GList       *matches,
 			 * buggy syntax pattern), so free the
 			 * PatternMatch structure if we were analyzing
 			 * a pattern from @matches */
-			if (i == match.endpos) {
+			if (i >= 0 && i == match.endpos) {
 				gchar *name;
 				g_object_get (G_OBJECT (tag), "name", &name, NULL);
 				g_warning ("The regex for pattern tag `%s' matched "
@@ -2194,7 +2192,6 @@ highlight_region (GtkSourceBuffer *source_buffer,
 	g_free (slice);
 
  	PROFILE ({
-
 		g_message ("highlighting took %g ms",
 			   g_timer_elapsed (timer, NULL) * 1000);
 		g_timer_destroy (timer);
