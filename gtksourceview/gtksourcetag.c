@@ -456,3 +456,52 @@ gtk_string_tag_new (const gchar    *name,
 		return tag;
 	}
 }
+
+/* GtkSourceTagStyle functions ------------- */
+
+GType 
+gtk_source_tag_style_get_type (void)
+{
+	static GType our_type = 0;
+
+	if (!our_type)
+		our_type = g_boxed_type_register_static (
+			"GtkSourceTagStyle",
+			(GBoxedCopyFunc) gtk_source_tag_style_copy,
+			(GBoxedFreeFunc) gtk_source_tag_style_free);
+
+	return our_type;
+} 
+
+GtkSourceTagStyle *
+gtk_source_tag_style_new (void)
+{
+	GtkSourceTagStyle *style;
+
+	style = g_new0 (GtkSourceTagStyle, 1);
+
+	return style;
+}
+
+GtkSourceTagStyle *
+gtk_source_tag_style_copy (const GtkSourceTagStyle *style)
+{
+	GtkSourceTagStyle *new_style;
+
+	g_return_val_if_fail (style != NULL, NULL);
+	
+	new_style = gtk_source_tag_style_new ();
+	*new_style = *style;
+
+	return new_style;
+}
+
+void 
+gtk_source_tag_style_free (GtkSourceTagStyle *style)
+{
+	g_return_if_fail (style != NULL);
+	
+	g_free (style);
+}
+
+

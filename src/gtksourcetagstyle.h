@@ -51,6 +51,14 @@ struct _GtkSourceTagStyle {
 	guint8 reserved[16];	
 };
 
+#define GTK_TYPE_SOURCE_TAG_STYLE     (gtk_source_tag_style_get_type ())
+
+GType              gtk_source_tag_style_get_type (void) G_GNUC_CONST;
+
+GtkSourceTagStyle *gtk_source_tag_style_new      (void);
+GtkSourceTagStyle *gtk_source_tag_style_copy     (const GtkSourceTagStyle *style);
+void               gtk_source_tag_style_free     (GtkSourceTagStyle       *style);
+
 G_END_DECLS
 
 #endif  /* __GTK_SOURCE_TAG_STYLE_H__ */

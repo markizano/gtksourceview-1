@@ -853,7 +853,7 @@ tag_style_changed_cb (GtkSourceLanguage *language,
 	if (ts != NULL)
 		gtk_source_tag_set_style (GTK_SOURCE_TAG (tag), ts);
 
-	g_free (ts);
+	gtk_source_tag_style_free (ts);
 }
 
 static GSList *
@@ -925,7 +925,7 @@ parseTag (GtkSourceLanguage *language,
 		if (ts != NULL)
 			gtk_source_tag_set_style (GTK_SOURCE_TAG (tag), ts);
 
-		g_free (ts);
+		gtk_source_tag_style_free (ts);
 		
 		g_signal_connect_object (language, 
 					 "tag_style_changed",
@@ -1038,7 +1038,7 @@ gtk_source_language_get_tags (GtkSourceLanguage *language)
 		language->priv->tag_name_to_style = g_hash_table_new_full ((GHashFunc)g_str_hash,
 									   (GEqualFunc)g_str_equal,
 									   (GDestroyNotify)g_free,
-									   (GDestroyNotify)g_free);
+									   (GDestroyNotify)gtk_source_tag_style_free);
 
 		populate_styles_table = TRUE;
 	}
@@ -1090,13 +1090,7 @@ gtk_source_language_get_tag_style (GtkSourceLanguage *language,
 	}
 	else
 	{
-		GtkSourceTagStyle *ts;
-
-		ts = g_new0 (GtkSourceTagStyle, 1);
-
-		memcpy (ts, style, sizeof (GtkSourceTagStyle));
-
-		return ts;
+		return gtk_source_tag_style_copy (style);
 	}
 }
 
@@ -1117,19 +1111,14 @@ gtk_source_language_get_tag_default_style (GtkSourceLanguage *language,
 
 	if (style_name != NULL)
 	{
-		GtkSourceTagStyle *ts;
 		const GtkSourceTagStyle *tmp;
 
 		g_return_val_if_fail (language->priv->style_scheme != NULL, NULL);
 
-		ts = g_new0 (GtkSourceTagStyle, 1);
-
 		tmp = gtk_source_style_scheme_get_tag_style (language->priv->style_scheme,
 							     style_name);
 
-		memcpy (ts, tmp, sizeof (GtkSourceTagStyle));
-
-		return ts;
+		return gtk_source_tag_style_copy (tmp);
 	}
 	else
 		return NULL;
@@ -1148,8 +1137,7 @@ gtk_source_language_set_tag_style (GtkSourceLanguage       *language,
 	if (!gtk_source_language_lazy_init_hash_tables (language))
 			return;	
 	
-	ts = g_new0 (GtkSourceTagStyle, 1);
-	memcpy (ts, style, sizeof (GtkSourceTagStyle));
+	ts = gtk_source_tag_style_copy (style);
 
 	g_hash_table_insert (language->priv->tag_name_to_style,
 			     g_strdup (tag_name),

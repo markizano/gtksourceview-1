@@ -273,24 +273,26 @@ gtk_source_languages_manager_get_language_from_mime_type (GtkSourceLanguagesMana
 
 	while (languages != NULL)
 	{
-		GSList *mime_types;
+		GSList *mime_types, *tmp;
 
 		GtkSourceLanguage *lang = GTK_SOURCE_LANGUAGE (languages->data);
 		
-		mime_types = gtk_source_language_get_mime_types (lang);
+		tmp = mime_types = gtk_source_language_get_mime_types (lang);
 
-		while (mime_types != NULL)
+		while (tmp != NULL)
 		{
-			if (strcmp ((const gchar*)mime_types->data, mime_type) == 0)
+			if (strcmp ((const gchar*)tmp->data, mime_type) == 0)
 			{		
-				return lang;
+				break;
 			}
 
-			mime_types = g_slist_next (mime_types);
+			tmp = g_slist_next (tmp);
 		}
 
 		slist_deep_free (mime_types);
-
+		if (tmp != NULL)
+			return lang;
+		
 		languages = g_slist_next (languages);
 	}
 

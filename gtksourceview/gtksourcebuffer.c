@@ -448,22 +448,26 @@ gtk_source_buffer_constructor (GType                  type,
 	
 	if (g_object) 
 	{
-		GtkSourceTagStyle tag_style;
+		GtkSourceTagStyle *tag_style;
 		
 		GtkSourceBuffer *source_buffer = GTK_SOURCE_BUFFER (g_object);
-		
-		gdk_color_parse ("white", &tag_style.foreground);
-		gdk_color_parse ("gray", &tag_style.background);
-		tag_style.mask |= (GTK_SOURCE_TAG_STYLE_USE_BACKGROUND |
-				   GTK_SOURCE_TAG_STYLE_USE_FOREGROUND);
 
-		tag_style.italic = FALSE;
-		tag_style.bold = TRUE;
-		tag_style.underline = FALSE;
-		tag_style.strikethrough = FALSE;
+		tag_style = gtk_source_tag_style_new ();
+		
+		gdk_color_parse ("white", &tag_style->foreground);
+		gdk_color_parse ("gray", &tag_style->background);
+		tag_style->mask |= (GTK_SOURCE_TAG_STYLE_USE_BACKGROUND |
+				    GTK_SOURCE_TAG_STYLE_USE_FOREGROUND);
+
+		tag_style->italic = FALSE;
+		tag_style->bold = TRUE;
+		tag_style->underline = FALSE;
+		tag_style->strikethrough = FALSE;
 
 		/* Set default bracket match style */
-		gtk_source_buffer_set_bracket_match_style (source_buffer, &tag_style);
+		gtk_source_buffer_set_bracket_match_style (source_buffer, tag_style);
+
+		gtk_source_tag_style_free (tag_style);
 
 		if (GTK_IS_SOURCE_TAG_TABLE (GTK_TEXT_BUFFER (source_buffer)->tag_table))
 		{

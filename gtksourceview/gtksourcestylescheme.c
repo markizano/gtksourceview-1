@@ -188,7 +188,7 @@ new_tag_style (gchar* foreground,
 {
 	GtkSourceTagStyle *ts;
 
-	ts = g_new0 (GtkSourceTagStyle, 1);
+	ts = gtk_source_tag_style_new ();
 
 	gdk_color_parse (foreground, &ts->foreground);
 	ts->mask |= GTK_SOURCE_TAG_STYLE_USE_FOREGROUND;
@@ -215,7 +215,7 @@ gtk_source_default_style_scheme_init (GtkSourceDefaultStyleScheme *scheme)
 	scheme->styles = g_hash_table_new_full ((GHashFunc)g_str_hash,
 				                (GEqualFunc)g_str_equal,
 					        (GDestroyNotify)g_free,
-					        (GDestroyNotify)g_free);
+					        (GDestroyNotify)gtk_source_tag_style_free);
 
 	ts = new_tag_style ("#FF00FF", NULL, FALSE, FALSE);
 	g_hash_table_insert (scheme->styles, 
