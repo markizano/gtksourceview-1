@@ -110,10 +110,12 @@ view_toggled_cb (ViewsData *vd,
 		case 3:
 			vd->auto_indent = active;
 			set_func = gtk_source_view_set_auto_indent;
+			break;
 		case 4:
 			vd->insert_spaces = active;
 			set_func = gtk_source_view_set_insert_spaces_instead_of_tabs;
-
+			break;
+			
 		default:
 			break;
 	}
@@ -447,8 +449,7 @@ create_window (ViewsData *vd)
 		gtk_widget_modify_font (view, font_desc);
 		pango_font_description_free (font_desc);
 	}
-
-	gtk_source_view_set_tabs_width (GTK_SOURCE_VIEW (view), 8);
+	gtk_source_view_set_tabs_width (GTK_SOURCE_VIEW (view), vd->tab_stop);
 
 	gtk_source_view_set_show_line_numbers (GTK_SOURCE_VIEW (view), vd->show_numbers);
 	gtk_source_view_set_show_line_pixmaps (GTK_SOURCE_VIEW (view), vd->show_markers);
@@ -579,6 +580,7 @@ main (int argc, char *argv[])
 
 	vd->show_numbers = TRUE;
 	vd->show_markers = TRUE;
+	vd->tab_stop = 8;
 	vd->auto_indent = TRUE;
 	vd->insert_spaces = FALSE;
 

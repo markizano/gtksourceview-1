@@ -79,6 +79,16 @@ enum {
 	LAST_SIGNAL
 };
 
+/* Properties */
+enum {
+	PROP_0,
+	PROP_ESCAPE_CHAR,
+	PROP_CHECK_BRACKETS,
+	PROP_HIGHLIGHT,
+	PROP_MAX_UNDO_LEVELS,
+	PROP_LANGUAGE
+};
+
 struct _MarkerSubList 
 {
 	gint                line;
@@ -111,6 +121,7 @@ struct _GtkSourceBufferPrivate
 	GList                 *syntax_items;
 	GList                 *pattern_items;
 	GtkSourceRegex         reg_syntax_all;
+	gunichar               escape_char;
 
 	/* Region covering the unhighlighted text */
 	GtkTextRegion         *refresh_region;
@@ -141,6 +152,14 @@ static GObject  *gtk_source_buffer_constructor          (GType                  
 							 guint                    n_construct_properties,
 							 GObjectConstructParam   *construct_param);
 static void 	 gtk_source_buffer_finalize		(GObject                 *object);
+static void      gtk_source_buffer_set_property         (GObject                 *object,
+							 guint                    prop_id,
+							 const GValue            *value,
+							 GParamSpec              *pspec);
+static void      gtk_source_buffer_get_property         (GObject                 *object,
+							 guint                    prop_id,
+							 GValue                  *value,
+							 GParamSpec              *pspec);
 
 static void 	 gtk_source_buffer_can_undo_handler 	(GtkSourceUndoManager    *um,
 							 gboolean                 can_undo,
@@ -246,9 +265,11 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 	parent_class 	= g_type_class_peek_parent (klass);
 	tb_class	= GTK_TEXT_BUFFER_CLASS (klass);
 		
-	object_class->constructor = gtk_source_buffer_constructor;
-	object_class->finalize	  = gtk_source_buffer_finalize;
-
+	object_class->constructor  = gtk_source_buffer_constructor;
+	object_class->finalize	   = gtk_source_buffer_finalize;
+	object_class->get_property = gtk_source_buffer_get_property;
+	object_class->set_property = gtk_source_buffer_set_property;
+	
 	klass->can_undo 	 = NULL;
 	klass->can_redo 	 = NULL;
 	klass->highlight_updated = NULL;
@@ -258,6 +279,53 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 	tb_class->insert_text 	= gtk_source_buffer_real_insert_text;
 	tb_class->delete_range 	= gtk_source_buffer_real_delete_range;
 
+	g_object_class_install_property (object_class,
+					 PROP_ESCAPE_CHAR,
+					 g_param_spec_unichar ("escape_char",
+							       _("Escape Character"),
+							       _("Escaping character "
+								 "for syntax delimiters"),
+							       0,
+							       G_PARAM_READWRITE));
+
+	g_object_class_install_property (object_class,
+					 PROP_CHECK_BRACKETS,
+					 g_param_spec_boolean ("check_brackets",
+							       _("Check Brackets"),
+							       _("Whether to check and "
+								 "highlight matching brackets"),
+							       TRUE,
+							       G_PARAM_READWRITE));
+	
+	g_object_class_install_property (object_class,
+					 PROP_HIGHLIGHT,
+					 g_param_spec_boolean ("highlight",
+							       _("Highlight"),
+							       _("Whether to syntax highlight "
+								 "the buffer"),
+							       TRUE,
+							       G_PARAM_READWRITE));
+	
+	g_object_class_install_property (object_class,
+					 PROP_MAX_UNDO_LEVELS,
+					 g_param_spec_int ("max_undo_levels",
+							   _("Maximum Undo Levels"),
+							   _("Number of undo levels for "
+							     "the buffer"),
+							   0,
+							   200,
+							   25,
+							   G_PARAM_READWRITE));
+	
+	g_object_class_install_property (object_class,
+					 PROP_LANGUAGE,
+					 g_param_spec_object ("language",
+							      _("Language"),
+							      _("Language object to get "
+								"highlighting rules from"),
+							      GTK_TYPE_SOURCE_LANGUAGE,
+							      G_PARAM_READWRITE));
+	
 	buffer_signals[CAN_UNDO] =
 	    g_signal_new ("can_undo",
 			  G_OBJECT_CLASS_TYPE (object_class),
@@ -370,6 +438,7 @@ gtk_source_buffer_constructor (GType                  type,
 		{
 			g_value_set_object_take_ownership (construct_param [i].value,
 							   gtk_source_tag_table_new ());
+			break;
 		}
 	}
 	
@@ -380,16 +449,12 @@ gtk_source_buffer_constructor (GType                  type,
 	if (g_object) {
 		GtkSourceBuffer *source_buffer = GTK_SOURCE_BUFFER (g_object);
 		
-		/* we can't create the tag in gtk_source_buffer_init
-		 * since we haven't set a tag table yet, and creating
-		 * the tag forces the creation of an empty table */
-		source_buffer->priv->bracket_match_tag = 
-			gtk_text_buffer_create_tag (GTK_TEXT_BUFFER (source_buffer),
-						    NULL,
-						    "foreground", "white",
-						    "background", "red",
-						    "weight", PANGO_WEIGHT_BOLD,
-						    NULL);
+		/* Set default bracket match style */
+		gtk_source_buffer_set_bracket_match_style (source_buffer,
+							   "foreground", "white",
+							   "background", "red",
+							   "weight", PANGO_WEIGHT_BOLD,
+							   NULL);
 
 		if (GTK_IS_SOURCE_TAG_TABLE (GTK_TEXT_BUFFER (source_buffer)->tag_table))
 		{
@@ -479,6 +544,95 @@ gtk_source_buffer_finalize (GObject *object)
 	/* TODO: free syntax_items, patterns, etc. - Paolo */
 	
 	G_OBJECT_CLASS (parent_class)->finalize (object);
+}
+
+static void 
+gtk_source_buffer_set_property (GObject      *object,
+				guint         prop_id,
+				const GValue *value,
+				GParamSpec   *pspec)
+{
+	GtkSourceBuffer *source_buffer;
+	
+	g_return_if_fail (GTK_IS_SOURCE_BUFFER (object));
+
+	source_buffer = GTK_SOURCE_BUFFER (object);
+    
+	switch (prop_id)
+	{
+		case PROP_ESCAPE_CHAR:
+			source_buffer->priv->escape_char = g_value_get_uint (value);
+			if (source_buffer->priv->highlight)
+				invalidate_syntax_regions (source_buffer, NULL, 0);
+			break;
+			
+		case PROP_CHECK_BRACKETS:
+			gtk_source_buffer_set_check_brackets (source_buffer,
+							      g_value_get_boolean (value));
+			break;
+			
+		case PROP_HIGHLIGHT:
+			gtk_source_buffer_set_highlight (source_buffer,
+							 g_value_get_boolean (value));
+			break;
+			
+		case PROP_MAX_UNDO_LEVELS:
+			gtk_source_buffer_set_max_undo_levels (source_buffer,
+							       g_value_get_int (value));
+			break;
+			
+		case PROP_LANGUAGE:
+			gtk_source_buffer_set_language (source_buffer,
+							g_value_get_object (value));
+			/* FIXME: I think we should unref the object
+			 * here, since g_value_set_object refs it - Gustavo */
+			break;
+			
+		default:
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+			break;
+	}
+}
+
+static void 
+gtk_source_buffer_get_property (GObject    *object,
+				guint       prop_id,
+				GValue     *value,
+				GParamSpec *pspec)
+{
+	GtkSourceBuffer *source_buffer;
+	
+	g_return_if_fail (GTK_IS_SOURCE_BUFFER (object));
+
+	source_buffer = GTK_SOURCE_BUFFER (object);
+    
+	switch (prop_id)
+	{
+		case PROP_ESCAPE_CHAR:
+			g_value_set_uint (value, source_buffer->priv->escape_char);
+			break;
+			
+		case PROP_CHECK_BRACKETS:
+			g_value_set_boolean (value, source_buffer->priv->check_brackets);
+			break;
+			
+		case PROP_HIGHLIGHT:
+			g_value_set_boolean (value, source_buffer->priv->highlight);
+			break;
+			
+		case PROP_MAX_UNDO_LEVELS:
+			g_value_set_int (value,
+					 gtk_source_buffer_get_max_undo_levels (source_buffer));
+			break;
+			
+		case PROP_LANGUAGE:
+			g_value_set_object (value, source_buffer->priv->language);
+			break;
+			
+		default:
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+			break;
+	}
 }
 
 GtkSourceBuffer *
@@ -1020,10 +1174,15 @@ void
 gtk_source_buffer_set_max_undo_levels (GtkSourceBuffer *buffer,
 				       gint             max_undo_levels)
 {
+	gint old_value;
+	
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 
+	old_value = gtk_source_undo_manager_get_max_undo_levels (buffer->priv->undo_manager);
 	gtk_source_undo_manager_set_max_undo_levels (buffer->priv->undo_manager,
-					      max_undo_levels);
+						     max_undo_levels);
+	if (old_value != max_undo_levels)
+		g_object_notify (G_OBJECT (buffer), "max_undo_levels");
 }
 
 void
@@ -1252,9 +1411,43 @@ void
 gtk_source_buffer_set_check_brackets (GtkSourceBuffer *buffer,
 				      gboolean         check_brackets)
 {
+	gboolean old_value;
+	
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 
+	old_value = buffer->priv->check_brackets;
 	buffer->priv->check_brackets = check_brackets;
+	if (old_value != check_brackets)
+		g_object_notify (G_OBJECT (buffer), "check_brackets");
+}
+
+void 
+gtk_source_buffer_set_bracket_match_style (GtkSourceBuffer *source_buffer,
+					   const gchar     *first_property_name,
+					   ...)
+{
+	va_list list;
+	
+	g_return_if_fail (GTK_IS_SOURCE_BUFFER (source_buffer));
+	
+	/* create the tag if not already done so */
+	if (!source_buffer->priv->bracket_match_tag)
+	{
+		source_buffer->priv->bracket_match_tag = gtk_text_tag_new (NULL);
+		gtk_text_tag_table_add (gtk_text_buffer_get_tag_table (
+						GTK_TEXT_BUFFER (source_buffer)),
+					source_buffer->priv->bracket_match_tag);
+		g_object_unref (source_buffer->priv->bracket_match_tag);
+	}
+	
+	/* set style */
+	if (first_property_name)
+	{
+		va_start (list, first_property_name);
+		g_object_set_valist (G_OBJECT (source_buffer->priv->bracket_match_tag),
+				     first_property_name, list);
+		va_end (list);
+	}
 }
 
 gboolean
@@ -1294,6 +1487,7 @@ gtk_source_buffer_set_highlight (GtkSourceBuffer *buffer,
 							  &iter1,
 							  &iter2);
 	}
+	g_object_notify (G_OBJECT (buffer), "highlight");
 }
 
 /* Idle worker code ------------ */
@@ -1368,13 +1562,16 @@ install_idle_worker (GtkSourceBuffer *source_buffer)
 /* Syntax analysis code -------------- */
 
 static gboolean
-is_escaped (const gchar *text, gint index)
+is_escaped (GtkSourceBuffer *source_buffer, const gchar *text, gint index)
 {
 	gchar *tmp = (gchar *) text + index;
 	gboolean retval = FALSE;
 
+	if (!source_buffer->priv->escape_char)
+		return FALSE;
+	
 	tmp = g_utf8_find_prev_char (text, tmp);
-	while (tmp && *tmp == '\\') {
+	while (tmp && g_utf8_get_char (tmp) == source_buffer->priv->escape_char) {
 		retval = !retval;
 		tmp = g_utf8_find_prev_char (text, tmp);
 	}
@@ -1414,7 +1611,7 @@ get_syntax_start (GtkSourceBuffer      *source_buffer,
 			pos,
 			length,
 			match);
-		if (pos < 0 || !is_escaped (text, match->startindex))
+		if (pos < 0 || !is_escaped (source_buffer, text, match->startindex))
 			break;
 		pos = match->startpos + 1;
 	} while (pos >= 0);
@@ -1440,7 +1637,8 @@ get_syntax_start (GtkSourceBuffer      *source_buffer,
 }
 
 static gboolean 
-get_syntax_end (const gchar          *text,
+get_syntax_end (GtkSourceBuffer      *source_buffer,
+		const gchar          *text,
 		gint                  length,
 		GtkSyntaxTag         *tag,
 		GtkSourceBufferMatch *match)
@@ -1459,7 +1657,7 @@ get_syntax_end (const gchar          *text,
 	do {
 		pos = gtk_source_regex_search (&tag->reg_end, text, pos,
 					       length, match);
-		if (pos < 0 || !is_escaped (text, match->startindex))
+		if (pos < 0 || !is_escaped (source_buffer, text, match->startindex))
 			break;
 		pos = match->startpos + 1;
 	} while (pos >= 0);
@@ -1678,7 +1876,8 @@ next_syntax_region (GtkSourceBuffer      *source_buffer,
 	} else {
 		/* seek the closing pattern for the current syntax
 		 * region */
-		found = get_syntax_end (head, head_length,
+		found = get_syntax_end (source_buffer,
+					head, head_length,
 					state->tag, match);
 		
 		if (!found)
@@ -2607,6 +2806,8 @@ gtk_source_buffer_set_language (GtkSourceBuffer   *buffer,
 		list = gtk_source_language_get_tags (language);		
  		gtk_source_tag_table_add_all (table, list);
 	}
+
+	g_object_notify (G_OBJECT (buffer), "language");
 }
 
 const GtkSourceLanguage *
@@ -2616,5 +2817,3 @@ gtk_source_buffer_get_language (GtkSourceBuffer *buffer)
 
 	return buffer->priv->language;
 }
-
-

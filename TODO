@@ -22,9 +22,9 @@ Before next release:
 [X] Cleaning up the test-widget demo (Gustavo)
 [ ] "escape_char" property.  We probably want to put it 
     into the .lang file too? (Gustavo)
-[ ] gtk_source_buffer_set_bracket_tag_style (or whatever we name it :-)
+[X] gtk_source_buffer_set_bracket_tag_style (or whatever we name it :-)
     (Gustavo)
-[ ] New properties "check_brackets", "highlight", "max_undo_levels" and "language",
+[X] New properties "check_brackets", "highlight", "max_undo_levels" and "language",
     and notification of changes in these (Gustavo)
 [X] Auto-indentation and insert spaces instead of tabs (Paolo)
 [X] gtk_source_buffer_new_with_language and gtk_source_view_[get|set]_language

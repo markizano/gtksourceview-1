@@ -182,17 +182,6 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 }
 
 static void
-view_realize_cb (GtkWidget *widget, GtkSourceView *view)
-{
-	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
-			
-	/* Set tab size: this function must be called after the widget is
-	 * realized */
-	gtk_source_view_set_tabs_width (view, 
-					view->priv->tabs_width);
-}
-
-static void
 gtk_source_view_init (GtkSourceView *view)
 {
 	GtkTargetList *tl;
@@ -213,10 +202,6 @@ gtk_source_view_init (GtkSourceView *view)
 	gtk_text_view_set_right_margin (GTK_TEXT_VIEW (view), 2);
 
 	g_signal_connect (G_OBJECT (view),
-			  "realize",
-			  G_CALLBACK (view_realize_cb),
-			  view);
-	g_signal_connect (G_OBJECT (view),
 			  "key_press_event",
 			  G_CALLBACK (key_press_cb),
 			  NULL);
@@ -230,8 +215,6 @@ gtk_source_view_init (GtkSourceView *view)
 			  "drag_data_received", 
 			  G_CALLBACK (view_dnd_drop), 
 			  NULL);
-
-	
 }
 
 static void
@@ -849,10 +832,8 @@ calculate_real_tab_width (GtkSourceView *view, guint tab_size)
 	}
 
 	tab_string [tab_size] = 0;
-
-	layout = gtk_widget_create_pango_layout (
-			GTK_WIDGET (view), 
-			tab_string);
+	gtk_widget_ensure_style (GTK_WIDGET (view));
+	layout = gtk_widget_create_pango_layout (GTK_WIDGET (view), tab_string);
 	g_free (tab_string);
 
 	if (layout != NULL) {
@@ -1034,9 +1015,7 @@ gtk_source_view_set_tabs_width (GtkSourceView *view,
 	if (view->priv->tabs_width == width)
 		return;
 
-	real_tab_width = calculate_real_tab_width (
-					GTK_SOURCE_VIEW (view),
-					width);
+	real_tab_width = calculate_real_tab_width (view, width);
 
 	if (real_tab_width < 0)
 	{

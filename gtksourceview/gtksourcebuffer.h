@@ -84,6 +84,10 @@ GtkSourceBuffer 	*gtk_source_buffer_new_with_language 	(GtkSourceLanguage     *l
 gboolean		 gtk_source_buffer_get_check_brackets   (GtkSourceBuffer       *buffer);
 void			 gtk_source_buffer_set_check_brackets	(GtkSourceBuffer       *buffer,
 							       	 gboolean               check_brackets);
+void                     gtk_source_buffer_set_bracket_match_style 
+                                                                (GtkSourceBuffer        *source_buffer,
+								 const gchar            *first_property_name,
+								 ...);
 
 gboolean		 gtk_source_buffer_get_highlight	(const GtkSourceBuffer *buffer);
 void			 gtk_source_buffer_set_highlight	(GtkSourceBuffer       *buffer,
