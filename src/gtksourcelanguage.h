@@ -71,14 +71,13 @@ void			 gtk_source_language_set_mime_types		(GtkSourceLanguage       *language,
 const GtkSourceTagStyle	*gtk_source_language_get_tag_style		(const GtkSourceLanguage *language,
 									 const gchar		 *tag_name);
 
-/*
-void			*gtk_source_language_set_tag_style		(const GtkSourceLanguage *language,
+void			 gtk_source_language_set_tag_style		(const GtkSourceLanguage *language,
 									 const gchar		 *tag_name,
 								 	 const GtkSourceTagStyle *style);
 
 const GtkSourceTagStyle	*gtk_source_language_get_tag_default_style	(const GtkSourceLanguage *language,
 								 	 const gchar		 *tag_name);
-*/
+
 G_END_DECLS				
 
 #endif /* __GTK_SOURCE_LANGUAGE_H__ */

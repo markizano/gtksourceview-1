@@ -456,8 +456,6 @@ get_gconf_key (const GtkSourceLanguage *lang, const gchar *k)
 
 	g_free (temp);
 
-	g_print ("Key: %s\n", key);
-	
 	return key;
 }
 
@@ -722,17 +720,19 @@ gtk_source_language_set_mime_types (GtkSourceLanguage	*language,
 
 	if (mime_types != NULL)
 	{
-		gconf_client_set_list (languages_manager->gconf_client,
-				       key,
-				       GCONF_VALUE_STRING,
-				       mime_types,
-				       NULL);
+		if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
+			gconf_client_set_list (languages_manager->gconf_client,
+					       key,
+					       GCONF_VALUE_STRING,
+					       mime_types,
+					       NULL);
 	}
 	else
 	{
-		gconf_client_unset (languages_manager->gconf_client,
-				    key,
-				    NULL);
+		if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
+			gconf_client_unset (languages_manager->gconf_client,
+					    key,
+					    NULL);
 					    
 		/* Get mime types from XML file */
 		language->priv->mime_types = get_mime_types_from_file (
@@ -1315,8 +1315,9 @@ gtk_source_language_get_tags (const GtkSourceLanguage *language)
 	return tag_list;
 }
 
-static const GtkSourceTagStyle *
-get_default_style_for_tag (const GtkSourceLanguage *language, const gchar *tag_name)
+const GtkSourceTagStyle *
+gtk_source_language_get_tag_default_style (const GtkSourceLanguage 	*language, 
+					   const gchar 			*tag_name)
 {
 	const gchar *style_name;
 	
@@ -1340,14 +1341,296 @@ get_default_style_for_tag (const GtkSourceLanguage *language, const gchar *tag_n
 		return NULL;
 }
 
-/* FIXME */
+static gchar *
+get_gconf_base_key_for_tag (const GtkSourceLanguage *language,
+			    const gchar             *tag_name)
+{
+	gchar *base_key;
+	gchar *key;
+	gchar *name;
+	
+	name = gconf_escape_key (tag_name, -1);
+	g_return_val_if_fail (name != NULL, NULL);
+
+	base_key = get_gconf_key (language, "styles");
+	g_return_val_if_fail (base_key != NULL, NULL);
+
+	key = gconf_concat_dir_and_key (base_key, name);
+	g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
+
+	g_free (base_key);
+	g_free (name);
+
+	return key;
+}
+
+static gchar* 
+gdk_color_to_string (GdkColor color)
+{
+	return g_strdup_printf ("#%04x%04x%04x",
+				color.red, 
+				color.green,
+				color.blue);
+}
+
+
+static GdkColor
+gconf_client_get_color (GConfClient *client, const gchar *key,
+                        gboolean *valid , GError **err)
+{
+	gchar *str_color = NULL;
+	GdkColor color;
+	
+      	g_return_val_if_fail (client != NULL, color);
+      	g_return_val_if_fail (GCONF_IS_CLIENT (client), color);  
+	g_return_val_if_fail (key != NULL, color);
+
+	str_color = gconf_client_get_string (client, key, NULL);
+
+	if (str_color != NULL)
+	{
+		if (valid != NULL)
+			*valid = TRUE;
+	}
+	else
+	{
+		if (valid != NULL)
+			*valid = FALSE;
+	
+		return color;
+	}
+		
+	gdk_color_parse (str_color, &color);
+	g_free (str_color);
+	
+	return color;
+}
+
+
+static gboolean
+gconf_client_set_color (GConfClient* client, const gchar* key,
+                        GdkColor val, GError** err)
+{
+	gchar *str_color = NULL;
+	gboolean res;
+	
+	g_return_val_if_fail (client != NULL, FALSE);
+	g_return_val_if_fail (GCONF_IS_CLIENT (client), FALSE);  
+	g_return_val_if_fail (key != NULL, FALSE);
+
+	str_color = gdk_color_to_string (val);
+	g_return_val_if_fail (str_color != NULL, FALSE);
+
+	res = gconf_client_set_string (client,
+				       key,
+				       str_color,
+				       err);
+	g_free (str_color);
+
+	return res;
+}
+
+
+/* FIXME: here we leak a GtkSourceTagStyle */
+
 const GtkSourceTagStyle	*
 gtk_source_language_get_tag_style (const GtkSourceLanguage *language,
 				   const gchar *tag_name)
 {
-	return 	get_default_style_for_tag (language, tag_name);
+	gchar *base_key;
+
+	g_return_val_if_fail (GTK_SOURCE_LANGUAGE (language), NULL);
+	g_return_val_if_fail (tag_name != NULL, NULL);
+
+	base_key = get_gconf_base_key_for_tag (language, tag_name);
+
+	/* FIXME: this is not right. Use a use_defaul key */
+	if (gconf_client_dir_exists (languages_manager->gconf_client, base_key, NULL))
+	{
+		gchar *key;
+		gboolean valid = FALSE;
+		GdkColor color;
+		GtkSourceTagStyle *ts;
+
+		/* FIXME: here we leak a GtkSourceTagStyle */
+		ts = g_new0 (GtkSourceTagStyle, 1);
+
+
+		key = gconf_concat_dir_and_key (base_key, "background");
+		g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
+
+		color = gconf_client_get_color (languages_manager->gconf_client, 
+						key,
+						&valid,
+						NULL);
+		
+		g_free (key);
+		
+		if (valid)
+		{
+			ts->use_background = TRUE;
+			ts->background = color;
+		}
+		else
+			ts->use_background = FALSE;
+
+		key = gconf_concat_dir_and_key (base_key, "foreground");
+		g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
+
+		color = gconf_client_get_color (languages_manager->gconf_client, 
+						key,
+						NULL,
+						NULL);
+		
+		g_free (key);
+
+		ts->foreground = color;
+
+		key = gconf_concat_dir_and_key (base_key, "italic");
+		g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
+
+		ts->italic = gconf_client_get_bool (languages_manager->gconf_client, 
+						   key,
+						   NULL);
+
+		g_free (key);
+
+		key = gconf_concat_dir_and_key (base_key, "bold");
+		g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
+
+		ts->bold = gconf_client_get_bool (languages_manager->gconf_client, 
+						   key,
+						   NULL);
+
+		g_free (key);
+
+		ts->use_default = FALSE;
+
+		g_free (base_key);
+			
+		return ts;
+		
+	}
+	else
+	{
+		g_free (base_key);
+		
+		return gtk_source_language_get_tag_default_style (language, tag_name);
+	}
 }
 
+void 
+gtk_source_language_set_tag_style (const GtkSourceLanguage *language,
+				   const gchar             *tag_name,
+				   const GtkSourceTagStyle *style)
+{
+	gchar *base_key;
+	gchar *key;
 
+	g_return_if_fail (GTK_SOURCE_LANGUAGE (language));
+	g_return_if_fail (tag_name != NULL);
+	g_return_if_fail (style != NULL);
 
+	base_key = get_gconf_base_key_for_tag (language, tag_name);
+
+	if (style->use_default && 
+	    gconf_client_dir_exists (languages_manager->gconf_client, base_key, NULL))
+	{
+		key = gconf_concat_dir_and_key (base_key, "background");
+		g_return_if_fail (gconf_valid_key (key, NULL));
+
+		if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
+			gconf_client_unset (languages_manager->gconf_client,
+					    key,
+					    NULL);
+
+		g_free (key);
+
+		key = gconf_concat_dir_and_key (base_key, "foreground");
+		g_return_if_fail (gconf_valid_key (key, NULL));
+
+		if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
+			gconf_client_unset (languages_manager->gconf_client,
+					    key,
+					    NULL);
+
+		g_free (key);
+
+		key = gconf_concat_dir_and_key (base_key, "italic");
+		g_return_if_fail (gconf_valid_key (key, NULL));
+
+		if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
+			gconf_client_unset (languages_manager->gconf_client,
+					    key,
+					    NULL);
+
+		g_free (key);
+
+		key = gconf_concat_dir_and_key (base_key, "bold");
+		g_return_if_fail (gconf_valid_key (key, NULL));
+
+		if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
+			gconf_client_unset (languages_manager->gconf_client,
+					    key,
+					    NULL);
+
+		g_free (key);
+
+		g_free (base_key);
+
+		return;		
+	}
+
+	key = gconf_concat_dir_and_key (base_key, "background");
+	g_return_if_fail (gconf_valid_key (key, NULL));
+
+	if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
+	{
+		if (style->use_background)
+			gconf_client_set_color (languages_manager->gconf_client,
+						key,
+						style->background,
+						NULL);
+		else
+			gconf_client_unset (languages_manager->gconf_client,
+					    key,
+					    NULL);
+	}
+
+	g_free (key);
+	
+	key = gconf_concat_dir_and_key (base_key, "foreground");
+	g_return_if_fail (gconf_valid_key (key, NULL));
+
+	if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
+		gconf_client_set_color (languages_manager->gconf_client,
+					key,
+					style->foreground,
+					NULL);
+	g_free (key);
+
+	key = gconf_concat_dir_and_key (base_key, "italic");
+	g_return_if_fail (gconf_valid_key (key, NULL));
+
+	if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
+		gconf_client_set_bool (languages_manager->gconf_client,
+				       key,
+				       style->italic,
+				       NULL);
+	g_free (key);
+
+	key = gconf_concat_dir_and_key (base_key, "bold");
+	g_return_if_fail (gconf_valid_key (key, NULL));
+
+	if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
+		gconf_client_set_bool (languages_manager->gconf_client,
+				       key,
+				       style->bold,
+				       NULL);
+	g_free (key);
+
+	g_free (base_key);
+
+	return;
+}
 

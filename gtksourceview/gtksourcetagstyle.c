@@ -77,7 +77,7 @@ new_tag_style (gchar* foreground,
 }
 
 static Theme *
-build_defaul_theme ()
+build_default_theme ()
 {	
 	Theme *theme;
 	GtkSourceTagStyle *ts;
@@ -170,7 +170,7 @@ gtk_source_tags_style_manager_init (void)
 		
 		tags_style_manager = g_new0 (GtkSourceTagsStyleManager, 1);
 
-		theme = build_defaul_theme ();
+		theme = build_default_theme ();
 
 		tags_style_manager->available_themes = g_slist_prepend (tags_style_manager->available_themes, theme);
 		tags_style_manager->current_theme = theme->name;
@@ -188,6 +188,9 @@ gtk_source_tags_style_manager_shutdown (void)
 
 	g_slist_foreach (tags_style_manager->available_themes, (GFunc) theme_free, NULL);
 	g_slist_free (tags_style_manager->available_themes);
+
+	g_free (tags_style_manager);
+	tags_style_manager = NULL;
 }
 
 
@@ -252,7 +255,6 @@ gtk_source_tags_style_manager_set_current_theme	(const gchar *theme)
 	return TRUE;
 }
 
-/* FIXME: it should be reimplemented when we will add theme support. */
 const GtkSourceTagStyle *
 gtk_source_get_default_tag_style (const gchar *klass)
 {

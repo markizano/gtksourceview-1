@@ -407,9 +407,21 @@ test_source (GtkSourceBuffer *buffer)
 		
 	if (language != NULL)
 	{
+
+/*
+		const GtkSourceTagStyle *ts;
+		GtkSourceTagStyle new_ts;
+
 		g_print ("Name: %s\n", gtk_source_language_get_name (language));
-		
-		list = gtk_source_language_get_tags (language);
+	
+		ts = gtk_source_language_get_tag_style (language, "Block Comment");
+		new_ts = *ts;
+		new_ts.italic = TRUE;
+		new_ts.use_default = TRUE;
+
+		gtk_source_language_set_tag_style (language, "Block Comment", &new_ts);
+*/	
+		list = gtk_source_language_get_tags (language);		
 		
 		gtk_source_buffer_install_regex_tags (buffer, list);
 		g_slist_foreach (list, (GFunc) g_object_unref, NULL);
