@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- <!DOCTYPE language SYSTEM "language.dtd"> -->
-<language name="Python" version="1.0" section="Sources" mimetypes="text/x-python">
+<language name="Python" version="1.0" section="Scripts" mimetypes="text/x-python">
 
 	<string name = "Multiline String" style = "String" end-at-line-end = "FALSE">
 		<start-regex>[uUrR]?&quot;&quot;&quot;</start-regex>

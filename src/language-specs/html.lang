@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- <!DOCTYPE language SYSTEM "language.dtd"> -->
-<language name="HTML" version="1.0" section="Sources" mimetypes="text/html">
+<language name="HTML" version="1.0" section="Markup" mimetypes="text/html">
 	
 	<block-comment name="Block Comment" style="Comment">
 		<start-regex>&lt;!--</start-regex>

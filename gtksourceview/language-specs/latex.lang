@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- <!DOCTYPE language SYSTEM "language.dtd"> -->
-<language name="Latex" version="1.0" section="Sources" mimetypes="text/x-tex">
+<language name="Latex" version="1.0" section="Markup" mimetypes="text/x-tex">
 
 	<line-comment name="Comment" style="Comment">
 		<start-regex>%</start-regex>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- <!DOCTYPE language SYSTEM "language.dtd"> -->
-<language name="Perl" version="1.0" section="Sources" mimetypes="text/x-perl">
+<language name="Perl" version="1.0" section="Scripts" mimetypes="text/x-perl">
 	
 	<string name = "String" style = "String" end-at-line-end = "TRUE">
 		<start-regex>"</start-regex>
