@@ -1,3 +1,23 @@
+2004-01-29  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	Splitted the highlighting code off GtkSourceBuffer into an object
+	GtkSourceSimpleEngine which is derived from the abstract
+	GtkSourceEngine.
+	
+	* gtksourceview/gtksourcebuffer.c: Removed highlighting code.
+	Added code to attach an engine.
+	
+	* gtksourceview/gtksourceengine.h: 
+	* gtksourceview/gtksourceengine.c: New abstract class for
+	highlighting engines.
+
+	* gtksourceview/gtksourcesimpleengine.h: 
+	* gtksourceview/gtksourcesimpleengine.c: New class for an engine
+	implementing the same highlighting algorithm which was in
+	GtkSourceBuffer.
+
+	* gtksourceview/Makefile.am: Added new files.
+
 2004-01-21 Alastair McKinstry <mckinstry@computer.org>
 
 	* configure.in: Added Irish locale "ga" to ALL_LINGUAS

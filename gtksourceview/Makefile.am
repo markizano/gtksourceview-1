@@ -60,6 +60,10 @@ libgtksourceview_1_0_la_SOURCES = 		\
 	gtksourcestylescheme.c		\
 	gtksourcemarker.c		\
 	gtksourceprintjob.c		\
+	gtksourceengine.h		\
+	gtksourceengine.c		\
+	gtksourcesimpleengine.h		\
+	gtksourcesimpleengine.c		\
 	$(libgtksourceview_headers)	\
 	$(BUILT_SOURCES)
 

@@ -140,6 +140,11 @@ GtkSourceMarker         *gtk_source_buffer_get_next_marker      (GtkSourceBuffer
 								 GtkTextIter            *iter);
 GtkSourceMarker         *gtk_source_buffer_get_prev_marker      (GtkSourceBuffer        *buffer,
 								 GtkTextIter            *iter);
+void                     gtk_source_buffer_remove_all_source_tags 
+                                                                (GtkSourceBuffer        *buffer,
+								 const GtkTextIter      *start,
+								 const GtkTextIter      *end);
+
 
 /* INTERNAL private stuff - not even exported from the library on
  * many platforms
