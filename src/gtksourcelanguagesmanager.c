@@ -110,6 +110,8 @@ gtk_source_languages_manager_finalize (GObject *object)
 	slist_deep_free (lm->priv->language_specs_directories);
 
 	g_free (lm->priv);
+
+	(* G_OBJECT_CLASS (parent_class)->finalize) (object);
 }
 
 void 

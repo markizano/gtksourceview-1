@@ -307,7 +307,10 @@ test_source (GtkSourceBuffer *buffer)
 	GSList *keywords = NULL;
 	*/
 	if (!buffer)
+		/*
 		buffer = GTK_SOURCE_BUFFER (gtk_source_buffer_new (NULL));
+		*/
+		buffer = g_object_new (GTK_TYPE_SOURCE_BUFFER, "tag_table", gtk_source_tag_table_new (), NULL);
 
 	table = GTK_TEXT_BUFFER (buffer)->tag_table;
 #if 0
@@ -409,6 +412,7 @@ test_source (GtkSourceBuffer *buffer)
 	if (language != NULL)
 	{
 
+		GtkSourceTagTable *table;
 /*
 		const GtkSourceTagStyle *ts;
 		GtkSourceTagStyle new_ts;
@@ -422,9 +426,14 @@ test_source (GtkSourceBuffer *buffer)
 
 		gtk_source_language_set_tag_style (language, "Block Comment", &new_ts);
 */	
+		table = GTK_SOURCE_TAG_TABLE (gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (buffer)));
+
+		gtk_source_tag_table_remove_all_source_tags (table);
+		
 		list = gtk_source_language_get_tags (language);		
 		
-		gtk_source_buffer_install_regex_tags (buffer, list);
+		gtk_source_tag_table_add_all (table, list);
+		
 		g_slist_foreach (list, (GFunc) g_object_unref, NULL);
 		g_slist_free (list);
 		

@@ -123,9 +123,9 @@ struct _GtkSourceBufferPrivate
 	guint                  worker_handler;
 
 	/* views highlight requests */
-	GtkTextRegion        *highlight_requests;
+	GtkTextRegion         *highlight_requests;
 
-	GtkSourceUndoManager *undo_manager;
+	GtkSourceUndoManager  *undo_manager;
 };
 
 
@@ -205,6 +205,7 @@ static void	 gtk_source_buffer_remove_all_source_tags (GtkSourceBuffer   *buffer
 					  		const GtkTextIter *start,
 					  		const GtkTextIter *end);
 
+static void	sync_with_tag_table 			(GtkSourceBuffer *buffer);
 
 GType
 gtk_source_buffer_get_type (void)
@@ -332,6 +333,37 @@ gtk_source_buffer_init (GtkSourceBuffer *buffer)
 			  "can_redo",
 			  G_CALLBACK (gtk_source_buffer_can_redo_handler),
 			  buffer);
+
+}
+
+static void 
+tag_added_or_removed_cb (GtkTextTagTable *table, GtkTextTag *tag, GtkSourceBuffer *buffer)
+{
+	sync_with_tag_table (buffer);
+	
+}
+
+
+static void 
+tag_table_changed_cb (GtkSourceTagTable *table, GtkSourceBuffer *buffer)
+{
+	sync_with_tag_table (buffer);
+}
+
+static void
+create_empty_tag_table (GtkSourceBuffer *buffer)
+{
+	GtkSourceTagTable *tag_table;
+	
+	g_return_if_fail (GTK_TEXT_BUFFER (buffer)->tag_table == NULL);
+
+	tag_table = gtk_source_tag_table_new ();
+
+	/* Add the buffer to the table */
+	GTK_TEXT_TAG_TABLE (tag_table)->buffers = 
+		g_slist_prepend (GTK_TEXT_TAG_TABLE (tag_table)->buffers, buffer);
+
+	GTK_TEXT_BUFFER (buffer)->tag_table = GTK_TEXT_TAG_TABLE (tag_table);
 }
 
 static GObject *
@@ -348,6 +380,9 @@ gtk_source_buffer_constructor (GType                  type,
 	if (g_object) {
 		GtkSourceBuffer *source_buffer = GTK_SOURCE_BUFFER (g_object);
 		
+		if (GTK_TEXT_BUFFER (source_buffer)->tag_table == NULL)
+			create_empty_tag_table (source_buffer);
+
 		/* we can't create the tag in gtk_source_buffer_init
 		 * since we haven't set a tag table yet, and creating
 		 * the tag forces the creation of an empty table */
@@ -358,6 +393,30 @@ gtk_source_buffer_constructor (GType                  type,
 						    "background", "red",
 						    "weight", PANGO_WEIGHT_BOLD,
 						    NULL);
+
+		if (GTK_IS_SOURCE_TAG_TABLE (GTK_TEXT_BUFFER (source_buffer)->tag_table))
+		{
+			g_signal_connect (GTK_TEXT_BUFFER (source_buffer)->tag_table ,
+					  "changed",
+					  G_CALLBACK (tag_table_changed_cb),
+					  source_buffer);
+		}
+		else
+		{
+			g_assert (GTK_IS_TEXT_TAG_TABLE (GTK_TEXT_BUFFER (source_buffer)->tag_table));
+
+			g_warning ("Please use GtkSourceTagTable with GtkSourceBuffer.");
+
+			g_signal_connect (GTK_TEXT_BUFFER (source_buffer)->tag_table,
+					  "tag_added",
+					  G_CALLBACK (tag_added_or_removed_cb),
+					  source_buffer);
+
+			g_signal_connect (GTK_TEXT_BUFFER (source_buffer)->tag_table,
+					  "tag_removed",
+					  G_CALLBACK (tag_added_or_removed_cb),
+					  source_buffer);				
+		}
 	}
 	
 	return g_object;
@@ -423,7 +482,7 @@ gtk_source_buffer_finalize (GObject *object)
 }
 
 GtkSourceBuffer *
-gtk_source_buffer_new (GtkTextTagTable *table)
+gtk_source_buffer_new (GtkSourceTagTable *table)
 {
 	GtkSourceBuffer *buffer;
 
@@ -433,6 +492,7 @@ gtk_source_buffer_new (GtkTextTagTable *table)
 							  NULL));
 	else
 		buffer = GTK_SOURCE_BUFFER (g_object_new (GTK_TYPE_SOURCE_BUFFER, 
+							  "tag_table", gtk_source_tag_table_new (),
 							  NULL));
 	
 	return buffer;
@@ -506,10 +566,12 @@ get_tags_func (GtkTextTag *tag, gpointer data)
 {
 	g_return_if_fail (data != NULL);
 
-	GSList *list = *(GSList **) data;
+	GSList **list = (GSList **) data;
 
 	if (GTK_IS_SOURCE_TAG (tag))
-		list = g_slist_prepend (list, tag);
+	{
+		*list = g_slist_prepend (*list, tag);
+	}
 }
 
 static void
@@ -657,8 +719,8 @@ add_markers (gpointer key, gpointer value, gpointer user_data)
 	g_free (sublist);
 }
 
-GSList *
-gtk_source_buffer_get_regex_tags (const GtkSourceBuffer *buffer)
+static GSList *
+gtk_source_buffer_get_source_tags (const GtkSourceBuffer *buffer)
 {
 	GSList *list = NULL;
 	GtkTextTagTable *table;
@@ -667,42 +729,21 @@ gtk_source_buffer_get_regex_tags (const GtkSourceBuffer *buffer)
 
 	table = gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (buffer));
 	gtk_text_tag_table_foreach (table, get_tags_func, &list);
-	list = g_slist_reverse (list);
+	list = g_slist_reverse (list);	
 	
 	return list;
 }
 
-void
-gtk_source_buffer_purge_regex_tags (GtkSourceBuffer * buffer)
+
+
+static void
+sync_with_tag_table (GtkSourceBuffer *buffer)
 {
-	GtkTextTagTable *table;
+	GtkTextTagTable *tag_table;
+	GSList *entries;
 	GSList *list;
-	GSList *cur;
-	GtkTextIter start_iter;
-	GtkTextIter end_iter;
 
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
-
-	gtk_text_buffer_get_bounds (GTK_TEXT_BUFFER (buffer),
-				    &start_iter, 
-				    &end_iter);
-	
-	gtk_source_buffer_remove_all_source_tags (buffer,
-						  &start_iter,
-						  &end_iter);
-
-	table = gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (buffer));
-	list = gtk_source_buffer_get_regex_tags (buffer);
-
-	cur = list;
-	while (cur != NULL) {
-		gtk_text_tag_table_remove (table,
-					   GTK_TEXT_TAG (cur->data));
-		g_object_unref (G_OBJECT (cur->data));
-		cur = g_slist_next (cur);
-	}
-
-	g_slist_free (list);
 
 	if (buffer->priv->syntax_items) {
 		g_list_free (buffer->priv->syntax_items);
@@ -713,61 +754,45 @@ gtk_source_buffer_purge_regex_tags (GtkSourceBuffer * buffer)
 		g_list_free (buffer->priv->pattern_items);
 		buffer->priv->pattern_items = NULL;
 	}
-}
 
-void
-gtk_source_buffer_install_regex_tags (GtkSourceBuffer *buffer,
-				      GSList          *entries)
-{
-	GtkTextTagTable *tag_table;
-
-	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
-	
 	tag_table = gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (buffer));
 	g_return_if_fail (tag_table != NULL);
+
+	list = entries = gtk_source_buffer_get_source_tags (buffer);
 	
-	while (entries != NULL) {
-		
-		gchar *name;
-
-		g_object_get (G_OBJECT (entries->data), "name", &name, NULL);
-
-		if (name != NULL) {
-			GtkTextTag *tag;
-
-			tag = gtk_text_tag_table_lookup (tag_table, name);
-		
-			/* FIXME: I'm not sure this is the right behavior - Paolo */	
-			if (tag)
-				gtk_text_tag_table_remove (tag_table, tag);
-		}
-
-		if (GTK_IS_SYNTAX_TAG (entries->data)) {
+	while (entries != NULL) 
+	{	
+		if (GTK_IS_SYNTAX_TAG (entries->data)) 
+		{
 			buffer->priv->syntax_items =
-			    g_list_append (buffer->priv->syntax_items, entries->data);
+			    g_list_prepend (buffer->priv->syntax_items, entries->data);
 			
-			gtk_text_tag_table_add (tag_table,
-						GTK_TEXT_TAG (entries->data));
-		} else if (GTK_IS_PATTERN_TAG (entries->data)) {
+		} 
+		else if (GTK_IS_PATTERN_TAG (entries->data)) 
+		{
 			buffer->priv->pattern_items =
-			    g_list_append (buffer->priv->pattern_items, entries->data);
+			    g_list_prepend (buffer->priv->pattern_items, entries->data);
 			
-			gtk_text_tag_table_add (tag_table,
-						GTK_TEXT_TAG (entries->data));
-
-			/* lower priority for pattern tags */
-			gtk_text_tag_set_priority (GTK_TEXT_TAG
-						   (entries->data), 0);
 		}
-
-		if (name)
-			g_free (name);
 
 		entries = g_slist_next (entries);
 	}
 
+	g_slist_free (list);
+
+	buffer->priv->syntax_items = g_list_reverse (buffer->priv->syntax_items);
+	buffer->priv->pattern_items = g_list_reverse (buffer->priv->pattern_items);
+	
 	if (buffer->priv->syntax_items != NULL)
+	{
 		sync_syntax_regex (buffer);
+	}
+	else
+	{
+		if (buffer->priv->reg_syntax_all.len > 0)
+			gtk_source_regex_destroy (&buffer->priv->reg_syntax_all);
+	}
+
 
 	if (buffer->priv->highlight)
 		invalidate_syntax_regions (buffer, NULL, 0);
@@ -1205,6 +1230,14 @@ gtk_source_buffer_remove_all_markers (GtkSourceBuffer *buffer,
 							   counter);
 
 	return remove_count;
+}
+
+gboolean
+gtk_source_buffer_get_check_brackets (GtkSourceBuffer *buffer)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), FALSE);
+
+	return buffer->priv->check_brackets;
 }
 
 void
@@ -2331,7 +2364,7 @@ highlight_queue (GtkSourceBuffer *source_buffer,
 }
 
 void
-gtk_source_buffer_highlight_region (GtkSourceBuffer *source_buffer,
+_gtk_source_buffer_highlight_region (GtkSourceBuffer *source_buffer,
 				    GtkTextIter     *start,
 				    GtkTextIter     *end)
 {
@@ -2490,4 +2523,3 @@ gtk_source_buffer_remove_all_source_tags (GtkSourceBuffer   *buffer,
   
 	g_slist_free (tags);
 }
-
