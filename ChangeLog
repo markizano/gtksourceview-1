@@ -1,5 +1,10 @@
 2004-02-01  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
 
+	* docs/reference/gtksourceview.types: Remove deleted GtkSyntaxTag
+	and GtkPatternTag types.
+
+2004-02-01  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
 	* gtksourceview/gtksourcetag.h:
 	* gtksourceview/gtksourcetag.c:
 	* gtksourceview/gtksourcetag-private.h: Remove GtkSourceTag's id,
