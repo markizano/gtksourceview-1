@@ -29,7 +29,7 @@
 		match-empty-string-at-beginning = "FALSE"
 		match-empty-string-at-end = "FALSE"
 		beginning-regex="&lt;/?"
-		end-regex="&gt;?">
+		end-regex="\(\b\|&gt;\)">
 		<keyword>a</keyword>
 		<keyword>abbr</keyword>
 		<keyword>acronym</keyword>
@@ -68,6 +68,7 @@
 		<keyword>hr</keyword>
 		<keyword>html</keyword>
 		<keyword>i</keyword>
+		<keyword>input</keyword>
 		<keyword>kbd</keyword>
 		<keyword>label</keyword>
 		<keyword>legend</keyword>
@@ -116,7 +117,7 @@
 	<keyword-list name="Attributes" style = "Others" case-sensitive="FALSE"
 		match-empty-string-at-beginning = "TRUE"
 		match-empty-string-at-end = "FALSE"
-		end-regex="=">
+		end-regex="[ \t]*=">
 		<keyword>abbr</keyword>
 		<keyword>accept-charset</keyword>
 		<keyword>accept</keyword>

@@ -1,5 +1,10 @@
-/*  Copyright (C) 2001
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- 
+ *  test-widget.c
+ *
+ *  Copyright (C) 2001
  *  Mikael Hermansson<tyan@linux.se>
+ *
+ *  Copyright (C) 2003 - Gustavo Giráldez <gustavo.giraldez@gmx.net>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -19,573 +24,493 @@
 #include <stdio.h>
 #include <string.h>
 #include <gtk/gtk.h>
+#include <libgnomevfs/gnome-vfs-init.h>
+#include <libgnomevfs/gnome-vfs-mime-utils.h>
+#include <libgnomevfs/gnome-vfs-utils.h>
 #include <gtksourceview.h>
 #include <gtksourcelanguage.h>
 #include <gtksourcelanguagesmanager.h>
 
-static GtkSourceLanguagesManager *lm;
 
-static GtkTextBuffer *test_source (GtkSourceBuffer *buf);
-static void cb_move_cursor (GtkTextBuffer *buf, GtkTextIter *cursoriter, GtkTextMark *mark,
-			    gpointer data);
+/* Private data structures */
 
-static gchar *
-gtk_source_buffer_convert_to_html (GtkSourceBuffer * buffer,
-				   const gchar * title)
+typedef struct {
+	GtkSourceBuffer *buffer;
+	GList           *windows;
+	gboolean         show_markers;
+	gboolean         show_numbers;
+	guint            tab_stop;
+	GtkItemFactory  *item_factory;
+} ViewsData;
+
+#define READ_BUFFER_SIZE   4096
+
+
+/* Private prototypes */
+
+static void       open_file_cb                   (ViewsData       *vd,
+						  guint            callback_action,
+						  GtkWidget       *widget);
+static void       new_view_cb                    (ViewsData       *vd,
+						  guint            callback_action,
+						  GtkWidget       *widget);
+static void       show_toggled_cb                (ViewsData       *vd,
+						  guint            callback_action,
+						  GtkWidget       *widget);
+
+/* Menu definition */
+
+#define SHOW_NUMBERS_PATH "/View/Show _Line Numbers"
+#define SHOW_MARKERS_PATH "/View/Show _Markers"
+
+static GtkItemFactoryEntry menu_items[] = {
+	{ "/_File",                   NULL,         0,               0, "<Branch>" },
+	{ "/File/_Open",              "<control>O", open_file_cb,    0, "<StockItem>", GTK_STOCK_OPEN },
+	{ "/File/sep1",               NULL,         0,               0, "<Separator>" },
+	{ "/File/_Quit",              "<control>Q", gtk_main_quit,   0 },
+	
+	{ "/_View",                   NULL,         0,               0, "<Branch>" },
+	{ "/View/_New View",          NULL,         new_view_cb,     0, "<StockItem>", GTK_STOCK_NEW },
+	{ "/View/sep1",               NULL,         0,               0, "<Separator>" },
+	{ SHOW_NUMBERS_PATH,          NULL,         show_toggled_cb, 1, "<CheckItem>" },
+	{ SHOW_MARKERS_PATH,          NULL,         show_toggled_cb, 2, "<CheckItem>" },
+};
+
+/* Implementation */
+
+static void 
+show_toggled_cb (ViewsData *vd,
+		 guint      callback_action,
+		 GtkWidget *widget)
 {
-	gchar txt[3];
-	GtkTextIter iter;
-	gboolean font = FALSE;
-	gboolean bold = FALSE;
-	gboolean italic = FALSE;
-	gboolean underline = FALSE;
-	GString *str = NULL;
-	GSList *list = NULL;
-	GtkTextTag *tag = NULL;
-	GdkColor *col = NULL;
-	GValue *value;
-	gunichar c = 0;
+	gboolean active;
+	void (*set_func) (GtkSourceView *, gboolean);
 
-	txt[1] = 0;
+	set_func = NULL;
+	active = gtk_check_menu_item_get_active (GTK_CHECK_MENU_ITEM (widget));
+	
+	switch (callback_action)
+	{
+		case 1:
+			vd->show_numbers = active;
+			set_func = gtk_source_view_set_show_line_numbers;
+			break;
+		case 2:
+			vd->show_markers = active;
+			set_func = gtk_source_view_set_show_line_pixmaps;
+			break;
+		default:
+			break;
+	}
 
-	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
-
-	gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (buffer),
-					    &iter, 0);
-
-	str = g_string_new ("<html>\n");
-	g_string_append (str, "<head>\n");
-	g_string_append_printf (str, "<title>%s</title>\n",
-				title ? title : "GtkSourceView converter");
-	g_string_append (str, "</head>\n");
-	g_string_append (str, "<body bgcolor=white>\n");
-	g_string_append (str, "<pre>");
-
-
-	while (!gtk_text_iter_is_end (&iter)) {
-		c = gtk_text_iter_get_char (&iter);
-		if (!tag) {
-			list =
-			    gtk_text_iter_get_toggled_tags (&iter, TRUE);
-			if (list && g_slist_last (list)->data) {
-				tag =
-				    GTK_TEXT_TAG (g_slist_last (list)->
-						  data);
-				g_slist_free (list);
-			}
-			if (tag && !gtk_text_iter_ends_tag (&iter, tag)) {
-				GValue val1 = { 0, };
-				GValue val2 = { 0, };
-				GValue val3 = { 0, };
-
-				value = &val1;
-				g_value_init (value, GDK_TYPE_COLOR);
-				g_object_get_property (G_OBJECT (tag),
-						       "foreground_gdk",
-						       value);
-				col = g_value_get_boxed (value);
-				if (col) {
-					g_string_append_printf (str,
-								"<font color=#%02X%02X%02X>",
-								col->red / 256,
-								col->green /
-								256,
-								col->blue /
-								256);
-					font = TRUE;
-				}
-				value = &val2;
-				g_value_init (value, G_TYPE_INT);
-				g_object_get_property (G_OBJECT (tag),
-						       "weight", value);
-				if (g_value_get_int (value) ==
-				    PANGO_WEIGHT_BOLD) {
-					g_string_append (str, "<b>");
-					bold = TRUE;
-				}
-
-				value = &val3;
-				g_value_init (value, PANGO_TYPE_STYLE);
-				g_object_get_property (G_OBJECT (tag),
-						       "style", value);
-				if (g_value_get_enum (value) ==
-				    PANGO_STYLE_ITALIC) {
-					g_string_append (str, "<i>");
-					italic = TRUE;
-				}
-
-			}
-		}
-
-		if (c == '<')
-			g_string_append (str, "&lt");
-		else if (c == '>')
-			g_string_append (str, "&gt");
-		else {
-			txt[0] = c;
-			g_string_append (str, txt);
-		}
-
-		gtk_text_iter_forward_char (&iter);
-		if (tag && gtk_text_iter_ends_tag (&iter, tag)) {
-			if (bold)
-				g_string_append (str, "</b>");
-			if (italic)
-				g_string_append (str, "</i>");
-			if (underline)
-				g_string_append (str, "</u>");
-			if (font)
-				g_string_append (str, "</font>");
-			tag = NULL;
-			bold = italic = underline = font = FALSE;
+	if (set_func)
+	{
+		GList *l;
+		for (l = vd->windows; l; l = l->next)
+		{
+			GtkWidget *window = l->data;
+			GtkWidget *view = g_object_get_data (G_OBJECT (window), "view");
+			set_func (GTK_SOURCE_VIEW (view), active);
 		}
 	}
-	g_string_append (str, "</pre>");
-	g_string_append (str, "</body>");
-	g_string_append (str, "</html>");
-
-	return g_string_free (str, FALSE);
 }
 
-static gboolean
-read_loop (GtkTextBuffer * buffer,
-	   const char *filename, GIOChannel * io, GError ** error)
+static void
+error_dialog (GtkWindow *parent, const gchar *msg, ...)
 {
-	GIOStatus status;
-	GtkWidget *widget;
-	GtkTextIter end;
-	gchar *str = NULL;
-	gint size = 0;
-	*error = NULL;
-
-	gtk_text_buffer_get_end_iter (GTK_TEXT_BUFFER (buffer), &end);
-	if ((status =
-	     g_io_channel_read_line (io, &str, &size, NULL,
-				     error)) == G_IO_STATUS_NORMAL
-	    && size) {
-#ifdef DEBUG_SOURCEVIEW
-		puts (str);
-#endif
-		gtk_text_buffer_insert (GTK_TEXT_BUFFER (buffer),
-					&end, str, size);
-		g_free (str);
-		return TRUE;
-	} else if (!*error
-		   && (status =
-		       g_io_channel_read_to_end (io, &str, &size,
-						 error)) ==
-		   G_IO_STATUS_NORMAL && size) {
-#ifdef DEBUG_SOURCEVIEW
-		puts (str);
-#endif
-		gtk_text_buffer_insert (GTK_TEXT_BUFFER (buffer),
-					&end, str, size);
-		g_free (str);
-
-		return TRUE;
-	}
-
-	if (status == G_IO_STATUS_EOF && !*error)
-		return FALSE;
-
-	if (!*error)
-		return FALSE;
-
-	widget = gtk_message_dialog_new (NULL,
-					 (GtkDialogFlags) 0,
+	va_list ap;
+	gchar *tmp;
+	GtkWidget *dialog;
+	
+	va_start (ap, msg);
+	tmp = g_strdup_vprintf (msg, ap);
+	va_end (ap);
+	
+	dialog = gtk_message_dialog_new (parent,
+					 GTK_DIALOG_DESTROY_WITH_PARENT,
 					 GTK_MESSAGE_ERROR,
 					 GTK_BUTTONS_OK,
-					 "%s\nFile %s",
-					 (*error)->message, filename);
-	gtk_dialog_run (GTK_DIALOG (widget));
-	gtk_widget_destroy (widget);
-
-	/* because of error in input we clear already loaded text */
-	gtk_text_buffer_set_text (buffer, "", 0);
-
-	return FALSE;
+					 tmp);
+	g_free (tmp);
+	
+	gtk_dialog_run (GTK_DIALOG (dialog));
+	gtk_widget_destroy (dialog);
 }
 
-static gboolean
-gtk_source_buffer_load_with_character_encoding (GtkSourceBuffer * buffer,
-						const gchar * filename,
-						const gchar * encoding,
-						GError ** error)
+static gboolean 
+gtk_source_buffer_load_with_encoding (GtkSourceBuffer *source_buffer,
+				      const gchar     *filename,
+				      const gchar     *encoding,
+				      GError         **error)
 {
 	GIOChannel *io;
-	GtkWidget *widget;
-	gboolean highlight = FALSE;
+	GtkTextIter iter;
+	gchar *buffer;
+	gboolean reading;
+	
+	g_return_val_if_fail (source_buffer != NULL, FALSE);
+	g_return_val_if_fail (filename != NULL, FALSE);
+	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (source_buffer), FALSE);
+
 	*error = NULL;
 
-	g_return_val_if_fail (buffer != NULL, FALSE);
-	g_return_val_if_fail (filename != NULL, FALSE);
-	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), FALSE);
-
-	highlight = gtk_source_buffer_get_highlight (buffer);
-
 	io = g_io_channel_new_file (filename, "r", error);
-	if (!io) {
-		widget = gtk_message_dialog_new (NULL,
-						 (GtkDialogFlags) 0,
-						 GTK_MESSAGE_ERROR,
-						 GTK_BUTTONS_OK,
-						 "%s\nFile %s",
-						 (*error)->message,
-						 filename);
-		gtk_dialog_run (GTK_DIALOG (widget));
-		gtk_widget_destroy (widget);
-
+	if (!io)
+	{
+		error_dialog (NULL, "%s\nFile %s", (*error)->message, filename);
 		return FALSE;
 	}
 
-	if (g_io_channel_set_encoding (io, encoding, error) !=
-	    G_IO_STATUS_NORMAL) {
-		widget =
-		    gtk_message_dialog_new (NULL, (GtkDialogFlags) 0,
-					    GTK_MESSAGE_ERROR,
-					    GTK_BUTTONS_OK,					 
-					    "Failed to set encoding:\n%s\n%s",
-					    filename, (*error)->message);
-
-		gtk_dialog_run (GTK_DIALOG (widget));
-		gtk_widget_destroy (widget);
-		g_io_channel_unref (io);
-
+	if (g_io_channel_set_encoding (io, encoding, error) != G_IO_STATUS_NORMAL)
+	{
+		error_dialog (NULL, "Failed to set encoding:\n%s\n%s",
+			      filename, (*error)->message);
 		return FALSE;
 	}
 
-/* 	if (highlight) */
-/* 		gtk_source_buffer_set_highlight (buffer, FALSE); */
+	gtk_source_buffer_begin_not_undoable_action (source_buffer);
 
-	gtk_source_buffer_begin_not_undoable_action (buffer);
+	gtk_text_buffer_set_text (GTK_TEXT_BUFFER (source_buffer), "", 0);
+	buffer = g_malloc (READ_BUFFER_SIZE);
+	reading = TRUE;
+	while (reading)
+	{
+		gsize bytes_read;
+		GIOStatus status;
+		
+		status = g_io_channel_read_chars (io, buffer,
+						  READ_BUFFER_SIZE, &bytes_read,
+						  error);
+		switch (status)
+		{
+			case G_IO_STATUS_EOF:
+				reading = FALSE;
+				/* fall through */
+				
+			case G_IO_STATUS_NORMAL:
+				if (bytes_read == 0)
+				{
+					continue;
+				}
+				
+				gtk_text_buffer_get_end_iter (
+					GTK_TEXT_BUFFER (source_buffer), &iter);
+				gtk_text_buffer_insert (GTK_TEXT_BUFFER (source_buffer),
+							&iter, buffer, bytes_read);
+				break;
+				
+			case G_IO_STATUS_AGAIN:
+				continue;
 
-	while (!*error
-	       && read_loop (GTK_TEXT_BUFFER (buffer), filename, io,
-			     error));
+			case G_IO_STATUS_ERROR:
+			default:
+				error_dialog (NULL, "%s\nFile %s", (*error)->message, filename);
 
-	gtk_source_buffer_end_not_undoable_action (buffer);
+				/* because of error in input we clear already loaded text */
+				gtk_text_buffer_set_text (GTK_TEXT_BUFFER (source_buffer), "", 0);
+				
+				reading = FALSE;
+				break;
+		}
+	}
+	g_free (buffer);
+	
+	gtk_source_buffer_end_not_undoable_action (source_buffer);
 
 	g_io_channel_unref (io);
 
 	if (*error)
 		return FALSE;
 
-	gtk_text_buffer_set_modified (GTK_TEXT_BUFFER (buffer), FALSE);
+	gtk_text_buffer_set_modified (GTK_TEXT_BUFFER (source_buffer), FALSE);
 
-/* 	if (highlight) */
-/* 		gtk_source_buffer_set_highlight (buffer, TRUE); */
+	/* move cursor to the beginning */
+	gtk_text_buffer_get_start_iter (GTK_TEXT_BUFFER (source_buffer), &iter);
+	gtk_text_buffer_place_cursor (GTK_TEXT_BUFFER (source_buffer), &iter);
 
 	return TRUE;
 }
 
 static gboolean
-gtk_source_buffer_load (GtkSourceBuffer * buffer,
-			const gchar * filename, GError ** error)
+open_file (GtkSourceBuffer *buffer, const gchar *filename)
 {
-	g_return_val_if_fail (buffer != NULL, FALSE);
-	g_return_val_if_fail (filename != NULL, FALSE);
-	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), FALSE);
-
-	return gtk_source_buffer_load_with_character_encoding (buffer,
-							       filename,
-							       NULL,
-							       error);
-}
-
-GtkTextBuffer *
-test_source (GtkSourceBuffer *buffer)
-{
-	/*
-	GtkTextTag *tag;
-	*/
-	GtkTextTagTable *table;
-	GSList *list = NULL;
-	GError * err = NULL;
-
-	GtkSourceLanguage *language;
-	/*
-	GSList *keywords = NULL;
-	*/
-	if (!buffer)
-		/*
-		buffer = GTK_SOURCE_BUFFER (gtk_source_buffer_new (NULL));
-		*/
-		buffer = g_object_new (GTK_TYPE_SOURCE_BUFFER, "tag_table", gtk_source_tag_table_new (), NULL);
-
-	table = GTK_TEXT_BUFFER (buffer)->tag_table;
-#if 0
-	tag = gtk_pattern_tag_new ("gnu_typedef", "\\b\\(Gtk\\|Gdk\\|Gnome\\)[a-zA-Z0-9_]+");
-	g_object_set (G_OBJECT (tag), "foreground", "blue", NULL);
-	list = g_list_append (list, (gpointer) tag);
-
-	tag = gtk_pattern_tag_new ("numbers", "\\b[0-9]+\\.?\\b");
-	g_object_set (G_OBJECT (tag), "weight", PANGO_WEIGHT_BOLD, NULL);
-	list = g_list_append (list, (gpointer) tag);
-
-	keywords = g_slist_append (keywords, "int");
-	keywords = g_slist_append (keywords, "float");
-	keywords = g_slist_append (keywords, "enum");
-	keywords = g_slist_append (keywords, "bool");
-	keywords = g_slist_append (keywords, "char");
-	keywords = g_slist_append (keywords, "void");
-	keywords = g_slist_append (keywords, "sizeof");
-	keywords = g_slist_append (keywords, "static");
-	keywords = g_slist_append (keywords, "const");
-	keywords = g_slist_append (keywords, "typedef");
-	keywords = g_slist_append (keywords, "struct");
-	keywords = g_slist_append (keywords, "class");
-
-	tag = gtk_keyword_list_tag_new ("types", keywords, TRUE, TRUE, TRUE, NULL, NULL);
-	/*
-	tag = gtk_pattern_tag_new ("types",
-				   "\\b\\(int\\|float\\|enum\\|bool\\|char\\|void\\|gint\\|"
-				   "gchar\\|gpointer\\|guint\\|guchar\\|static\\|const\\|"
-				   "typedef\\|struct\\|class\\|gboolean\\|sizeof\\)\\b");
-	*/
-	g_slist_free (keywords);
+	GtkSourceLanguagesManager *manager;
+	GtkSourceLanguage *language = NULL;
+	gchar *mime_type;
+	GtkSourceTagTable *table;
+	GError *err = NULL;
+	gchar *uri;
 	
-	g_object_set (G_OBJECT (tag), "foreground", "navy", /*"weight", PANGO_WEIGHT_BOLD,*/ NULL);
-	list = g_list_append (list, (gpointer) tag);
+	/* remove previous tags */
+	table = GTK_SOURCE_TAG_TABLE (gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (buffer)));
+	gtk_source_tag_table_remove_all_source_tags (table);
 
-	tag = gtk_pattern_tag_new ("gtk_functions", "\\b\\(gtk\\|gdk\\|g\\|gnome\\)_[a-zA-Z0-9_]+");
-	g_object_set (G_OBJECT (tag), "foreground", "brown", NULL);
-	list = g_list_append (list, (gpointer) tag);
+	/* get the new language for the file mimetype */
+	manager = g_object_get_data (G_OBJECT (buffer), "languages-manager");
 
-	tag = gtk_pattern_tag_new ("functions", "^[a-zA-Z_]*\\:");
-	g_object_set (G_OBJECT (tag), "foreground", "navy", NULL);
-	list = g_list_append (list, (gpointer) tag);
-/*
-	tag = gtk_pattern_tag_new ("macro", "\\b[A-Z_][A-Z0-9_\\-]+\\b");
-	g_object_set (G_OBJECT (tag), "foreground", "red", NULL);
-	list = g_list_append (list, (gpointer) tag);
-*/
-
-	tag = gtk_pattern_tag_new ("operators",
-				   "\\(\\*\\|\\*\\*\\|->\\|::\\|<<\\|>>\\|>\\|<\\|=\\|==\\|!=\\|<=\\|>=\\|++\\|--\\|%\\|+\\|-\\|||\\|&&\\|!\\|+=\\|-=\\|\\*=\\|/=\\|%=\\)");
-	g_object_set (G_OBJECT (tag), "foreground", "green", NULL);
-	list = g_list_append (list, (gpointer) tag);
-
-	tag = gtk_pattern_tag_new ("char_string", "'\\?[a-zA-Z0-9_\\()#@!$%^&*-=+\"{}<)]'");
-	g_object_set (G_OBJECT (tag), "foreground", "orange", NULL);
-	list = g_list_append (list, (gpointer) tag);
-
-	keywords = NULL;
-	keywords = g_slist_append (keywords, "include");
-	keywords = g_slist_append (keywords, "if");
-	keywords = g_slist_append (keywords, "ifdef");
-	keywords = g_slist_append (keywords, "ifndef");
-	keywords = g_slist_append (keywords, "else");
-	keywords = g_slist_append (keywords, "elif");
-	keywords = g_slist_append (keywords, "define");
-	keywords = g_slist_append (keywords, "endif");
-	keywords = g_slist_append (keywords, "pragma");
-	keywords = g_slist_append (keywords, "undef");
-
-	tag = gtk_keyword_list_tag_new ("defs", keywords, TRUE, FALSE, TRUE, "^[ \t]*#[ \t]*", NULL);
-	g_object_set (G_OBJECT (tag), "foreground", "tomato3", NULL);
-	list = g_list_append (list, (gpointer) tag);
-	g_slist_free (keywords);
-
-	tag = gtk_pattern_tag_new ("keywords",
-				   "\\b\\(do\\|while\\|for\\|if\\|else\\|switch\\|case\\|"
-				   "return\\|public\\|protected\\|private\\|false\\|"
-				   "true\\|break\\|extern\\|inline\\|this\\|dynamic_cast\\|"
-				   "static_cast\\|template\\|cin\\|cout\\)\\b");
-	g_object_set (G_OBJECT (tag), "foreground", "blue", "weight", PANGO_WEIGHT_BOLD, NULL);
-	list = g_list_append (list, (gpointer) tag);
-
-	
-	tag = gtk_line_comment_tag_new ("comment", "//");
-	g_object_set (G_OBJECT (tag), "foreground", "gray", "style", PANGO_STYLE_ITALIC, NULL);
-	list = g_list_append (list, (gpointer) tag);
-
-	tag = gtk_block_comment_tag_new ("comment_multiline", "/\\*", "\\*/");
-	g_object_set (G_OBJECT (tag), "foreground", "gray", "style", PANGO_STYLE_ITALIC, NULL);
-	list = g_list_append (list, (gpointer) tag);
-
-	tag = gtk_string_tag_new ("string", "\"", "\"", TRUE);
-	g_object_set (G_OBJECT (tag), "foreground", "forest green", NULL);
-	list = g_list_append (list, (gpointer) tag);
-#endif
-	language = gtk_source_languages_manager_get_language_from_mime_type (lm, "text/x-c");
-		
-	if (language != NULL)
+	/* I hate this! */
+	if (g_path_is_absolute (filename))
 	{
-
-		GtkSourceTagTable *table;
-/*
-		const GtkSourceTagStyle *ts;
-		GtkSourceTagStyle new_ts;
-
-		g_print ("Name: %s\n", gtk_source_language_get_name (language));
-	
-		ts = gtk_source_language_get_tag_style (language, "Block Comment");
-		new_ts = *ts;
-		new_ts.italic = TRUE;
-		new_ts.use_default = TRUE;
-
-		gtk_source_language_set_tag_style (language, "Block Comment", &new_ts);
-*/	
-		table = GTK_SOURCE_TAG_TABLE (gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (buffer)));
-
-		gtk_source_tag_table_remove_all_source_tags (table);
-		
-		list = gtk_source_language_get_tags (language);		
-		
-		gtk_source_tag_table_add_all (table, list);
-		
-		g_slist_foreach (list, (GFunc) g_object_unref, NULL);
-		g_slist_free (list);
-		
+		uri = gnome_vfs_get_uri_from_local_path (filename);
 	}
 	else
-		g_print ("No language found.");	
-
-
-	gtk_source_buffer_load (buffer, "../src/gtksourcebuffer.c", &err);	
-	
-	
-	return GTK_TEXT_BUFFER (buffer);
-}
-
-static void
-cb_convert (GtkWidget *widget, gpointer data)
-{
-	FILE *hf;
-	gchar *txt;
-
-	txt = gtk_source_buffer_convert_to_html (GTK_SOURCE_BUFFER (data), "This is a test");
-	if (txt) {
-		hf = fopen ("test.html", "w+");
-		fwrite (txt, strlen (txt), 1, hf);
-		fclose (hf);
+	{
+		gchar *curdir, *path;
+		
+		curdir = g_get_current_dir ();
+		path = g_strconcat (curdir, "/", filename, NULL);
+		g_free (curdir);
+		uri = gnome_vfs_get_uri_from_local_path (path);
+		g_free (path);
 	}
-	g_free (txt);
+
+	mime_type = gnome_vfs_get_mime_type (uri);
+	g_free (uri);
+	if (mime_type)
+	{
+		language = gtk_source_languages_manager_get_language_from_mime_type (manager,
+										     mime_type);
+
+		if (language != NULL)
+		{
+			const GSList *list = NULL;
+			
+			list = gtk_source_language_get_tags (language);		
+ 			gtk_source_tag_table_add_all (table, list);
+		}
+		else
+		{
+			g_print ("No language found for mime type `%s'\n", mime_type);
+		}
+		g_free (mime_type);
+	}
+	else
+	{
+		g_warning ("Couldn't get mime type for file `%s'", filename);
+	}
+
+	gtk_source_buffer_load_with_encoding (buffer, filename, "utf-8", &err);
+	
+	if (err != NULL)
+	{
+		g_error_free (err);
+		return FALSE;
+	}
+	return TRUE;
 }
 
 static void
-cb_toggle (GtkWidget *widget, gpointer data)
+file_selected_cb (GtkWidget *widget, GtkFileSelection *file_sel)
 {
-	gtk_source_view_set_show_line_pixmaps (GTK_SOURCE_VIEW (data),
-					       !GTK_SOURCE_VIEW (data)->show_line_pixmaps);
+	ViewsData *vd;
+	const gchar *filename;
+	
+	vd = g_object_get_data (G_OBJECT (file_sel), "viewsdata");
+	filename = gtk_file_selection_get_filename (file_sel);
+	open_file (vd->buffer, filename);
 }
 
-static void
-cb_line_numbers_toggle (GtkWidget *widget, gpointer data)
+static void 
+open_file_cb (ViewsData *vd,
+	      guint      callback_action,
+	      GtkWidget *widget)
 {
-	gtk_source_view_set_show_line_numbers (GTK_SOURCE_VIEW (data),
-					       !GTK_SOURCE_VIEW (data)->show_line_numbers);
+	GtkWidget *file_sel;
+
+	file_sel = gtk_file_selection_new ("Open file...");
+	g_object_set_data (G_OBJECT (file_sel), "viewsdata", vd);
+
+	g_signal_connect (GTK_FILE_SELECTION (file_sel)->ok_button,
+			  "clicked",
+			  G_CALLBACK (file_selected_cb),
+			  file_sel);
+
+	g_signal_connect_swapped (GTK_FILE_SELECTION (file_sel)->ok_button, 
+				  "clicked", G_CALLBACK (gtk_widget_destroy),
+				  file_sel);
+	g_signal_connect_swapped (GTK_FILE_SELECTION (file_sel)->cancel_button, 
+				  "clicked", G_CALLBACK (gtk_widget_destroy),
+				  file_sel);
+
+	gtk_widget_show (file_sel);
 }
 
-static void
-cb_move_cursor (GtkTextBuffer *b, GtkTextIter *cursoriter, GtkTextMark *mark, gpointer data)
-{
-	char buf[64];
+/* Stolen from gedit */
 
-	if (mark != gtk_text_buffer_get_insert (gtk_text_iter_get_buffer (cursoriter)))
+static void
+update_cursor_position (GtkTextBuffer *buffer, GtkWidget *label)
+{
+	gchar *msg;
+	gint row, col, chars;
+	GtkTextIter iter, start;
+	
+	gtk_text_buffer_get_iter_at_mark (buffer,
+					  &iter,
+					  gtk_text_buffer_get_insert (buffer));
+	
+	chars = gtk_text_iter_get_offset (&iter);
+	row = gtk_text_iter_get_line (&iter) + 1;
+	
+	start = iter;
+	gtk_text_iter_set_line_offset (&start, 0);
+	col = 0;
+
+	while (!gtk_text_iter_equal (&start, &iter))
+	{
+		if (gtk_text_iter_get_char (&start) == '\t')
+		{
+			col += (8 - (col % 8));
+		}
+		else
+			++col;
+		
+		gtk_text_iter_forward_char (&start);
+	}
+	
+	msg = g_strdup_printf ("char: %d, line: %d, column: %d", chars, row, col);
+	gtk_label_set_text (GTK_LABEL (label), msg);
+      	g_free (msg);
+}
+
+static void 
+move_cursor_cb (GtkTextBuffer *buffer,
+		GtkTextIter   *cursoriter,
+		GtkTextMark   *mark,
+		gpointer       data)
+{
+	if (mark != gtk_text_buffer_get_insert (buffer))
 		return;
-	g_snprintf (buf, 64, "char pos %d line %d column %d",
-		    gtk_text_iter_get_offset (cursoriter),
-		    gtk_text_iter_get_line (cursoriter),
-		    gtk_text_iter_get_line_offset (cursoriter));
-	gtk_label_set_text (GTK_LABEL (data), buf);
+	
+	update_cursor_position (buffer, GTK_WIDGET (data));
 }
 
-static void
-cb_new_view (GtkWidget *w, GtkSourceBuffer *buffer)
+static gboolean
+window_deleted_cb (GtkWidget *widget, GdkEvent *ev, ViewsData *vd)
 {
-	GtkWidget *window, *sw, *view;
+	if (g_list_nth_data (vd->windows, 0) == widget)
+	{
+		/* Main (first in the list) window was closed, so exit
+		 * the application */
+		gtk_main_quit ();
+	}
+	else
+	{
+		vd->windows = g_list_remove (vd->windows, widget);
+
+		/* we return FALSE since we want the window destroyed */
+		return FALSE;
+	}
+	
+	return TRUE;
+}
+
+static GtkWidget *
+create_window (ViewsData *vd)
+{
+	GtkWidget *window, *sw, *view, *vbox;
 	PangoFontDescription *font_desc = NULL;
 	
+	/* window */
 	window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-	sw = gtk_scrolled_window_new (NULL, NULL);
-	gtk_container_add (GTK_CONTAINER (window), sw);
-	gtk_widget_show (sw);
-	view = gtk_source_view_new_with_buffer (buffer);
+	gtk_container_set_border_width (GTK_CONTAINER (window), 0);
+	gtk_window_set_title (GTK_WINDOW (window), "GtkSourceView Demo");
+	g_signal_connect (window, "delete-event", (GCallback) window_deleted_cb, vd);
+	vd->windows = g_list_append (vd->windows, window);
 
+	/* vbox */
+	vbox = gtk_vbox_new (0, FALSE);
+	gtk_container_add (GTK_CONTAINER (window), vbox);
+	g_object_set_data (G_OBJECT (window), "vbox", vbox);
+	gtk_widget_show (vbox);
+
+	/* scrolled window */
+	sw = gtk_scrolled_window_new (NULL, NULL);
+	gtk_box_pack_end (GTK_BOX (vbox), sw, TRUE, TRUE, 0);
+	gtk_widget_show (sw);
+	
+	/* view */
+	view = gtk_source_view_new_with_buffer (vd->buffer);
+	g_object_set_data (G_OBJECT (window), "view", view);
+	gtk_container_add (GTK_CONTAINER (sw), view);
+	gtk_widget_show (view);
+
+	/* setup view */
 	font_desc = pango_font_description_from_string ("monospace 10");
-	if (font_desc != NULL) {
+	if (font_desc != NULL)
+	{
 		gtk_widget_modify_font (view, font_desc);
 		pango_font_description_free (font_desc);
 	}
+	g_signal_connect (view, "realize",
+			  (GCallback) gtk_source_view_set_tab_stop,
+			  GINT_TO_POINTER (vd->tab_stop));
+	gtk_source_view_set_show_line_numbers (GTK_SOURCE_VIEW (view), vd->show_numbers);
+	gtk_source_view_set_show_line_pixmaps (GTK_SOURCE_VIEW (view), vd->show_markers);
 
-	gtk_container_add (GTK_CONTAINER (sw), view);
-	gtk_widget_show (view);
+	return window;
+}
+
+static void
+new_view_cb (ViewsData *vd, guint callback_action, GtkWidget *widget)
+{
+	GtkWidget *window;
+	
+	window = create_window (vd);
 	gtk_window_set_default_size (GTK_WINDOW (window), 400, 400);
 	gtk_widget_show (window);
 }
 
-int
-main (int argc, char *argv[])
+static GtkWidget *
+create_main_window (ViewsData *vd)
 {
 	GtkWidget *window;
-	GtkWidget *scrolled;
+	GtkAccelGroup *accel_group;
 	GtkWidget *vbox;
 	GtkWidget *label;
-	GtkWidget *button;
-	GtkTextBuffer *buf;
-	GtkWidget *tw;
-	GdkPixbuf *pixbuf;
-		/*
-	int i;
-	*/
-	PangoFontDescription *font_desc = NULL;
+	GtkWidget *menu;
 	
-	gtk_init (&argc, &argv);
+	window = create_window (vd);
+	vbox = g_object_get_data (G_OBJECT (window), "vbox");
+
+	/* item factory/menu */
+	accel_group = gtk_accel_group_new ();
+	vd->item_factory = gtk_item_factory_new (GTK_TYPE_MENU_BAR, "<main>", accel_group);
+	gtk_window_add_accel_group (GTK_WINDOW (window), accel_group);
+	g_object_unref (accel_group);
+	gtk_item_factory_create_items (vd->item_factory,
+				       G_N_ELEMENTS (menu_items),
+				       menu_items,
+				       vd);
+	menu = gtk_item_factory_get_widget (vd->item_factory, "<main>");
+	gtk_box_pack_start (GTK_BOX (vbox), menu, FALSE, FALSE, 0);
+	gtk_widget_show (menu);
 	
-	lm = gtk_source_languages_manager_new ();
-			
-	if (!gtk_source_tags_style_manager_init())
-		return -1;
+	/* preselect menu checkitems */
+	gtk_check_menu_item_set_active (
+		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
+								"/View/Show Line Numbers")),
+		vd->show_numbers);
+	gtk_check_menu_item_set_active (
+		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
+								"/View/Show Markers")),
+		vd->show_markers);
 
-	window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-	g_signal_connect (window, "destroy", G_CALLBACK (gtk_main_quit), NULL);
-
-	buf = test_source (NULL);
-
-	vbox = gtk_vbox_new (0, FALSE);
-	gtk_container_add (GTK_CONTAINER (window), vbox);
-
-	button = gtk_button_new_with_label ("convert to html (example is saved as test.html)");
-	gtk_box_pack_start (GTK_BOX (vbox), button, FALSE, FALSE, 0);
-	g_signal_connect (button, "clicked", G_CALLBACK (cb_convert), buf);
-
-	button = gtk_button_new_with_label ("New view");
-	gtk_box_pack_start (GTK_BOX (vbox), button, FALSE, FALSE, 0);
-	g_signal_connect (button, "clicked", G_CALLBACK (cb_new_view), buf);
-	
-	scrolled = gtk_scrolled_window_new (NULL, NULL);
-	gtk_box_pack_start (GTK_BOX (vbox), scrolled, TRUE, TRUE, 0);
-
+	/* cursor position label */
 	label = gtk_label_new ("label");
 	gtk_box_pack_start (GTK_BOX (vbox), label, FALSE, FALSE, 0);
-
-	g_signal_connect_closure (G_OBJECT (buf), "mark_set",
-				  g_cclosure_new ((GCallback) cb_move_cursor, label, NULL), TRUE);
-	tw = gtk_source_view_new_with_buffer (GTK_SOURCE_BUFFER (buf));
-	g_object_unref (buf);
+	g_signal_connect_closure (vd->buffer, "mark_set",
+				  g_cclosure_new_object ((GCallback) move_cursor_cb,
+							 G_OBJECT (label)),
+				  TRUE);
+	g_signal_connect_closure (vd->buffer, "changed",
+				  g_cclosure_new_object ((GCallback) update_cursor_position,
+							 G_OBJECT (label)),
+				  TRUE);
+	gtk_widget_show (label);
 	
-	gtk_source_view_set_show_line_numbers (GTK_SOURCE_VIEW (tw), TRUE);
-	gtk_source_view_set_show_line_pixmaps (GTK_SOURCE_VIEW (tw), TRUE);
-
-	font_desc = pango_font_description_from_string ("monospace 10");
-	if (font_desc != NULL) {
-		gtk_widget_modify_font (tw, font_desc);
-		pango_font_description_free (font_desc);
-	}
-
-	gtk_source_view_set_tab_stop (GTK_SOURCE_VIEW (tw), 8);
-
-	gtk_container_add (GTK_CONTAINER (scrolled), tw);
-
-	button = gtk_button_new_with_label ("Toggle line pixmaps");
-	gtk_box_pack_start (GTK_BOX (vbox), button, FALSE, FALSE, 0);
-	g_signal_connect (button, "clicked", G_CALLBACK (cb_toggle), tw);
-
-	button = gtk_button_new_with_label ("Toggle line numbers");
-	gtk_box_pack_start (GTK_BOX (vbox), button, FALSE, FALSE, 0);
-	g_signal_connect (button, "clicked", G_CALLBACK (cb_line_numbers_toggle), tw);
-
+#if 0
+	/* FIXME: update when we have a stable marker API */
+	
 	pixbuf = gdk_pixbuf_new_from_file ("/usr/share/pixmaps/apple-green.png", NULL);
 	gtk_source_view_add_pixbuf (GTK_SOURCE_VIEW (tw), "one", pixbuf, FALSE);
 	g_object_unref (pixbuf);
@@ -597,112 +522,65 @@ main (int argc, char *argv[])
 	pixbuf = gdk_pixbuf_new_from_file ("/usr/share/pixmaps/yes.xpm", NULL);
 	gtk_source_view_add_pixbuf (GTK_SOURCE_VIEW (tw), "three", pixbuf, FALSE);
 	g_object_unref (pixbuf);
-	
-	/*
-	for (i = 1; i < 200; i += 20) {
-		gtk_source_buffer_line_set_marker (GTK_SOURCE_BUFFER (GTK_TEXT_VIEW (tw)->buffer),
-						   i, "one");
-	}
-	for (i = 1; i < 200; i += 40) {
-		gtk_source_buffer_line_add_marker (GTK_SOURCE_BUFFER (GTK_TEXT_VIEW (tw)->buffer),
-						   i, "two");
-	}
-	for (i = 1; i < 200; i += 80) {
-		gtk_source_buffer_line_add_marker (GTK_SOURCE_BUFFER (GTK_TEXT_VIEW (tw)->buffer),
-						   i, "three");
-	}
-	*/
-
-	
-#if 0
-	{
-		const GSList *langs;
-		GtkSourceLanguage *language;
-		GSList *types = NULL;
-		
-		if (!gtk_source_languages_manager_init ())
-			return -1;       
-		
-		if (!gtk_source_tags_style_manager_init())
-			return -1;
-		
-		langs = gtk_source_languages_manager_get_available_languages ();
-
-		while (langs != NULL)
-		{
-			const GSList *mime_types;
-			const GSList *tags;
-			GtkSourceLanguage *l = GTK_SOURCE_LANGUAGE (langs->data);
-
-			g_print ("Name: %s\n", gtk_source_language_get_name (l));
-			g_print ("Section: %s\n", gtk_source_language_get_section (l));
-
-			mime_types = gtk_source_language_get_mime_types (l);
-			g_print ("Mime types: ");
-			while (mime_types != NULL)
-			{
-				g_print ("%s ", (const gchar*)mime_types->data);
-
-				mime_types = g_slist_next (mime_types);
-			}
-
-			g_print ("\n\n");
-
-			g_print ("Tags:\n");
-			tags = gtk_source_language_get_tags (l);
-
-			while (tags != NULL)
-			{
-				if (GTK_IS_SOURCE_TAG (tags->data))
-				{
-					g_print ("  Tag name: %s\n", GTK_TEXT_TAG (tags->data)->name);
-				}
-				else
-					g_print ("  Error!!!\n");
-
-				tags = g_slist_next (tags);
-			}
-							
-			
-			langs = g_slist_next (langs);
-		}
-
-		types = g_slist_prepend (types, "text/test");
-		gtk_source_language_set_mime_types (
-				GTK_SOURCE_LANGUAGE (
-					gtk_source_languages_manager_get_available_languages ()->data),
-				types);
-		g_slist_free (types);
-
-		g_print ("Get language from mime type: text/test\n\n");
-		
-		language = gtk_source_language_get_from_mime_type ("text/test");
-		
-		if (language != NULL)
-		{
-			g_print ("Name: %s\n", gtk_source_language_get_name (language));
-			g_object_unref (language);
-		}
-		else
-			g_print ("No language found.");	
-
-		
-		gtk_source_language_set_mime_types (
-				GTK_SOURCE_LANGUAGE (
-					gtk_source_languages_manager_get_available_languages ()->data),
-				NULL);			
-	}
 #endif
+	
+	return window;
+}
 
-	gtk_window_set_default_size (GTK_WINDOW (window), 400, 500);
-	gtk_widget_show_all (window);
+static GtkSourceBuffer *
+create_source_buffer (GtkSourceLanguagesManager *manager)
+{
+	GtkSourceBuffer *buffer;
+	
+	buffer = GTK_SOURCE_BUFFER (gtk_source_buffer_new (NULL));
+	g_object_ref (manager);
+	g_object_set_data_full (G_OBJECT (buffer), "languages-manager",
+				manager, (GDestroyNotify) g_object_unref);
+	
+	return buffer;
+}
+
+int
+main (int argc, char *argv[])
+{
+	GtkWidget *window;
+	GtkSourceLanguagesManager *lm;
+	ViewsData *vd;
+	
+	/* initialization */
+	gtk_init (&argc, &argv);
+	gnome_vfs_init ();
+	
+	lm = gtk_source_languages_manager_new ();
+	
+	/* setup... */
+	vd = g_new0 (ViewsData, 1);
+	vd->buffer = create_source_buffer (lm);
+	g_object_unref (lm);
+	vd->windows = NULL;
+	vd->show_numbers = TRUE;
+	vd->show_markers = TRUE;
+	
+	window = create_main_window (vd);
+	if (argc > 1)
+		open_file (vd->buffer, argv [1]);
+	else
+		open_file (vd->buffer, "../src/gtksourcebuffer.c");
+
+	gtk_window_set_default_size (GTK_WINDOW (window), 500, 500);
+	gtk_widget_show (window);
+
+	/* ... and action! */
 	gtk_main ();
 
-	g_object_unref (lm);
+	/* cleanup */
+	g_object_unref (vd->buffer);
+	g_object_unref (vd->item_factory);
+	g_list_foreach (vd->windows, (GFunc) gtk_widget_destroy, NULL);
+	g_list_free (vd->windows);
+	g_free (vd);
 
-	gtk_source_tags_style_manager_shutdown ();
-
-	g_print ("Done.\n");
-
-	return (0);
+	gnome_vfs_shutdown ();
+	
+	return 0;
 }

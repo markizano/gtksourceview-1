@@ -38,27 +38,6 @@ struct _GtkSourceTagStyle {
 	gboolean use_default;
 };
 
-/** LIFE CYCLE MANAGEMENT FUNCTIONS **/
-
-gboolean	 	 gtk_source_tags_style_manager_init	 		(void);
-
-/* This function must be called for releasing the resources used by the tags style manager */
-void		 	 gtk_source_tags_style_manager_shutdown			(void);
-
-
-
-const GSList		*gtk_source_tags_style_manager_get_available_themes	(void);
-
-const gchar		*gtk_source_tags_style_manager_get_current_theme	(void);
-gboolean		 gtk_source_tags_style_manager_set_current_theme	(const gchar 		 *theme);
-
-
-
-const GtkSourceTagStyle *gtk_source_get_default_tag_style 			(const gchar 		 *klass);
-/*
-void			*gtk_source_set_default_tag_style			(const gchar 		 *klass,
-								 		 const GtkSourceTagStyle *style);
-*/
 G_END_DECLS
 
 #endif  /* __GTK_SOURCE_TAG_STYLE_H__ */

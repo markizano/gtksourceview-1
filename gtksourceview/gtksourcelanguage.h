@@ -58,17 +58,14 @@ GType            	 gtk_source_language_get_type 			(void) G_GNUC_CONST;
 const gchar	 	*gtk_source_language_get_name			(const GtkSourceLanguage *language);
 const gchar		*gtk_source_language_get_section		(const GtkSourceLanguage *language);
 
-GSList			*gtk_source_language_get_tags			(const GtkSourceLanguage *language);
+const GSList		*gtk_source_language_get_tags			(const GtkSourceLanguage *language);
 
 const GSList		*gtk_source_language_get_mime_types		(const GtkSourceLanguage *language);
-
-
 void			 gtk_source_language_set_mime_types		(GtkSourceLanguage       *language,
 								 	 GSList			 *mime_types);
 
 const GtkSourceTagStyle	*gtk_source_language_get_tag_style		(const GtkSourceLanguage *language,
 									 const gchar		 *tag_name);
-
 void			 gtk_source_language_set_tag_style		(const GtkSourceLanguage *language,
 									 const gchar		 *tag_name,
 								 	 const GtkSourceTagStyle *style);

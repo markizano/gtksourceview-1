@@ -30,6 +30,7 @@
 #include "gtksourceview-i18n.h"
 #include "gtksourcelanguage.h"
 #include "gtksourcetag.h"
+#include "gtksourcestylescheme.h"
 
 static void	 	  gtk_source_language_class_init 	(GtkSourceLanguageClass 	*klass);
 static void		  gtk_source_language_init		(GtkSourceLanguage 		*lang);
@@ -107,9 +108,11 @@ _gtk_source_language_new_from_file (const gchar			*filename,
 
 	if (lang != NULL)
 	{
-		lang->priv->languages_manager = lm;
-
 		lang->priv->gconf_client = gconf_client_get_default ();
+
+		g_object_get (lm, "gconf_base_dir", &lang->priv->gconf_base_dir, NULL);
+		g_return_val_if_fail (lang->priv->gconf_base_dir != NULL, lang);
+
 
 		if (lang->priv->gconf_client != NULL)
 		{
@@ -204,9 +207,17 @@ gtk_source_language_finalize (GObject *object)
 
 		slist_deep_free (lang->priv->mime_types);
 
-		if (lang->priv->tag_name_to_style_name)
+		if (lang->priv->tag_list != NULL)
+		{
+			g_slist_foreach (lang->priv->tag_list, (GFunc)g_object_unref, NULL);
+			g_slist_free (lang->priv->tag_list);
+		}
+
+		if (lang->priv->tag_name_to_style_name != NULL)
 			g_hash_table_destroy (lang->priv->tag_name_to_style_name);
 		
+		g_free (lang->priv->gconf_base_dir);
+
 		g_free (lang->priv); 
 	}
 	
@@ -220,15 +231,14 @@ get_gconf_key (const GtkSourceLanguage *lang, const gchar *k)
 	gchar *temp;
 	gchar *key;
 	gchar *name;
-       
-	g_return_val_if_fail (lang->priv->languages_manager != NULL, NULL);
+
+	g_return_val_if_fail (lang->priv->gconf_base_dir != NULL, NULL);
 
 	name = gconf_escape_key (gtk_source_language_get_name (lang), -1);
 	g_return_val_if_fail (name != NULL, NULL);
+	
+	key = gconf_concat_dir_and_key (lang->priv->gconf_base_dir, "languages");
 
-	key = gconf_concat_dir_and_key (
-			gtk_source_languages_manager_get_gconf_base_dir (lang->priv->languages_manager), 
-			"languages");
 	g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
 	
 	temp = gconf_concat_dir_and_key (key, name);
@@ -452,7 +462,7 @@ gtk_source_language_set_mime_types (GtkSourceLanguage	*language,
 	gchar *key;
 	
 	g_return_if_fail (GTK_IS_SOURCE_LANGUAGE (language));
-	g_return_if_fail (language->priv->languages_manager != NULL);
+	g_return_if_fail (language->priv->gconf_base_dir != NULL);
 		
 	slist_deep_free (language->priv->mime_types);
 	language->priv->mime_types = NULL;
@@ -995,7 +1005,7 @@ parseTag (const GtkSourceLanguage *language,
 	return tag_list;
 }
 
-GSList *
+const GSList *
 gtk_source_language_get_tags (const GtkSourceLanguage *language)
 {
 	GSList *tag_list = NULL;
@@ -1006,6 +1016,9 @@ gtk_source_language_get_tags (const GtkSourceLanguage *language)
 
 	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
 
+	if (language->priv->tag_list != NULL)
+		return language->priv->tag_list;
+	
 	xmlKeepBlanksDefault (0);
 
 	doc = xmlParseFile (language->priv->lang_file_name);
@@ -1067,7 +1080,9 @@ gtk_source_language_get_tags (const GtkSourceLanguage *language)
       
 	xmlFreeDoc(doc);
 
-	return tag_list;
+	language->priv->tag_list = tag_list;
+	
+	return language->priv->tag_list;
 }
 
 const GtkSourceTagStyle *
@@ -1078,12 +1093,8 @@ gtk_source_language_get_tag_default_style (const GtkSourceLanguage 	*language,
 	
 	if (language->priv->tag_name_to_style_name == NULL)
 	{
-		GSList *list;
-		list = gtk_source_language_get_tags (language);
-
-		g_slist_foreach (list, (GFunc)g_object_unref, NULL);
-		g_slist_free (list);
-
+		gtk_source_language_get_tags (language);
+	
 		g_return_val_if_fail (language->priv->tag_name_to_style_name != NULL, NULL);
 	}
 
@@ -1091,7 +1102,14 @@ gtk_source_language_get_tag_default_style (const GtkSourceLanguage 	*language,
 							tag_name);
 
 	if (style_name != NULL)
-		return gtk_source_get_default_tag_style (style_name);
+	{
+		const GtkSourceStyleScheme *scheme;
+		
+		scheme = gtk_source_get_current_style_scheme ();
+
+		return gtk_source_style_scheme_get_tag_style (scheme,
+				                              style_name);
+	}
 	else
 		return NULL;
 }

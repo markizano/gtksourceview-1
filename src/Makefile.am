@@ -38,11 +38,12 @@ libgtksourceview_1_0_la_SOURCES = 		\
 	gtksourcelanguagesmanager.h 	\
 	gtksourcelanguagesmanager.c 	\
 	gtksourcetagstyle.h		\
-	gtksourcetagstyle.c		\
 	gtksourceview-i18n.h 		\
 	gtksourceview-i18n.c		\
 	gtksourcetagtable.h		\
 	gtksourcetagtable.c		\
+	gtksourcestylescheme.h		\
+	gtksourcestylescheme.c		\
 	$(BUILT_SOURCES)
 
 libgtksourceview_1_0_la_LIBADD = $(DEP_LIBS)
@@ -58,6 +59,7 @@ libgtksourceview_1_0_include_HEADERS = 	\
 	gtksourcelanguagesmanager.h 	\
 	gtksourcetagstyle.h 		\
 	gtksourcetagtable.h		\
+	gtksourcestylescheme.h		\
 	gtktextregion.h
 
 gtksourceview-marshal.h: gtksourceview-marshal.list $(GLIB_GENMARSHAL)

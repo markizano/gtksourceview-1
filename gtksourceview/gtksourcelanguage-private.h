@@ -36,10 +36,10 @@ struct _GtkSourceLanguagePrivate
 	GSList		*mime_types;
 
 	GHashTable	*tag_name_to_style_name;
+	GSList 		*tag_list;
 
 	GConfClient 	*gconf_client;
-
-	GtkSourceLanguagesManager *languages_manager;
+	gchar		*gconf_base_dir;
 };
 
 GtkSourceLanguage *_gtk_source_language_new_from_file (const gchar			*filename,

@@ -56,17 +56,6 @@ GType            gtk_source_languages_manager_get_type 		(void) G_GNUC_CONST;
 GtkSourceLanguagesManager *gtk_source_languages_manager_new	(void);
 
 
-/* Set a list of dirs containing .lang files */
-void		 gtk_source_languages_manager_set_specs_dirs	(GtkSourceLanguagesManager	 *lm,
-								 const GSList 		   	 *dirs);
-const GSList	*gtk_source_languages_manager_get_specs_dirs	(GtkSourceLanguagesManager 	 *lm);
-
-
-void		 gtk_source_languages_manager_set_gconf_base_dir (GtkSourceLanguagesManager	 *lm,
-								  const gchar			 *dir);
-const gchar	*gtk_source_languages_manager_get_gconf_base_dir (GtkSourceLanguagesManager	 *lm);
-
-									
 const GSList	*gtk_source_languages_manager_get_available_languages (GtkSourceLanguagesManager *lm);
 
 /* The GtkSourceLanguage life cycle is managed by the Manager */
