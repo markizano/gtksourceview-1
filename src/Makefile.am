@@ -31,7 +31,9 @@ libgtksourceview_la_SOURCES = \
 	gtksourceview-marshal.h \
 	gtksourceview-marshal.c \
 	gtktextregion.h \
-	gtktextregion.c
+	gtktextregion.c \
+	gtksourceregex.h \
+	gtksourceregex.c
 
 libgtksourceview_la_LIBADD = @DEP_LIBS@
 
@@ -40,7 +42,8 @@ libgtksourceview_includedir=$(includedir)/gtksourceview
 libgtksourceview_include_HEADERS = \
 	gtksourcebuffer.h \
 	gtksourcetag.h \
-	gtksourceview.h
+	gtksourceview.h \
+	gtksourceregex.h
 
 gtksourceview-marshal.h: gtksourceview-marshal.list
 	@GLIB_GENMARSHAL@ \

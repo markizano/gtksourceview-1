@@ -58,8 +58,10 @@ static void gtk_source_view_draw_line_markers (GtkSourceView *view,
 					       gint           line,
 					       gint           x,
 					       gint           y);
+#if 0
 static GdkPixbuf *gtk_source_view_get_line_marker (GtkSourceView *view,
 						   GList *list);
+#endif
 
 static void gtk_source_view_get_lines (GtkTextView  *text_view,
 				       gint          first_y,
@@ -225,6 +227,7 @@ menuitem_activate_cb (GtkWidget   *menuitem,
 	g_signal_emit_by_name (G_OBJECT (text_view), signal);
 }
 
+#if 0
 static GdkPixbuf *
 gtk_source_view_get_line_marker (GtkSourceView *view,
 				 GList         *list)
@@ -272,13 +275,14 @@ gtk_source_view_get_line_marker (GtkSourceView *view,
 
 	return pixbuf;
 }
-
+#endif
 static void
 gtk_source_view_draw_line_markers (GtkSourceView *view,
 				   gint           line,
 				   gint           x,
 				   gint           y)
 {
+#if 0
 	GList *list;
 	GdkPixbuf *pixbuf;
 	GdkWindow *win = gtk_text_view_get_window (GTK_TEXT_VIEW (view),
@@ -298,6 +302,7 @@ gtk_source_view_draw_line_markers (GtkSourceView *view,
 			g_object_unref (pixbuf);
 		}
 	}
+#endif 
 }
 
 static void
@@ -504,6 +509,7 @@ gtk_source_view_expose (GtkWidget      *widget,
 
 	event_handled = FALSE;
 	
+#if 0
 	/* check if the expose event is for the text window first, and
 	 * highlight the exposed region */
 	if (event->window == gtk_text_view_get_window (text_view, GTK_TEXT_WINDOW_TEXT)) {
@@ -532,7 +538,7 @@ gtk_source_view_expose (GtkWidget      *widget,
 		gtk_source_buffer_highlight_region (GTK_SOURCE_BUFFER (text_view->buffer),
 						    &iter1, &iter2);
 	}
-	
+#endif	
 	/* now check for the left window, which contains the margin */
 	if (event->window == gtk_text_view_get_window (text_view,
 						       GTK_TEXT_WINDOW_LEFT)) {
