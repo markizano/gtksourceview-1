@@ -44,6 +44,7 @@ typedef struct {
 	gboolean	 show_margin;
 	guint            tab_stop;
 	GtkItemFactory  *item_factory;
+	GtkWidget       *pos_label;
 } ViewsData;
 
 #define READ_BUFFER_SIZE   4096
@@ -381,7 +382,7 @@ open_file_cb (ViewsData *vd,
 /* Stolen from gedit */
 
 static void
-update_cursor_position (GtkTextBuffer *buffer, GtkWidget *label)
+update_cursor_position (GtkTextBuffer *buffer, ViewsData *vd)
 {
 	gchar *msg;
 	gint row, col, chars;
@@ -402,7 +403,7 @@ update_cursor_position (GtkTextBuffer *buffer, GtkWidget *label)
 	{
 		if (gtk_text_iter_get_char (&start) == '\t')
 		{
-			col += (8 - (col % 8));
+			col += (vd->tab_stop - (col % vd->tab_stop));
 		}
 		else
 			++col;
@@ -411,7 +412,7 @@ update_cursor_position (GtkTextBuffer *buffer, GtkWidget *label)
 	}
 	
 	msg = g_strdup_printf ("char: %d, line: %d, column: %d", chars, row, col);
-	gtk_label_set_text (GTK_LABEL (label), msg);
+	gtk_label_set_text (GTK_LABEL (vd->pos_label), msg);
       	g_free (msg);
 }
 
@@ -424,7 +425,7 @@ move_cursor_cb (GtkTextBuffer *buffer,
 	if (mark != gtk_text_buffer_get_insert (buffer))
 		return;
 	
-	update_cursor_position (buffer, GTK_WIDGET (data));
+	update_cursor_position (buffer, data);
 }
 
 static gboolean
@@ -515,7 +516,6 @@ create_main_window (ViewsData *vd)
 	GtkWidget *window;
 	GtkAccelGroup *accel_group;
 	GtkWidget *vbox;
-	GtkWidget *label;
 	GtkWidget *menu;
 	GtkWidget *radio_item;
 	gchar *radio_path;
@@ -566,17 +566,13 @@ create_main_window (ViewsData *vd)
 	g_free (radio_path);
 	
 	/* cursor position label */
-	label = gtk_label_new ("label");
-	gtk_box_pack_start (GTK_BOX (vbox), label, FALSE, FALSE, 0);
-	g_signal_connect_closure (vd->buffer, "mark_set",
-				  g_cclosure_new_object ((GCallback) move_cursor_cb,
-							 G_OBJECT (label)),
-				  TRUE);
-	g_signal_connect_closure (vd->buffer, "changed",
-				  g_cclosure_new_object ((GCallback) update_cursor_position,
-							 G_OBJECT (label)),
-				  TRUE);
-	gtk_widget_show (label);
+	vd->pos_label = gtk_label_new ("label");
+	gtk_box_pack_start (GTK_BOX (vbox), vd->pos_label, FALSE, FALSE, 0);
+	g_signal_connect (vd->buffer, "mark_set",
+			  (GCallback) move_cursor_cb, vd);
+	g_signal_connect (vd->buffer, "changed",
+			  (GCallback) update_cursor_position, vd);
+	gtk_widget_show (vd->pos_label);
 	
 #if 0
 	/* FIXME: update when we have a stable marker API */
