@@ -613,6 +613,7 @@ main (int argc, char *argv[])
 		while (langs != NULL)
 		{
 			const GSList *mime_types;
+			const GSList *tags;
 			GtkSourceLanguage *l = GTK_SOURCE_LANGUAGE (langs->data);
 
 			g_print ("Name: %s\n", gtk_source_language_get_name (l));
@@ -629,8 +630,22 @@ main (int argc, char *argv[])
 
 			g_print ("\n\n");
 
-			gtk_source_language_get_tags (l);
+			g_print ("Tags:\n");
+			tags = gtk_source_language_get_tags (l);
 
+			while (tags != NULL)
+			{
+				if (GTK_IS_SOURCE_TAG (tags->data))
+				{
+					g_print ("  Tag name: %s\n", GTK_TEXT_TAG (tags->data)->name);
+				}
+				else
+					g_print ("  Error!!!\n");
+
+				tags = g_slist_next (tags);
+			}
+							
+			
 			langs = g_slist_next (langs);
 		}
 
@@ -653,12 +668,11 @@ main (int argc, char *argv[])
 		else
 			g_print ("No language found.");	
 
+		
 		gtk_source_language_set_mime_types (
 				GTK_SOURCE_LANGUAGE (
 					gtk_source_languages_manager_get_available_languages ()->data),
-				NULL);
-
-				
+				NULL);			
 	}
 
 	gtk_widget_set_usize (window, 400, 500);

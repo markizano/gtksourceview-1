@@ -38,7 +38,9 @@ libgtksourceview_la_SOURCES = \
 	gtksourcelanguage.c \
 	gtksourcelanguage.h \
 	gtksourcelanguagesmanager.h \
-	gtksourcetagstyle.h
+	gtksourcetagstyle.h	\
+	gtksourcetagstyle.c
+
 
 libgtksourceview_la_LIBADD = @DEP_LIBS@
 

@@ -20,6 +20,9 @@
 #ifndef __GTK_SOURCE_TAG_STYLE_H__
 #define __GTK_SOURCE_TAG_STYLE_H__
 
+#include <glib.h>
+#include <gdk/gdkcolor.h>
+
 G_BEGIN_DECLS
 
 typedef struct _GtkSourceTagStyle GtkSourceTagStyle;
@@ -33,11 +36,27 @@ struct _GtkSourceTagStyle {
 	gboolean use_default;
 };
 
-const GtkSourceTagStyle *gtk_source_get_default_tag_style 	(const gchar 		 *klass);
+/** LIFE CYCLE MANAGEMENT FUNCTIONS **/
 
-void			*gtk_source_set_default_tag_style	(const gchar 		 *klass,
-								 const GtkSourceTagStyle *style);
+gboolean	 	 gtk_source_tags_style_manager_init	 		(void);
+
+/* This function must be called for releasing the resources used by the tags style manager */
+void		 	 gtk_source_tags_style_manager_shutdown			(void);
+
+
+
+const GSList		*gtk_source_tags_style_manager_get_available_themes	(void);
+
+const gchar		*gtk_source_tags_style_manager_get_current_theme	(void);
+gboolean		 gtk_source_tags_style_manager_set_current_theme	(const gchar 		 *theme);
+
+
+
+const GtkSourceTagStyle *gtk_source_get_default_tag_style 			(const gchar 		 *klass);
+
+void			*gtk_source_set_default_tag_style			(const gchar 		 *klass,
+								 		 const GtkSourceTagStyle *style);
 G_END_DECLS
 
-#undef  /* __GTK_SOURCE_TAG_STYLE_H__ */
+#endif  /* __GTK_SOURCE_TAG_STYLE_H__ */
 

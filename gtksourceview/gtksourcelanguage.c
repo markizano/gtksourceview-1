@@ -441,15 +441,21 @@ get_gconf_key (const GtkSourceLanguage *lang, const gchar *k)
 	name = gconf_escape_key (gtk_source_language_get_name (lang), -1);
 	g_return_val_if_fail (name != NULL, NULL);
 
-	temp = gconf_concat_dir_and_key (languages_manager->gconf_base_dir, name);
+	key = gconf_concat_dir_and_key (languages_manager->gconf_base_dir, "languages");
+	g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
+	
+	temp = gconf_concat_dir_and_key (key, name);
 	g_return_val_if_fail (gconf_valid_key (temp, NULL), NULL);
 
+	g_free (key);
 	g_free (name);
 
 	key = gconf_concat_dir_and_key (temp, k);
 	g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
 
 	g_free (temp);
+
+	g_print ("Key: %s\n", key);
 	
 	return key;
 }
@@ -1042,8 +1048,90 @@ parseKeywordList (xmlDocPtr doc, xmlNodePtr cur, xmlChar *name)
 	return tag;
 }
 
+static GtkTextTag *
+parsePatternItem (xmlDocPtr doc, xmlNodePtr cur, xmlChar *name)
+{
+	GtkTextTag *tag = NULL;
+	
+	xmlNodePtr child;
 
-static void
+	child = cur->xmlChildrenNode;
+		
+	if ((child != NULL) && !xmlStrcmp (child->name, (const xmlChar *)"regex"))
+	{
+		xmlChar *regex;
+			
+		regex = xmlNodeListGetString (doc, child->xmlChildrenNode, 1);
+			
+		tag = gtk_pattern_tag_new (name, strconvescape (regex));
+
+		xmlFree (regex);
+	}
+	else
+	{
+		g_warning ("Missing regex in tag 'pattern-item' (%s, line %ld)", 
+			   doc->name, xmlGetLineNo (child));
+	}
+
+	return tag;
+}
+
+static GtkTextTag *
+parseSyntaxItem (xmlDocPtr doc, xmlNodePtr cur, xmlChar *name)
+{
+	GtkTextTag *tag = NULL;
+
+	xmlChar *start_regex = NULL;
+	xmlChar *end_regex = NULL;
+
+	xmlNodePtr child;
+
+	child = cur->xmlChildrenNode;
+	
+	while (child != NULL)
+	{	
+		if (!xmlStrcmp (child->name, (const xmlChar *)"start-regex"))
+		{
+			start_regex = xmlNodeListGetString (doc, child->xmlChildrenNode, 1);
+		}
+		else
+		if (!xmlStrcmp (child->name, (const xmlChar *)"end-regex"))
+		{
+			end_regex = xmlNodeListGetString (doc, child->xmlChildrenNode, 1);
+		}
+
+		child = child->next;
+	}
+
+	if (start_regex == NULL)
+	{
+		g_warning ("Missing start-regex in tag 'syntax-item' (%s, line %ld)", 
+			   doc->name, xmlGetLineNo (cur));
+
+		return NULL;
+	}
+
+	if (end_regex == NULL)
+	{
+		xmlFree (start_regex);
+
+		g_warning ("Missing end-regex in tag 'syntax-item' (%s, line %ld)", 
+			   doc->name, xmlGetLineNo (cur));
+
+		return NULL;
+	}
+
+	tag = gtk_syntax_tag_new (name, 
+				  strconvescape (start_regex),
+				  strconvescape (end_regex));
+
+	xmlFree (start_regex);
+	xmlFree (end_regex);
+
+	return tag;
+}
+
+static GSList *
 parseTag (xmlDocPtr doc, xmlNodePtr cur, GSList *tag_list)
 {
 	GtkTextTag *tag = NULL;
@@ -1055,7 +1143,7 @@ parseTag (xmlDocPtr doc, xmlNodePtr cur, GSList *tag_list)
 
 	if (name == NULL)
 	{
-		return;	
+		return tag_list;	
 	}
 	if (style == NULL)
 	{
@@ -1079,12 +1167,26 @@ parseTag (xmlDocPtr doc, xmlNodePtr cur, GSList *tag_list)
 	{
 		tag = parseKeywordList (doc, cur, name);		
 	}
+	else if (!xmlStrcmp (cur->name, (const xmlChar *)"pattern-item"))
+	{
+		tag = parsePatternItem (doc, cur, name);		
+	}
+	else if (!xmlStrcmp (cur->name, (const xmlChar *)"syntax-item"))
+	{
+		tag = parseSyntaxItem (doc, cur, name);		
+	}
+	else
+	{
+		g_print ("Unknown tag: %s\n", cur->name);
+	}
 
 	if (tag != NULL)
 		tag_list = g_slist_prepend (tag_list, tag);
-
+	
 	xmlFree (name);
 	xmlFree (style);
+
+	return tag_list;
 }
 
 const GSList *
@@ -1130,12 +1232,16 @@ gtk_source_language_get_tags (const GtkSourceLanguage *language)
 	 * right ones - Paolo */
 
 	cur = cur->xmlChildrenNode;
+	g_return_val_if_fail (cur != NULL, NULL);
+	
 	while (cur != NULL)
 	{
-		parseTag (doc, cur, tag_list);
+		tag_list = parseTag (doc, cur, tag_list);
 		
 		cur = cur->next;
 	}
+
+	tag_list = g_slist_reverse (tag_list);
       
 	xmlFreeDoc(doc);
 
