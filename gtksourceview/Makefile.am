@@ -40,7 +40,7 @@ libgtksourceview_headers =			\
 	gtksourceprintjob.h			\
 	gtksourceengine.h
 
-libgtksourceview_1_0_la_SOURCES = 		\
+libgtksourceview_1_0_la_SOURCES = 	\
 	gtksourcebuffer.c 		\
 	gtksourceiter.c			\
 	gtksourcetag.c 			\
@@ -55,6 +55,8 @@ libgtksourceview_1_0_la_SOURCES = 		\
 	gtksourcelanguage.c 		\
 	gtksourcelanguage-private.h 	\
 	gtksourcelanguagesmanager.c 	\
+	gtksourcelanguage-parser-1.c	\
+	gtksourcelanguage-parser-2.c	\
 	gtksourceview-i18n.h 		\
 	gtksourceview-i18n.c		\
 	gtksourcetagtable.c		\
@@ -64,8 +66,11 @@ libgtksourceview_1_0_la_SOURCES = 		\
 	gtksourceengine.c		\
 	gtksourcesimpleengine.h		\
 	gtksourcesimpleengine.c		\
+	gtksourcestackengine.h		\
+	gtksourcestackengine.c		\
 	$(libgtksourceview_headers)	\
 	$(BUILT_SOURCES)
+
 
 libgtksourceview_1_0_la_LIBADD = $(DEP_LIBS) $(REGEX_LIBS)
 

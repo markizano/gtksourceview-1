@@ -115,15 +115,3 @@ GtkSourceLanguage
 @tag_name: 
 
 
-<!-- ##### FUNCTION gtk_source_language_get_tag_default_style ##### -->
-<para>
-
-</para>
-
-@language: 
-@tag_id: 
-@Returns: 
-<!-- # Unused Parameters # -->
-@tag_name: 
-
-

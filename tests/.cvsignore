@@ -2,3 +2,5 @@ Makefile
 Makefile.in
 test-widget
 testregion
+test-new-engine
+

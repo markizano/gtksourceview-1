@@ -29,7 +29,8 @@ GtkSourceStyleScheme
 @style_changed: 
 @get_name: 
 @get_tag_style: 
-@get_style_names: 
+@get_style_name: 
+@get_style_ids: 
 @_gtk_source_reserved1: 
 @_gtk_source_reserved2: 
 @_gtk_source_reserved3: 
@@ -41,8 +42,10 @@ GtkSourceStyleScheme
 </para>
 
 @scheme: 
-@style_name: 
+@style_id: 
 @Returns: 
+<!-- # Unused Parameters # -->
+@style_name: 
 
 
 <!-- ##### FUNCTION gtk_source_style_scheme_get_name ##### -->

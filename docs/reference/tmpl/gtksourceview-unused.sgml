@@ -196,6 +196,16 @@
 @language: 
 @Returns: 
 
+<!-- ##### FUNCTION gtk_source_language_get_tag_default_style ##### -->
+<para>
+
+</para>
+
+@language: 
+@tag_id: 
+@Returns: 
+@tag_name: 
+
 <!-- ##### FUNCTION gtk_string_tag_new ##### -->
 <para>
 

@@ -12,7 +12,7 @@ INCLUDES = 				\
 	$(TESTS_CFLAGS)
 
 # testing executables
-noinst_PROGRAMS = test-widget testregion
+noinst_PROGRAMS = test-widget testregion test-new-engine
 
 test_widget_SOURCES = test-widget.c
 
@@ -24,5 +24,11 @@ test_widget_LDADD = 			\
 testregion_SOURCES = testregion.c
 
 testregion_LDADD = 			\
+	$(top_builddir)/gtksourceview/libgtksourceview-1.0.la \
+	$(DEP_LIBS)
+
+test_new_engine_SOURCES = test-new-engine.c
+
+test_new_engine_LDADD = 		\
 	$(top_builddir)/gtksourceview/libgtksourceview-1.0.la \
 	$(DEP_LIBS)

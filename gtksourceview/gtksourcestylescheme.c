@@ -79,6 +79,16 @@ gtk_source_style_scheme_get_tag_style (GtkSourceStyleScheme *scheme,
 	return GTK_SOURCE_STYLE_SCHEME_GET_CLASS (scheme)->get_tag_style (scheme, style_name);
 }
 
+gchar *
+gtk_source_style_scheme_get_style_name (GtkSourceStyleScheme *scheme,
+                                        const gchar          *style_id)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme), NULL);
+	g_return_val_if_fail (style_id != NULL, NULL);
+
+	return GTK_SOURCE_STYLE_SCHEME_GET_CLASS (scheme)->get_style_name (scheme, style_id);
+}
+
 const gchar *
 gtk_source_style_scheme_get_name (GtkSourceStyleScheme *scheme)
 {
@@ -88,11 +98,11 @@ gtk_source_style_scheme_get_name (GtkSourceStyleScheme *scheme)
 }
 
 GSList *
-gtk_source_style_scheme_get_style_names (GtkSourceStyleScheme *scheme)
+gtk_source_style_scheme_get_style_ids (GtkSourceStyleScheme *scheme)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme), NULL);
 
-	return GTK_SOURCE_STYLE_SCHEME_GET_CLASS (scheme)->get_style_names (scheme);
+	return GTK_SOURCE_STYLE_SCHEME_GET_CLASS (scheme)->get_style_ids (scheme);
 }
 
 
@@ -108,6 +118,14 @@ gtk_source_style_scheme_get_style_names (GtkSourceStyleScheme *scheme)
 
 typedef struct _GtkSourceDefaultStyleScheme     	GtkSourceDefaultStyleScheme;
 typedef struct _GtkSourceDefaultStyleSchemeClass	GtkSourceDefaultStyleSchemeClass;
+
+typedef struct _TagStyle TagStyle;
+
+struct _TagStyle
+{
+	gchar              *translated_name;
+	GtkSourceTagStyle  *tag_style;
+};
 
 struct _GtkSourceDefaultStyleScheme
 {
@@ -132,9 +150,11 @@ static void   gtk_source_default_style_scheme_finalize		(GObject			 *object);
 
 static GtkSourceTagStyle *gtk_source_default_style_scheme_get_tag_style 
 								(GtkSourceStyleScheme *scheme,
-								 const gchar          *style_name);
+								 const gchar          *style_id);
+static gchar  *gtk_source_default_style_scheme_get_style_name   (GtkSourceStyleScheme *scheme,
+								 const gchar          *style_id);
 static const gchar *gtk_source_default_style_scheme_get_name 	(GtkSourceStyleScheme *scheme);
-static GSList *gtk_source_default_style_scheme_get_style_names  (GtkSourceStyleScheme *scheme);
+static GSList *gtk_source_default_style_scheme_get_style_ids    (GtkSourceStyleScheme *scheme);
 
 
 static GType
@@ -192,18 +212,25 @@ gtk_source_default_style_scheme_IFace_init (GtkSourceStyleSchemeClass *iface)
 {
 	iface->get_tag_style 	= gtk_source_default_style_scheme_get_tag_style;
 	iface->get_name		= gtk_source_default_style_scheme_get_name;
-	iface->get_style_names  = gtk_source_default_style_scheme_get_style_names;
+	iface->get_style_name   = gtk_source_default_style_scheme_get_style_name;
+	iface->get_style_ids    = gtk_source_default_style_scheme_get_style_ids;
 }
 
-static GtkSourceTagStyle *
-new_tag_style (gchar* foreground,
-	       gchar* background,
-	       gboolean bold,
-	       gboolean italic)
+static void
+insert_new_tag_style (GHashTable  *styles,
+                      const gchar *id,
+                      const gchar *foreground,
+	              const gchar *background,
+	              gboolean     bold,
+	              gboolean     italic)
 {
+	TagStyle *t;
 	GtkSourceTagStyle *ts;
 
+	t = g_new0 (TagStyle, 1);
 	ts = gtk_source_tag_style_new ();
+	t->translated_name = g_strdup (gtksourceview_gettext (id));
+	t->tag_style = ts;
 
 	gdk_color_parse (foreground, &ts->foreground);
 	ts->mask |= GTK_SOURCE_TAG_STYLE_USE_FOREGROUND;
@@ -218,89 +245,69 @@ new_tag_style (gchar* foreground,
 	ts->bold	= bold;
 	ts->is_default	= TRUE;
 
-	return ts;
+	g_hash_table_insert (styles, g_strdup (id), t);
 }
 
+static void
+tag_style_free (TagStyle *ts)
+{
+	if (ts)
+	{
+		g_free (ts->translated_name);
+		gtk_source_tag_style_free (ts->tag_style);
+		g_free (ts);
+	}
+}
 
 static void
 gtk_source_default_style_scheme_init (GtkSourceDefaultStyleScheme *scheme)
 {
-	GtkSourceTagStyle *ts;
+	scheme->styles = g_hash_table_new_full ((GHashFunc) g_str_hash,
+				                (GEqualFunc) g_str_equal,
+					        (GDestroyNotify) g_free,
+					        (GDestroyNotify) tag_style_free);
 
-	scheme->styles = g_hash_table_new_full ((GHashFunc)g_str_hash,
-				                (GEqualFunc)g_str_equal,
-					        (GDestroyNotify)g_free,
-					        (GDestroyNotify)gtk_source_tag_style_free);
+	insert_new_tag_style (scheme->styles, N_("Base-N Integer"), 
+	                      "#FF00FF", NULL, FALSE, FALSE);
 
-	ts = new_tag_style ("#FF00FF", NULL, FALSE, FALSE);
-	g_hash_table_insert (scheme->styles, 
-			     g_strdup (N_("Base-N Integer")),
-			     ts);
+	insert_new_tag_style (scheme->styles, N_("Character"),
+	                      "#FF00FF", NULL, FALSE, FALSE);
 
-	ts = new_tag_style ("#FF00FF", NULL, FALSE, FALSE);
-	g_hash_table_insert (scheme->styles, 
-			     g_strdup (N_("Character")),
-			     ts);
+	insert_new_tag_style (scheme->styles, N_("Comment"),
+	                      "#0000FF", NULL, FALSE, FALSE);
 
-	ts = new_tag_style ("#0000FF", NULL, FALSE, FALSE);
-	g_hash_table_insert (scheme->styles, 
-			     g_strdup (N_("Comment")),
-			     ts);
+	insert_new_tag_style (scheme->styles, N_("Data Type"),
+	                      "#2E8B57", NULL, TRUE, FALSE);
 
-	ts = new_tag_style ("#2E8B57", NULL, TRUE, FALSE);
-	g_hash_table_insert (scheme->styles, 
-			     g_strdup (N_("Data Type")),
-			     ts);
+	insert_new_tag_style (scheme->styles, N_("Function"),
+	                      "#008A8C", NULL, FALSE, FALSE);
 
-	ts = new_tag_style ("#008A8C", NULL, FALSE, FALSE);
-	g_hash_table_insert (scheme->styles, 
-			     g_strdup (N_("Function")),
-			     ts);
+	insert_new_tag_style (scheme->styles, N_("Decimal"),
+	                      "#FF00FF", NULL, FALSE, FALSE);
 
-	ts = new_tag_style ("#FF00FF", NULL, FALSE, FALSE);
-	g_hash_table_insert (scheme->styles, 
-			     g_strdup (N_("Decimal")),
-			     ts);
+	insert_new_tag_style (scheme->styles, N_("Floating Point"),
+	                      "#FF00FF", NULL, FALSE, FALSE);
 
-	ts = new_tag_style ("#FF00FF", NULL, FALSE, FALSE);
-	g_hash_table_insert (scheme->styles, 
-			     g_strdup (N_("Floating Point")),
-			     ts);
-
-	ts = new_tag_style ("#A52A2A", NULL, TRUE, FALSE);
-	g_hash_table_insert (scheme->styles, 
-			     g_strdup (N_("Keyword")),
-			     ts);
+	insert_new_tag_style (scheme->styles, N_("Keyword"),
+	                      "#A52A2A", NULL, TRUE, FALSE);
 	
-	ts = new_tag_style ("#A020F0", NULL, FALSE, FALSE);
-	g_hash_table_insert (scheme->styles, 
-			     g_strdup (N_("Preprocessor")),
-			     ts);
+	insert_new_tag_style (scheme->styles, N_("Preprocessor"),
+	                      "#A020F0", NULL, FALSE, FALSE);
 
-	ts = new_tag_style ("#FF00FF", NULL, FALSE, FALSE);
-	g_hash_table_insert (scheme->styles, 
-			     g_strdup (N_("String")),
-			     ts);
+	insert_new_tag_style (scheme->styles, N_("String"),
+	                      "#FF00FF", NULL, FALSE, FALSE);
 
-	ts = new_tag_style ("#FFFFFF", "#FF0000", FALSE, FALSE);
-	g_hash_table_insert (scheme->styles, 
-			     g_strdup (N_("Specials")),
-			     ts);
+	insert_new_tag_style (scheme->styles, N_("Specials"),
+	                      "#FFFFFF", "#FF0000", FALSE, FALSE);
 
-	ts = new_tag_style ("#2E8B57", NULL, TRUE, FALSE);
-	g_hash_table_insert (scheme->styles, 
-			     g_strdup (N_("Others")),
-			     ts);
+	insert_new_tag_style (scheme->styles, N_("Others"),
+	                      "#2E8B57", NULL, TRUE, FALSE);
 
-	ts = new_tag_style ("#008B8B", NULL, FALSE, FALSE);
-	g_hash_table_insert (scheme->styles, 
-			     g_strdup (N_("Others 2")),
-			     ts);
+	insert_new_tag_style (scheme->styles, N_("Others 2"),
+	                      "#008B8B", NULL, FALSE, FALSE);
 
-	ts = new_tag_style ("#6A5ACD", NULL, FALSE, FALSE);
-	g_hash_table_insert (scheme->styles, 
-			     g_strdup (N_("Others 3")),
-			     ts);
+	insert_new_tag_style (scheme->styles, N_("Others 3"),
+	                      "#6A5ACD", NULL, FALSE, FALSE);
 }
 
 static void 
@@ -316,19 +323,36 @@ gtk_source_default_style_scheme_finalize (GObject *object)
 
 static GtkSourceTagStyle *
 gtk_source_default_style_scheme_get_tag_style (GtkSourceStyleScheme *scheme,
-					       const gchar          *style_name)
+					       const gchar          *style_id)
 {
 	GtkSourceDefaultStyleScheme *ds;
 	const gpointer *style;
 
 	g_return_val_if_fail (GTK_IS_SOURCE_DEFAULT_STYLE_SCHEME (scheme), NULL);
-	g_return_val_if_fail (style_name != NULL, NULL);
+	g_return_val_if_fail (style_id != NULL, NULL);
 
 	ds = GTK_SOURCE_DEFAULT_STYLE_SCHEME (scheme);
 
-	style = g_hash_table_lookup (ds->styles, style_name);
+	style = g_hash_table_lookup (ds->styles, style_id);
 
-	return (style != NULL) ? gtk_source_tag_style_copy ((GtkSourceTagStyle *)style) : NULL;
+	return style ? gtk_source_tag_style_copy (((TagStyle *) style)->tag_style) : NULL;
+}
+
+static gchar *
+gtk_source_default_style_scheme_get_style_name (GtkSourceStyleScheme *scheme,
+                                                const gchar          *style_id)
+{
+	GtkSourceDefaultStyleScheme *ds;
+	const gpointer *style;
+
+	g_return_val_if_fail (GTK_IS_SOURCE_DEFAULT_STYLE_SCHEME (scheme), NULL);
+	g_return_val_if_fail (style_id != NULL, NULL);
+
+	ds = GTK_SOURCE_DEFAULT_STYLE_SCHEME (scheme);
+
+	style = g_hash_table_lookup (ds->styles, style_id);
+
+	return style ? g_strdup (((TagStyle *) style)->translated_name) : NULL;
 }
 
 static const gchar *
@@ -348,7 +372,7 @@ add_style_name (gpointer key, gpointer value, gpointer user_data)
 }
 
 static GSList *
-gtk_source_default_style_scheme_get_style_names (GtkSourceStyleScheme *scheme)
+gtk_source_default_style_scheme_get_style_ids (GtkSourceStyleScheme *scheme)
 {
 	GtkSourceDefaultStyleScheme *ds;
 	GSList *l = NULL;

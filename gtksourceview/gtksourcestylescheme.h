@@ -69,8 +69,10 @@ struct _GtkSourceStyleSchemeClass
 	/* vtable */
 	const gchar		* (* get_name)		(GtkSourceStyleScheme *scheme);
 	GtkSourceTagStyle       * (* get_tag_style) 	(GtkSourceStyleScheme *scheme,
-						     	 const gchar          *style_name);
-	GSList                  * (* get_style_names)   (GtkSourceStyleScheme *scheme);
+						     	 const gchar          *style_id);
+	gchar                   * (* get_style_name)    (GtkSourceStyleScheme *scheme,
+	                                                 const gchar          *style_id);
+	GSList                  * (* get_style_ids)     (GtkSourceStyleScheme *scheme);
 
 	/* Padding for future expansion */
 	void (*_gtk_source_reserved1) (void);
@@ -83,9 +85,11 @@ GType                        gtk_source_style_scheme_get_type        (void) G_GN
 
 
 GtkSourceTagStyle	    *gtk_source_style_scheme_get_tag_style   (GtkSourceStyleScheme *scheme,
-								      const gchar          *style_name);
+								      const gchar          *style_id);
+gchar                       *gtk_source_style_scheme_get_style_name  (GtkSourceStyleScheme *scheme,
+                                                                      const gchar          *style_id);
 const gchar		    *gtk_source_style_scheme_get_name        (GtkSourceStyleScheme *scheme);
-GSList                      *gtk_source_style_scheme_get_style_names (GtkSourceStyleScheme *scheme);
+GSList                      *gtk_source_style_scheme_get_style_ids   (GtkSourceStyleScheme *scheme);
 
 
 /* Default style scheme */

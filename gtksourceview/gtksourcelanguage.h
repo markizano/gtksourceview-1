@@ -65,6 +65,7 @@ struct _GtkSourceLanguageClass
 };
 
 #define GTK_SOURCE_LANGUAGE_VERSION_1_0  100
+#define GTK_SOURCE_LANGUAGE_VERSION_2_0  200
 
 
 GType            	 gtk_source_language_get_type 			(void) G_GNUC_CONST;
@@ -94,9 +95,6 @@ GtkSourceTagStyle	*gtk_source_language_get_tag_style		(GtkSourceLanguage       *
 void			 gtk_source_language_set_tag_style		(GtkSourceLanguage       *language,
 									 const gchar		 *tag_id,
 								 	 const GtkSourceTagStyle *style);
-
-GtkSourceTagStyle	*gtk_source_language_get_tag_default_style	(GtkSourceLanguage       *language,
-								 	 const gchar		 *tag_id);
 
 G_END_DECLS				
 

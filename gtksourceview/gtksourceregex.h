@@ -51,6 +51,9 @@ gboolean        gtk_source_regex_match          (GtkSourceRegex       *regex,
 						 gint                  pos,
 						 gint                  len);
 
+gchar          *gtk_source_regex_case_insesitive_keyword (const gchar *keyword);
+gchar          *gtk_source_regex_escape_string           (const gchar *text);
+
 G_END_DECLS
 
 #endif

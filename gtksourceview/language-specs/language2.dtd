@@ -1,0 +1,36 @@
+<!ELEMENT language ((style|context)+)>
+<!-- FIXME: the "name" and "section" attributes can be prefixed with
+     "_" to be marked for translation -->
+<!ATTLIST language
+  name                CDATA #REQUIRED
+  version             CDATA #REQUIRED
+  section             CDATA #REQUIRED
+  translation-domain  CDATA #IMPLIED
+  mimetypes           CDATA #REQUIRED>
+
+<!ELEMENT style (EMPTY)>
+<!ATTLIST style
+  id       ID    #REQUIRED
+  name     CDATA #IMPLIED
+  inherits IDREF #IMPLIED>
+
+<!ELEMENT context (string|regex)*>
+<!ATTLIST context
+  id       ID    #REQUIRED
+  style    IDREF #IMPLIED>
+
+<!ENTITY % matchattrs
+ "id       ID    #IMPLIED
+  style    IDREF #IMPLIED
+  action   CDATA #IMPLIED">
+
+<!ELEMENT string (EMPTY)>
+<!ATTLIST string
+  %matchattrs;
+  text     CDATA #REQUIRED>
+
+<!ELEMENT regex (EMPTY)>
+<!ATTLIST regex
+  %matchattrs;
+  text     CDATA #REQUIRED>
+
