@@ -24,53 +24,16 @@
 #include <string.h>
 
 #include <libxml/xmlreader.h>
-#include <libgnome/gnome-util.h>
 #include <gconf/gconf.h>
-#include <gconf/gconf-client.h>
 
+#include "gtksourcelanguage-private.h"
 #include "gtksourceview-i18n.h"
-#include "gtksourcelanguagesmanager.h"
 #include "gtksourcelanguage.h"
 #include "gtksourcetag.h"
 
-#define DEFAULT_GCONF_BASE_DIR		"/apps/gtksourceview"
-
-#define DEFAULT_LANGUAGE_DIR		DATADIR "/gtksourceview/language-specs"
-#define USER_LANGUAGE_DIR		"gtksourceview/language-specs"
-
-typedef struct _GtkSourceLanguagesManager	GtkSourceLanguagesManager;
-
-struct _GtkSourceLanguagesManager {
-
-	GSList 		*available_languages;
-
-	GSList		*language_specs_directories;
-	gchar		*gconf_base_dir;
-	
-	GConfClient 	*gconf_client;
-};
-
-struct _GtkSourceLanguagePrivate 
-{
-	gchar		*lang_file_name;
-
-	gchar		*name;
-	gchar		*section;
-
-	GSList		*mime_types;
-
-	GHashTable	*tag_name_to_style_name;
-};
-
-static void		 gtk_source_language_class_init 	(GtkSourceLanguageClass 	*klass);
-static void		 gtk_source_language_init		(GtkSourceLanguage 		*lang);
-static void	 	 gtk_source_language_finalize 		(GObject 			*object);
-
-static GSList 		 *get_lang_files 			(void);
-static GtkSourceLanguage *get_language_from_file 		(const gchar 			*filename);
-
-static GSList	 	 *build_file_listing 			(const gchar 			*directory, 
-					 		 	 GSList				*filenames);
+static void	 	  gtk_source_language_class_init 	(GtkSourceLanguageClass 	*klass);
+static void		  gtk_source_language_init		(GtkSourceLanguage 		*lang);
+static void	 	  gtk_source_language_finalize 		(GObject 			*object);
 
 static GtkSourceLanguage *process_language_node 		(xmlTextReaderPtr 		 reader, 
 								 const gchar 			*filename);
@@ -79,9 +42,6 @@ static gchar 		 *get_gconf_key 			(const GtkSourceLanguage 	*lang,
 
 static GObjectClass 	 *parent_class  = NULL;
 
-static GtkSourceLanguagesManager *languages_manager = NULL;
-
-
 static void
 slist_deep_free (GSList *list)
 {
@@ -89,177 +49,17 @@ slist_deep_free (GSList *list)
 	g_slist_free (list);
 }
 
-gboolean
-gtk_source_languages_manager_init (void)
-{
-	if (languages_manager == NULL)
-	{
-		GConfClient *gconf_client;
-
-		languages_manager = g_new0 (GtkSourceLanguagesManager, 1);
-
-		gconf_client = gconf_client_get_default ();
-		if (gconf_client == NULL)
-			goto init_error;
-
-		languages_manager->gconf_client = gconf_client;
-
-		gtk_source_languages_manager_set_gconf_base_dir (NULL);
-		gtk_source_languages_manager_set_specs_dirs (NULL);		
-	}
-
-	return TRUE;
-
-init_error:
-
-	g_warning ("Error initializing the languages manager.");
-
-	g_free (languages_manager);
-	languages_manager = NULL;
-
-	return FALSE;
-}
-
-void
-gtk_source_languages_manager_shutdown (void)
-{
-	g_return_if_fail (languages_manager != NULL);
-
-	g_object_unref (languages_manager->gconf_client);
-
-	g_free (languages_manager->gconf_base_dir);
-	
-	if (languages_manager->available_languages != NULL)
-	{
-		GSList *list = languages_manager->available_languages;
-		
-		g_slist_foreach (list, (GFunc) g_object_unref, NULL);
-		g_slist_free (list);
-	}
-
-	slist_deep_free (languages_manager->language_specs_directories);
-
-	g_free (languages_manager);
-	languages_manager = NULL;
-}
-
-
-void 
-gtk_source_languages_manager_set_gconf_base_dir (const gchar *dir)
-{
-	g_return_if_fail (languages_manager != NULL);
-	
-	g_free (languages_manager->gconf_base_dir);
-
-	if (dir != NULL)
-		languages_manager->gconf_base_dir = g_strdup (dir);
-	else
-		languages_manager->gconf_base_dir = g_strdup (DEFAULT_GCONF_BASE_DIR);
-}
-
-void
-gtk_source_languages_manager_set_specs_dirs (const GSList *dirs)
-{
-	g_return_if_fail (languages_manager != NULL);
-
-	if (languages_manager->language_specs_directories != NULL)
-	{
-		slist_deep_free (languages_manager->language_specs_directories);
-		languages_manager->language_specs_directories = NULL;
-	}
-
-	if (dirs == NULL)
-	{
-		languages_manager->language_specs_directories =
-			g_slist_prepend (languages_manager->language_specs_directories,
-					g_strdup (DEFAULT_LANGUAGE_DIR));
-		languages_manager->language_specs_directories = 
-			g_slist_prepend (languages_manager->language_specs_directories,
-					gnome_util_home_file (USER_LANGUAGE_DIR));
-
-		return;
-	}
-
-	while (dirs != NULL)
-	{
-		languages_manager->language_specs_directories = 
-			g_slist_prepend (languages_manager->language_specs_directories,
-					 g_strdup ((const gchar*)dirs->data));
-
-		dirs = g_slist_next (dirs);
-	}
-}
-
-const GSList *
-gtk_source_languages_manager_get_available_languages (void)
-{
-	GSList *filenames;
-
-	g_return_val_if_fail (languages_manager != NULL, NULL);
-
-	if (languages_manager->available_languages != NULL)
-	{
-		return languages_manager->available_languages;
-	}
-	
-	/* Build list of availables languages */
-	filenames = get_lang_files ();
-	
-	while (filenames != NULL)
-	{
-		GtkSourceLanguage *lang = get_language_from_file ((const gchar*)filenames->data);
-
-		if (lang == NULL)
-		{
-			g_warning ("Error reading language specification file '%s'", 
-				   (const gchar*)filenames->data);
-		}
-		else
-		{	
-			languages_manager->available_languages = 
-				g_slist_prepend (languages_manager->available_languages, lang);
-		}
-
-		filenames = g_slist_next (filenames);
-	}
-
-	slist_deep_free (filenames);
-
-	/* TODO: sorting available_languages */
-
-	return languages_manager->available_languages;
-}
-
-static GSList *
-get_lang_files ()
-{
-	GSList *filenames = NULL;
-	GSList *dirs;
-
-	g_return_val_if_fail (languages_manager->language_specs_directories != NULL, NULL);
-
-	dirs = languages_manager->language_specs_directories;
-
-	while (dirs != NULL)
-	{
-		filenames = build_file_listing ((const gchar*)dirs->data,
-						filenames);
-
-		dirs = g_slist_next (dirs);
-	}
-
-	return filenames;
-}
-
-static GtkSourceLanguage *
-get_language_from_file (const gchar *filename)
+GtkSourceLanguage *
+_gtk_source_language_new_from_file (const gchar			*filename,
+				    GtkSourceLanguagesManager	*lm)
 {
 	GtkSourceLanguage *lang = NULL;
 
 	xmlTextReaderPtr reader;
 	gint ret;
 	
-	g_return_val_if_fail (languages_manager != NULL, NULL);
+	g_return_val_if_fail (filename != NULL, NULL);
+	g_return_val_if_fail (lm != NULL, NULL);
 
 	reader = xmlNewTextReaderFilename (filename);
 
@@ -307,7 +107,11 @@ get_language_from_file (const gchar *filename)
 
 	if (lang != NULL)
 	{
-		if (languages_manager->gconf_client != NULL)
+		lang->priv->languages_manager = lm;
+
+		lang->priv->gconf_client = gconf_client_get_default ();
+
+		if (lang->priv->gconf_client != NULL)
 		{
 			GSList *mime_types = NULL;
 			gchar *key;
@@ -315,7 +119,7 @@ get_language_from_file (const gchar *filename)
 			key = get_gconf_key (lang, "mime_types");
 			g_return_val_if_fail (key != NULL, lang);
 
-			mime_types = gconf_client_get_list (languages_manager->gconf_client,
+			mime_types = gconf_client_get_list (lang->priv->gconf_client,
 							    key,
 							    GCONF_VALUE_STRING, 
 							    NULL);
@@ -330,41 +134,13 @@ get_language_from_file (const gchar *filename)
 				lang->priv->mime_types = mime_types;
 			}
 		}
+		else
+			g_warning ("Error connecting to GConf.");
 	}	
 	
 	return lang;
 }
 
-static GSList *
-build_file_listing (const gchar *directory, GSList *filenames)
-{
-	GDir *dir;
-	const gchar *file_name;
-	
-	dir = g_dir_open (directory, 0, NULL);
-	
-	if (dir == NULL)
-		return filenames;
-
-	file_name = g_dir_read_name (dir);
-	
-	while (file_name != NULL)
-	{
-		gchar *full_path = g_build_filename (directory, file_name);
-
-		if (!g_file_test (full_path, G_FILE_TEST_IS_DIR) && 
-		    (strcmp (g_extension_pointer (full_path), "lang") == 0))
-			filenames = g_slist_prepend (filenames, full_path);
-		else
-			g_free (full_path);
-
-		file_name = g_dir_read_name (dir);
-	}
-
-	g_dir_close (dir);
-
-	return filenames;
-}
 
 GType
 gtk_source_language_get_type (void)
@@ -413,11 +189,16 @@ gtk_source_language_finalize (GObject *object)
 	GtkSourceLanguage *lang;
 
 	lang = GTK_SOURCE_LANGUAGE (object);
-	
+		
 	if (lang->priv != NULL)
 	{
+		g_print ("Finalize lang: %s\n", lang->priv->name);
+
 		g_free (lang->priv->lang_file_name);
-		
+
+		if (lang->priv->gconf_client != NULL)
+			g_object_unref (lang->priv->gconf_client);
+
 		xmlFree (lang->priv->name);
 		xmlFree (lang->priv->section);
 
@@ -437,12 +218,14 @@ get_gconf_key (const GtkSourceLanguage *lang, const gchar *k)
 	gchar *key;
 	gchar *name;
        
-	g_return_val_if_fail (languages_manager != NULL, NULL);
+	g_return_val_if_fail (lang->priv->languages_manager != NULL, NULL);
 
 	name = gconf_escape_key (gtk_source_language_get_name (lang), -1);
 	g_return_val_if_fail (name != NULL, NULL);
 
-	key = gconf_concat_dir_and_key (languages_manager->gconf_base_dir, "languages");
+	key = gconf_concat_dir_and_key (
+			gtk_source_languages_manager_get_gconf_base_dir (lang->priv->languages_manager), 
+			"languages");
 	g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
 	
 	temp = gconf_concat_dir_and_key (key, name);
@@ -573,40 +356,6 @@ gtk_source_language_get_mime_types (const GtkSourceLanguage *language)
 	return language->priv->mime_types;
 }
 
-GtkSourceLanguage *
-gtk_source_language_get_from_mime_type (const gchar *mime_type)
-{
-	const GSList *languages;
-	g_return_val_if_fail (mime_type != NULL, NULL);
-
-	languages = gtk_source_languages_manager_get_available_languages ();
-
-	while (languages != NULL)
-	{
-		const GSList *mime_types;
-
-		GtkSourceLanguage *lang = GTK_SOURCE_LANGUAGE (languages->data);
-		
-		mime_types = gtk_source_language_get_mime_types (lang);
-
-		while (mime_types != NULL)
-		{
-			/* FIXME: is this right ? - Paolo */
-			if (strcmp ((const gchar*)mime_types->data, mime_type) == 0)
-			{
-				g_object_ref (lang);
-				
-				return lang;
-			}
-
-			mime_types = g_slist_next (mime_types);
-		}
-
-		languages = g_slist_next (languages);
-	}
-
-	return NULL;
-}
 
 
 static GSList *
@@ -700,11 +449,8 @@ gtk_source_language_set_mime_types (GtkSourceLanguage	*language,
 	gchar *key;
 	
 	g_return_if_fail (GTK_IS_SOURCE_LANGUAGE (language));
-	g_return_if_fail (languages_manager != NULL);
-	
-	key = get_gconf_key (language, "mime_types");
-	g_return_if_fail (key != NULL);
-	
+	g_return_if_fail (language->priv->languages_manager != NULL);
+		
 	slist_deep_free (language->priv->mime_types);
 	language->priv->mime_types = NULL;
 
@@ -718,10 +464,16 @@ gtk_source_language_set_mime_types (GtkSourceLanguage	*language,
 	}
 	language->priv->mime_types = g_slist_reverse (language->priv->mime_types);
 
+	if (language->priv->gconf_client == NULL)
+		return;
+
+	key = get_gconf_key (language, "mime_types");
+	g_return_if_fail (key != NULL);
+	
 	if (mime_types != NULL)
 	{
-		if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
-			gconf_client_set_list (languages_manager->gconf_client,
+		if (gconf_client_key_is_writable (language->priv->gconf_client, key, NULL))
+			gconf_client_set_list (language->priv->gconf_client,
 					       key,
 					       GCONF_VALUE_STRING,
 					       mime_types,
@@ -729,8 +481,8 @@ gtk_source_language_set_mime_types (GtkSourceLanguage	*language,
 	}
 	else
 	{
-		if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
-			gconf_client_unset (languages_manager->gconf_client,
+		if (gconf_client_key_is_writable (language->priv->gconf_client, key, NULL))
+			gconf_client_unset (language->priv->gconf_client,
 					    key,
 					    NULL);
 					    
@@ -1445,7 +1197,8 @@ gtk_source_language_get_tag_style (const GtkSourceLanguage *language,
 	base_key = get_gconf_base_key_for_tag (language, tag_name);
 
 	/* FIXME: this is not right. Use a use_defaul key */
-	if (gconf_client_dir_exists (languages_manager->gconf_client, base_key, NULL))
+	if ((language->priv->gconf_client != NULL) && 
+	    gconf_client_dir_exists (language->priv->gconf_client, base_key, NULL))
 	{
 		gchar *key;
 		gboolean valid = FALSE;
@@ -1459,7 +1212,7 @@ gtk_source_language_get_tag_style (const GtkSourceLanguage *language,
 		key = gconf_concat_dir_and_key (base_key, "background");
 		g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
 
-		color = gconf_client_get_color (languages_manager->gconf_client, 
+		color = gconf_client_get_color (language->priv->gconf_client, 
 						key,
 						&valid,
 						NULL);
@@ -1477,7 +1230,7 @@ gtk_source_language_get_tag_style (const GtkSourceLanguage *language,
 		key = gconf_concat_dir_and_key (base_key, "foreground");
 		g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
 
-		color = gconf_client_get_color (languages_manager->gconf_client, 
+		color = gconf_client_get_color (language->priv->gconf_client, 
 						key,
 						NULL,
 						NULL);
@@ -1489,7 +1242,7 @@ gtk_source_language_get_tag_style (const GtkSourceLanguage *language,
 		key = gconf_concat_dir_and_key (base_key, "italic");
 		g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
 
-		ts->italic = gconf_client_get_bool (languages_manager->gconf_client, 
+		ts->italic = gconf_client_get_bool (language->priv->gconf_client, 
 						   key,
 						   NULL);
 
@@ -1498,7 +1251,7 @@ gtk_source_language_get_tag_style (const GtkSourceLanguage *language,
 		key = gconf_concat_dir_and_key (base_key, "bold");
 		g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
 
-		ts->bold = gconf_client_get_bool (languages_manager->gconf_client, 
+		ts->bold = gconf_client_get_bool (language->priv->gconf_client, 
 						   key,
 						   NULL);
 
@@ -1531,16 +1284,24 @@ gtk_source_language_set_tag_style (const GtkSourceLanguage *language,
 	g_return_if_fail (tag_name != NULL);
 	g_return_if_fail (style != NULL);
 
+	if (language->priv->gconf_client == NULL)
+	{
+		g_warning ("Impossible to set tag style for tag '%s' of language '%s'.",
+				tag_name, gtk_source_language_get_name (language));
+
+		return;
+	}
+
 	base_key = get_gconf_base_key_for_tag (language, tag_name);
 
 	if (style->use_default && 
-	    gconf_client_dir_exists (languages_manager->gconf_client, base_key, NULL))
+	    gconf_client_dir_exists (language->priv->gconf_client, base_key, NULL))
 	{
 		key = gconf_concat_dir_and_key (base_key, "background");
 		g_return_if_fail (gconf_valid_key (key, NULL));
 
-		if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
-			gconf_client_unset (languages_manager->gconf_client,
+		if (gconf_client_key_is_writable (language->priv->gconf_client, key, NULL))
+			gconf_client_unset (language->priv->gconf_client,
 					    key,
 					    NULL);
 
@@ -1549,8 +1310,8 @@ gtk_source_language_set_tag_style (const GtkSourceLanguage *language,
 		key = gconf_concat_dir_and_key (base_key, "foreground");
 		g_return_if_fail (gconf_valid_key (key, NULL));
 
-		if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
-			gconf_client_unset (languages_manager->gconf_client,
+		if (gconf_client_key_is_writable (language->priv->gconf_client, key, NULL))
+			gconf_client_unset (language->priv->gconf_client,
 					    key,
 					    NULL);
 
@@ -1559,8 +1320,8 @@ gtk_source_language_set_tag_style (const GtkSourceLanguage *language,
 		key = gconf_concat_dir_and_key (base_key, "italic");
 		g_return_if_fail (gconf_valid_key (key, NULL));
 
-		if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
-			gconf_client_unset (languages_manager->gconf_client,
+		if (gconf_client_key_is_writable (language->priv->gconf_client, key, NULL))
+			gconf_client_unset (language->priv->gconf_client,
 					    key,
 					    NULL);
 
@@ -1569,8 +1330,8 @@ gtk_source_language_set_tag_style (const GtkSourceLanguage *language,
 		key = gconf_concat_dir_and_key (base_key, "bold");
 		g_return_if_fail (gconf_valid_key (key, NULL));
 
-		if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
-			gconf_client_unset (languages_manager->gconf_client,
+		if (gconf_client_key_is_writable (language->priv->gconf_client, key, NULL))
+			gconf_client_unset (language->priv->gconf_client,
 					    key,
 					    NULL);
 
@@ -1584,15 +1345,15 @@ gtk_source_language_set_tag_style (const GtkSourceLanguage *language,
 	key = gconf_concat_dir_and_key (base_key, "background");
 	g_return_if_fail (gconf_valid_key (key, NULL));
 
-	if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
+	if (gconf_client_key_is_writable (language->priv->gconf_client, key, NULL))
 	{
 		if (style->use_background)
-			gconf_client_set_color (languages_manager->gconf_client,
+			gconf_client_set_color (language->priv->gconf_client,
 						key,
 						style->background,
 						NULL);
 		else
-			gconf_client_unset (languages_manager->gconf_client,
+			gconf_client_unset (language->priv->gconf_client,
 					    key,
 					    NULL);
 	}
@@ -1602,8 +1363,8 @@ gtk_source_language_set_tag_style (const GtkSourceLanguage *language,
 	key = gconf_concat_dir_and_key (base_key, "foreground");
 	g_return_if_fail (gconf_valid_key (key, NULL));
 
-	if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
-		gconf_client_set_color (languages_manager->gconf_client,
+	if (gconf_client_key_is_writable (language->priv->gconf_client, key, NULL))
+		gconf_client_set_color (language->priv->gconf_client,
 					key,
 					style->foreground,
 					NULL);
@@ -1612,8 +1373,8 @@ gtk_source_language_set_tag_style (const GtkSourceLanguage *language,
 	key = gconf_concat_dir_and_key (base_key, "italic");
 	g_return_if_fail (gconf_valid_key (key, NULL));
 
-	if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
-		gconf_client_set_bool (languages_manager->gconf_client,
+	if (gconf_client_key_is_writable (language->priv->gconf_client, key, NULL))
+		gconf_client_set_bool (language->priv->gconf_client,
 				       key,
 				       style->italic,
 				       NULL);
@@ -1622,8 +1383,8 @@ gtk_source_language_set_tag_style (const GtkSourceLanguage *language,
 	key = gconf_concat_dir_and_key (base_key, "bold");
 	g_return_if_fail (gconf_valid_key (key, NULL));
 
-	if (gconf_client_key_is_writable (languages_manager->gconf_client, key, NULL))
-		gconf_client_set_bool (languages_manager->gconf_client,
+	if (gconf_client_key_is_writable (language->priv->gconf_client, key, NULL))
+		gconf_client_set_bool (language->priv->gconf_client,
 				       key,
 				       style->bold,
 				       NULL);

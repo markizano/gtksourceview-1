@@ -7,21 +7,21 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2003-03-14 10:50-0300\n"
+"POT-Creation-Date: 2003-03-15 16:50+0100\n"
 "PO-Revision-Date: 2003-03-14 10:54-0300\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
-"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
 #. create undo menuitem.
-#: src/gtksourceview.c:287
+#: src/gtksourceview.c:297
 msgid "Undo"
 msgstr "Deshacer"
 
 #. create redo menuitem.
-#: src/gtksourceview.c:299
+#: src/gtksourceview.c:309
 msgid "Redo"
 msgstr "Rehacer"
 

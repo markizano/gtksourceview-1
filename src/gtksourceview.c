@@ -4,6 +4,7 @@
  *  Copyright (C) 2001
  *  Mikael Hermansson<tyan@linux.se>
  *  Chris Phelps <chicane@reninet.com>
+ *  
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU Library General Public License as published by
  *  the Free Software Foundation; either version 2 of the License, or
@@ -14,10 +15,9 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU Library General Public License for more details.
  *
- *  You should have received a copy of the GNU Library General Public
- *  License* along with this program; if not, write to the Free
- *  Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
- *  02111-1307, USA.
+ *  You should have received a copy of the GNU Library General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -136,8 +136,8 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 				      GDK_CONTROL_MASK,
 				      "undo", 0);
 	gtk_binding_entry_add_signal (binding_set,
-				      GDK_r,
-				      GDK_CONTROL_MASK,
+				      GDK_z,
+				      GDK_CONTROL_MASK | GDK_SHIFT_MASK,
 				      "redo", 0);
 }
 
@@ -250,21 +250,31 @@ gtk_source_view_pixbuf_foreach_unref (gpointer key,
 static void
 gtk_source_view_undo (GtkSourceView *view)
 {
+	GtkSourceBuffer *buffer;
+	
 	g_return_if_fail (view != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
 
-	gtk_source_buffer_undo (GTK_SOURCE_BUFFER
-				(gtk_text_view_get_buffer (GTK_TEXT_VIEW (view))));
+	buffer = GTK_SOURCE_BUFFER (
+			gtk_text_view_get_buffer (GTK_TEXT_VIEW (view)));
+		
+	if (gtk_source_buffer_can_undo (buffer))
+		gtk_source_buffer_undo (buffer);
 }
 
 static void
 gtk_source_view_redo (GtkSourceView *view)
 {
+	GtkSourceBuffer *buffer;
+
 	g_return_if_fail (view != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
 
-	gtk_source_buffer_redo (GTK_SOURCE_BUFFER
-				(gtk_text_view_get_buffer (GTK_TEXT_VIEW (view))));
+	buffer = GTK_SOURCE_BUFFER (
+			gtk_text_view_get_buffer (GTK_TEXT_VIEW (view)));
+		
+	if (gtk_source_buffer_can_redo (buffer))
+		gtk_source_buffer_redo (buffer);
 }
 
 static void

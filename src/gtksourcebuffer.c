@@ -32,7 +32,8 @@
 
 #include "gtksourceview-i18n.h"
 #include "gtksourcebuffer.h"
-#include "gtkundomanager.h"
+
+#include "gtksourceundomanager.h"
 #include "gtksourceview-marshal.h"
 #include "gtktextregion.h"
 
@@ -99,33 +100,34 @@ struct _PatternMatch
 
 struct _GtkSourceBufferPrivate 
 {
-	gint                highlight:1;
-	gint                check_brackets:1;
+	gint                   highlight:1;
+	gint                   check_brackets:1;
 
-	GtkTextTag         *bracket_match_tag;
-	GtkTextMark        *bracket_mark;
+	GtkTextTag            *bracket_match_tag;
+	GtkTextMark           *bracket_mark;
 
-	GHashTable         *line_markers;
+	GHashTable            *line_markers;
 
-	GList              *syntax_items;
-	GList              *pattern_items;
-	GtkSourceRegex      reg_syntax_all;
+	GList                 *syntax_items;
+	GList                 *pattern_items;
+	GtkSourceRegex         reg_syntax_all;
 
 	/* Region covering the unhighlighted text */
-	GtkTextRegion      *refresh_region;
+	GtkTextRegion         *refresh_region;
 
 	/* Syntax regions data */
-	GArray             *syntax_regions;
-	GArray             *old_syntax_regions;
-	gint                worker_last_offset;
-	gint                worker_batch_size;
-	guint               worker_handler;
+	GArray                *syntax_regions;
+	GArray                *old_syntax_regions;
+	gint                   worker_last_offset;
+	gint                   worker_batch_size;
+	guint                  worker_handler;
 
 	/* views highlight requests */
-	GtkTextRegion      *highlight_requests;
+	GtkTextRegion        *highlight_requests;
 
-	GtkUndoManager     *undo_manager;
+	GtkSourceUndoManager *undo_manager;
 };
+
 
 
 static GtkTextBufferClass *parent_class = NULL;
@@ -135,10 +137,10 @@ static void 	 gtk_source_buffer_class_init		(GtkSourceBufferClass    *klass);
 static void 	 gtk_source_buffer_init			(GtkSourceBuffer         *klass);
 static void 	 gtk_source_buffer_finalize		(GObject                 *object);
 
-static void 	 gtk_source_buffer_can_undo_handler 	(GtkUndoManager          *um,
+static void 	 gtk_source_buffer_can_undo_handler 	(GtkSourceUndoManager    *um,
 							 gboolean                 can_undo,
 							 GtkSourceBuffer         *buffer);
-static void 	 gtk_source_buffer_can_redo_handler	(GtkUndoManager          *um,
+static void 	 gtk_source_buffer_can_redo_handler	(GtkSourceUndoManager    *um,
 							 gboolean                 can_redo,
 							 GtkSourceBuffer         *buffer);
 
@@ -290,7 +292,7 @@ gtk_source_buffer_init (GtkSourceBuffer *buffer)
 
 	buffer->priv = priv;
 
-	priv->undo_manager = gtk_undo_manager_new (buffer);
+	priv->undo_manager = gtk_source_undo_manager_new (GTK_TEXT_BUFFER (buffer));
 
 	priv->check_brackets = TRUE;
 	priv->bracket_mark = NULL;
@@ -410,9 +412,9 @@ gtk_source_buffer_new (GtkTextTagTable *table)
 
 
 static void
-gtk_source_buffer_can_undo_handler (GtkUndoManager  *um,
-				    gboolean         can_undo,
-				    GtkSourceBuffer *buffer)
+gtk_source_buffer_can_undo_handler (GtkSourceUndoManager  	*um,
+				    gboolean			 can_undo,
+				    GtkSourceBuffer 		*buffer)
 {
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 
@@ -423,14 +425,16 @@ gtk_source_buffer_can_undo_handler (GtkUndoManager  *um,
 }
 
 static void
-gtk_source_buffer_can_redo_handler (GtkUndoManager  *um,
-				    gboolean         can_redo,
-				    GtkSourceBuffer *buffer)
+gtk_source_buffer_can_redo_handler (GtkSourceUndoManager  	*um,
+				    gboolean         		 can_redo,
+				    GtkSourceBuffer 		*buffer)
 {
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 
 	g_signal_emit (G_OBJECT (buffer),
-		       buffer_signals[CAN_REDO], 0, can_redo);
+		       buffer_signals[CAN_REDO], 
+		       0, 
+		       can_redo);
 }
 
 static gboolean
@@ -914,7 +918,7 @@ gtk_source_buffer_can_undo (const GtkSourceBuffer *buffer)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), FALSE);
 
-	return gtk_undo_manager_can_undo (buffer->priv->undo_manager);
+	return gtk_source_undo_manager_can_undo (buffer->priv->undo_manager);
 }
 
 gboolean
@@ -922,43 +926,43 @@ gtk_source_buffer_can_redo (const GtkSourceBuffer *buffer)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), FALSE);
 
-	return gtk_undo_manager_can_redo (buffer->priv->undo_manager);
+	return gtk_source_undo_manager_can_redo (buffer->priv->undo_manager);
 }
 
 void
 gtk_source_buffer_undo (GtkSourceBuffer *buffer)
 {
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
-	g_return_if_fail (gtk_undo_manager_can_undo (buffer->priv->undo_manager));
+	g_return_if_fail (gtk_source_undo_manager_can_undo (buffer->priv->undo_manager));
 
-	gtk_undo_manager_undo (buffer->priv->undo_manager);
+	gtk_source_undo_manager_undo (buffer->priv->undo_manager);
 }
 
 void
 gtk_source_buffer_redo (GtkSourceBuffer *buffer)
 {
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
-	g_return_if_fail (gtk_undo_manager_can_redo (buffer->priv->undo_manager));
+	g_return_if_fail (gtk_source_undo_manager_can_redo (buffer->priv->undo_manager));
 
-	gtk_undo_manager_redo (buffer->priv->undo_manager);
+	gtk_source_undo_manager_redo (buffer->priv->undo_manager);
 }
 
 gint
-gtk_source_buffer_get_undo_levels (const GtkSourceBuffer *buffer)
+gtk_source_buffer_get_max_undo_levels (const GtkSourceBuffer *buffer)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), 0);
 
-	return gtk_undo_manager_get_undo_levels (buffer->priv->undo_manager);
+	return gtk_source_undo_manager_get_max_undo_levels (buffer->priv->undo_manager);
 }
 
 void
-gtk_source_buffer_set_undo_levels (GtkSourceBuffer *buffer,
-				   gint             undo_levels)
+gtk_source_buffer_set_max_undo_levels (GtkSourceBuffer *buffer,
+				       gint             max_undo_levels)
 {
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 
-	gtk_undo_manager_set_undo_levels (buffer->priv->undo_manager,
-					  undo_levels);
+	gtk_source_undo_manager_set_max_undo_levels (buffer->priv->undo_manager,
+					      max_undo_levels);
 }
 
 void
@@ -966,7 +970,7 @@ gtk_source_buffer_begin_not_undoable_action (GtkSourceBuffer *buffer)
 {
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 
-	gtk_undo_manager_begin_not_undoable_action (buffer->priv->undo_manager);
+	gtk_source_undo_manager_begin_not_undoable_action (buffer->priv->undo_manager);
 }
 
 void
@@ -974,7 +978,7 @@ gtk_source_buffer_end_not_undoable_action (GtkSourceBuffer *buffer)
 {
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 
-	gtk_undo_manager_end_not_undoable_action (buffer->priv->undo_manager);
+	gtk_source_undo_manager_end_not_undoable_action (buffer->priv->undo_manager);
 }
 
 /* Add a marker to a line.
@@ -1889,7 +1893,7 @@ update_syntax_regions (GtkSourceBuffer *source_buffer,
 		if (delim.offset > start_offset + delta)
 			delim.offset -= delta;
 
-		if (table_index > table->len - 1 ||
+		if (table_index > (table->len - 1) ||
 		    !delimiter_is_equal (&delim,
 					 &g_array_index (table,
 							 SyntaxDelimiter,

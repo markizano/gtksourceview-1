@@ -22,23 +22,57 @@
 
 #include <glib.h>
 
+#include "gtksourcelanguage.h"
+
 G_BEGIN_DECLS
 
-/** LIFE CYCLE MANAGEMENT FUNCTIONS **/
+#define GTK_TYPE_SOURCE_LANGUAGES_MANAGER		(gtk_source_languages_manager_get_type ())
+#define GTK_SOURCE_LANGUAGES_MANAGER(obj)		(GTK_CHECK_CAST ((obj), GTK_TYPE_SOURCE_LANGUAGES_MANAGER, GtkSourceLanguagesManager))
+#define GTK_SOURCE_LANGUAGES_MANAGER_CLASS(klass)	(GTK_CHECK_CLASS_CAST ((klass), GTK_TYPE_SOURCE_LANGUAGES_MANAGER, GtkSourceLanguagesManagerClass))
+#define GTK_IS_SOURCE_LANGUAGES_MANAGER(obj)		(GTK_CHECK_TYPE ((obj), GTK_TYPE_SOURCE_LANGUAGES_MANAGER))
+#define GTK_IS_SOURCE_LANGUAGES_MANAGER_CLASS(klass)	(GTK_CHECK_CLASS_TYPE ((klass), GTK_TYPE_SOURCE_LANGUAGES_MANAGER))
 
-gboolean	 gtk_source_languages_manager_init	 		(void);
 
-/* This function must be called for releasing the resources used by the languages manager */
-void		 gtk_source_languages_manager_shutdown 			(void);
+typedef struct _GtkSourceLanguagesManager		GtkSourceLanguagesManager;
+typedef struct _GtkSourceLanguagesManagerClass		GtkSourceLanguagesManagerClass;
+
+typedef struct _GtkSourceLanguagesManagerPrivate	GtkSourceLanguagesManagerPrivate;
+
+struct _GtkSourceLanguagesManager 
+{
+	GObject                   parent;
+
+	GtkSourceLanguagesManagerPrivate *priv;
+};
+
+struct _GtkSourceLanguagesManagerClass 
+{
+	GObjectClass              parent_class;
+};
+
+
+GType            gtk_source_languages_manager_get_type 		(void) G_GNUC_CONST;
+
+GtkSourceLanguagesManager *gtk_source_languages_manager_new	(void);
+
 
 /* Set a list of dirs containing .lang files */
-void		 gtk_source_languages_manager_set_specs_dirs		(const GSList 	*dirs);
-
-void		 gtk_source_languages_manager_set_gconf_base_dir	(const gchar	*dir);
-
-const GSList	*gtk_source_languages_manager_get_available_languages	(void);
+void		 gtk_source_languages_manager_set_specs_dirs	(GtkSourceLanguagesManager	 *lm,
+								 const GSList 		   	 *dirs);
+const GSList	*gtk_source_languages_manager_get_specs_dirs	(GtkSourceLanguagesManager 	 *lm);
 
 
+void		 gtk_source_languages_manager_set_gconf_base_dir (GtkSourceLanguagesManager	 *lm,
+								  const gchar			 *dir);
+const gchar	*gtk_source_languages_manager_get_gconf_base_dir (GtkSourceLanguagesManager	 *lm);
+
+									
+const GSList	*gtk_source_languages_manager_get_available_languages (GtkSourceLanguagesManager *lm);
+
+/* The GtkSourceLanguage life cycle is managed by the Manager */
+GtkSourceLanguage *gtk_source_languages_manager_get_language_from_mime_type 
+								(GtkSourceLanguagesManager	 *lm,
+							  	 const gchar 			 *mime_type);
 
 
 G_END_DECLS				

@@ -23,6 +23,8 @@
 #include "gtksourcelanguage.h"
 #include "gtksourcelanguagesmanager.h"
 
+static GtkSourceLanguagesManager *lm;
+
 static GtkTextBuffer *test_source (GtkSourceBuffer *buf);
 static void cb_move_cursor (GtkTextBuffer *buf, GtkTextIter *cursoriter, GtkTextMark *mark,
 			    gpointer data);
@@ -298,7 +300,7 @@ test_source (GtkSourceBuffer *buffer)
 	*/
 	GtkTextTagTable *table;
 	GSList *list = NULL;
-	GError *err = NULL;
+	GError * err = NULL;
 
 	GtkSourceLanguage *language;
 	/*
@@ -402,7 +404,7 @@ test_source (GtkSourceBuffer *buffer)
 	g_object_set (G_OBJECT (tag), "foreground", "forest green", NULL);
 	list = g_list_append (list, (gpointer) tag);
 #endif
-	language = gtk_source_language_get_from_mime_type ("text/x-c");
+	language = gtk_source_languages_manager_get_language_from_mime_type (lm, "text/x-c");
 		
 	if (language != NULL)
 	{
@@ -425,35 +427,15 @@ test_source (GtkSourceBuffer *buffer)
 		gtk_source_buffer_install_regex_tags (buffer, list);
 		g_slist_foreach (list, (GFunc) g_object_unref, NULL);
 		g_slist_free (list);
-
-		g_object_unref (language);
 		
 	}
 	else
 		g_print ("No language found.");	
 
 
-#if 0
-	gtk_source_buffer_load (buffer, "test-widget.c", &err);
-	gtk_source_buffer_load (buffer, "/home/gustavo/cvs/gnome/gnome-python/pygtk/gtk/gtk.c", &err);
-#else
 	gtk_source_buffer_load (buffer, "gtksourcebuffer.c", &err);	
-#endif
 	
-#ifdef OLD
-	if (g_file_get_contents ("gtksourcebuffer.c", &txt, &len, &error)) {
-		gtk_text_buffer_set_text (GTK_TEXT_BUFFER (buffer), txt, len);
-	} else {
-		GtkWidget *w;
-
-		w = gtk_message_dialog_new (NULL, 0, GTK_MESSAGE_ERROR, GTK_BUTTONS_OK,
-					    error->message);
-		gtk_dialog_run (GTK_DIALOG (w));
-		gtk_widget_destroy (w);
-		g_error_free (error);
-	}
-#endif
-
+	
 	return GTK_TEXT_BUFFER (buffer);
 }
 
@@ -535,25 +517,17 @@ main (int argc, char *argv[])
 	GtkTextBuffer *buf;
 	GtkWidget *tw;
 	GdkPixbuf *pixbuf;
-	GSList *dirs = NULL;
-
-	/*
+		/*
 	int i;
 	*/
 	PangoFontDescription *font_desc = NULL;
 	
 	gtk_init (&argc, &argv);
 	
-	if (!gtk_source_languages_manager_init ())
-			return -1;       
-		
+	lm = gtk_source_languages_manager_new ();
+			
 	if (!gtk_source_tags_style_manager_init())
 		return -1;
-
-	dirs = g_slist_prepend (dirs, ".");
-
-	gtk_source_languages_manager_set_specs_dirs (dirs);		
-	g_slist_free (dirs);
 
 	window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 	g_signal_connect (window, "destroy", G_CALLBACK (gtk_main_quit), NULL);
@@ -715,9 +689,8 @@ main (int argc, char *argv[])
 	gtk_widget_show_all (window);
 	gtk_main ();
 
-	g_print ("Shutting down languages manager...\n");	
+	g_object_unref (lm);
 
-	gtk_source_languages_manager_shutdown ();
 	gtk_source_tags_style_manager_shutdown ();
 
 	g_print ("Done.\n");

@@ -55,8 +55,6 @@ struct _GtkSourceLanguageClass
 
 GType            	 gtk_source_language_get_type 			(void) G_GNUC_CONST;
 
-GtkSourceLanguage	*gtk_source_language_get_from_mime_type		(const gchar             *mime_type);
-
 const gchar	 	*gtk_source_language_get_name			(const GtkSourceLanguage *language);
 const gchar		*gtk_source_language_get_section		(const GtkSourceLanguage *language);
 
