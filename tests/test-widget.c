@@ -41,6 +41,7 @@ typedef struct {
 	gboolean         show_numbers;
 	gboolean	 auto_indent;
 	gboolean	 insert_spaces;
+	gboolean	 show_margin;
 	guint            tab_stop;
 	GtkItemFactory  *item_factory;
 } ViewsData;
@@ -67,6 +68,8 @@ static void       tabs_toggled_cb                (ViewsData       *vd,
 
 #define SHOW_NUMBERS_PATH "/View/Show _Line Numbers"
 #define SHOW_MARKERS_PATH "/View/Show _Markers"
+#define SHOW_MARGIN_PATH "/View/Show M_argin"
+
 #define ENABLE_AUTO_INDENT_PATH "/View/Enable _Auto Indent"
 #define INSERT_SPACES_PATH "/View/Insert _Spaces Instead of Tabs"
 
@@ -82,6 +85,8 @@ static GtkItemFactoryEntry menu_items[] = {
 	{ "/View/sep1",               NULL,         0,               0, "<Separator>" },
 	{ SHOW_NUMBERS_PATH,          NULL,         view_toggled_cb, 1, "<CheckItem>" },
 	{ SHOW_MARKERS_PATH,          NULL,         view_toggled_cb, 2, "<CheckItem>" },
+	{ SHOW_MARGIN_PATH,           NULL,         view_toggled_cb, 5, "<CheckItem>" },
+
 	{ "/View/sep2",               NULL,         0,               0, "<Separator>" },
 	{ ENABLE_AUTO_INDENT_PATH,    NULL,         view_toggled_cb, 3, "<CheckItem>" },
 	{ INSERT_SPACES_PATH,         NULL,         view_toggled_cb, 4, "<CheckItem>" },
@@ -126,6 +131,9 @@ view_toggled_cb (ViewsData *vd,
 			vd->insert_spaces = active;
 			set_func = gtk_source_view_set_insert_spaces_instead_of_tabs;
 			break;
+		case 5: 
+			vd->show_margin = active;
+			set_func = gtk_source_view_set_show_margin;
 			
 		default:
 			break;
@@ -483,6 +491,7 @@ create_window (ViewsData *vd)
 		      "tabs_width", vd->tab_stop, 
 		      "show_line_numbers", vd->show_numbers,
 		      "show_line_pixmaps", vd->show_markers,
+		      "show_margin", vd->show_margin,
 		      "auto_indent", vd->auto_indent,
 		      "insert_spaces_instead_of_tabs", vd->insert_spaces,
 		      NULL);
@@ -534,6 +543,11 @@ create_main_window (ViewsData *vd)
 		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
 								"/View/Show Markers")),
 		vd->show_markers);
+	gtk_check_menu_item_set_active (
+		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
+								"/View/Show Margin")),
+		vd->show_margin);
+
 	gtk_check_menu_item_set_active (
 		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
 								"/View/Enable Auto Indent")),
@@ -631,6 +645,7 @@ main (int argc, char *argv[])
 
 	vd->show_numbers = TRUE;
 	vd->show_markers = FALSE;
+	vd->show_margin = TRUE;
 	vd->tab_stop = 8;
 	vd->auto_indent = TRUE;
 	vd->insert_spaces = FALSE;

@@ -41,6 +41,9 @@
 #define MIN_NUMBER_WINDOW_WIDTH		20
 #define MAX_TAB_WIDTH			32
 
+#define DEFAULT_MARGIN			80
+#define MAX_MARGIN			200
+
 enum {
 	UNDO,
 	REDO,
@@ -54,7 +57,9 @@ enum {
 	PROP_SHOW_LINE_PIXMAPS,
 	PROP_TABS_WIDTH,
 	PROP_AUTO_INDENT,
-	PROP_INSERT_SPACES
+	PROP_INSERT_SPACES,
+	PROP_SHOW_MARGIN,
+	PROP_MARGIN
 };
 
 
@@ -65,6 +70,8 @@ struct _GtkSourceViewPrivate
 	gboolean	 show_line_pixmaps;
 	gboolean	 auto_indent;
 	gboolean	 insert_spaces;
+	gboolean	 show_margin;
+	guint		 margin;
 	
 	GHashTable 	*pixmap_cache;
 
@@ -137,6 +144,9 @@ static void 	view_dnd_drop 				(GtkTextView       *view,
 							 guint              info,
 							 guint              time,
 							 gpointer           data);
+
+static gint	calculate_real_tab_width 		(GtkSourceView     *view, 
+							 guint              tab_size);
 
 static void	gtk_source_view_set_property 		(GObject                 *object,
 							 guint                    prop_id,
@@ -213,6 +223,25 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 							       FALSE,
 							       G_PARAM_READWRITE));
 
+	g_object_class_install_property (object_class,
+					 PROP_SHOW_LINE_PIXMAPS,
+					 g_param_spec_boolean ("show_margin",
+							       _("Show Right Margin"),
+							       _("Whether to display the right margin"),
+							       FALSE,
+							       G_PARAM_READWRITE));
+
+	g_object_class_install_property (object_class,
+					 PROP_TABS_WIDTH,
+					 g_param_spec_uint ("margin",
+							    _("Margin position"),
+							    _("Position of the right margin"),
+							    1,
+							    MAX_MARGIN,
+							    DEFAULT_MARGIN,
+							    G_PARAM_READWRITE));
+
+
 	signals [UNDO] =
 		g_signal_new ("undo",
 			      G_TYPE_FROM_CLASS (klass),
@@ -286,6 +315,16 @@ gtk_source_view_set_property (GObject      *object,
 							g_value_get_boolean (value));
 			break;
 			
+		case PROP_SHOW_MARGIN:
+			gtk_source_view_set_show_margin (view,
+							 g_value_get_boolean (value));
+			break;
+			
+		case PROP_MARGIN:
+			gtk_source_view_set_margin (view, 
+						    g_value_get_uint (value));
+			break;
+
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 			break;
@@ -334,6 +373,18 @@ gtk_source_view_get_property (GObject    *object,
 					     gtk_source_view_get_insert_spaces_instead_of_tabs (view));
 	
 			break;
+
+		case PROP_SHOW_MARGIN:
+			g_value_set_boolean (value,
+					     gtk_source_view_get_show_margin (view));
+
+			break;
+			
+		case PROP_MARGIN:
+			g_value_set_uint (value,
+					  gtk_source_view_get_margin (view));
+			break;
+
 			
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -349,6 +400,7 @@ gtk_source_view_init (GtkSourceView *view)
 	view->priv = g_new0 (GtkSourceViewPrivate, 1);
 
 	view->priv->tabs_width = DEFAULT_TAB_WIDTH;
+	view->priv->margin = DEFAULT_MARGIN;
 
 	view->priv->pixmap_cache = g_hash_table_new (g_str_hash, g_str_equal);
 
@@ -944,10 +996,43 @@ gtk_source_view_expose (GtkWidget      *widget,
 				gdk_window_invalidate_rect (w, NULL, FALSE);
 		}
 
+		if (view->priv->show_margin && 
+		    (event->window == gtk_text_view_get_window (text_view, GTK_TEXT_WINDOW_TEXT)))
+		{
+			GdkRectangle visible_rect;
+			GdkRectangle redraw_rect;
+
+			gint x = calculate_real_tab_width (view, view->priv->margin);
+		
+			gtk_text_view_get_visible_rect (text_view, &visible_rect);
+			
+			gtk_text_view_buffer_to_window_coords (text_view,
+						       GTK_TEXT_WINDOW_WIDGET,
+						       visible_rect.x,
+						       visible_rect.y,
+						       &redraw_rect.x,
+						       &redraw_rect.y);
+			
+			redraw_rect.width = visible_rect.width;
+			redraw_rect.height = visible_rect.height;
+
+			gtk_paint_vline (widget->style, 
+					 event->window, 
+					 GTK_WIDGET_STATE (widget), 
+					 &redraw_rect, 
+					 widget,
+					 "margin", 
+					 redraw_rect.y, 
+					 redraw_rect.y + redraw_rect.height, 
+					 x);
+		}
+
 		if (GTK_WIDGET_CLASS (parent_class)->expose_event)
-			event_handled = 
-				(* GTK_WIDGET_CLASS (parent_class)->expose_event)
-				(widget, event);
+				event_handled = 
+					(* GTK_WIDGET_CLASS (parent_class)->expose_event)
+					(widget, event);
+
+				
 	}
 	
 	return event_handled;	
@@ -1388,7 +1473,7 @@ gtk_source_view_set_auto_indent (GtkSourceView *view, gboolean enable)
 }
 
 gboolean
-gtk_source_view_get_insert_spaces_instead_of_tabs (GtkSourceView *view)
+gtk_source_view_get_insert_spaces_instead_of_tabs (const GtkSourceView *view)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
 
@@ -1474,4 +1559,56 @@ view_dnd_drop (GtkTextView *view,
 		return;
 	}
 }
+
+void 
+gtk_source_view_set_show_margin (GtkSourceView *view, gboolean show)
+{
+	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
+
+	show = (show != FALSE);
+
+	if (view->priv->show_margin == show)
+		return;
+
+	view->priv->show_margin = show;
+
+	gtk_widget_queue_draw (GTK_WIDGET (view));
+
+	g_object_notify (G_OBJECT (view), "show_margin");
+}
+
+gboolean 
+gtk_source_view_get_show_margin (const GtkSourceView *view)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
+
+	return view->priv->show_margin;
+}
+
+void 
+gtk_source_view_set_margin (GtkSourceView *view, guint margin)
+{
+	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
+	g_return_if_fail (margin >= 1);
+	g_return_if_fail (margin <= MAX_MARGIN);
+
+	if (view->priv->margin == margin)
+		return;
+
+	view->priv->margin = margin;
+
+	gtk_widget_queue_draw (GTK_WIDGET (view));
+
+	g_object_notify (G_OBJECT (view), "margin");
+}
+		
+guint
+gtk_source_view_get_margin  (const GtkSourceView *view)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), DEFAULT_MARGIN);
+
+	return view->priv->margin;
+
+}
+
 

@@ -93,7 +93,16 @@ void		 gtk_source_view_set_insert_spaces_instead_of_tabs
 							(GtkSourceView       *view, 
 							 gboolean             enable);
 gboolean	 gtk_source_view_get_insert_spaces_instead_of_tabs 
-							(GtkSourceView       *view);
+							(const GtkSourceView *view);
+
+void		 gtk_source_view_set_show_margin 	(GtkSourceView       *view,
+							 gboolean             show);
+gboolean 	 gtk_source_view_get_show_margin 	(const GtkSourceView *view);
+
+void		 gtk_source_view_set_margin 		(GtkSourceView       *view,
+							 guint                margin);
+guint		 gtk_source_view_get_margin 		(const GtkSourceView *view);
+
 
 /* FIXME: Re-enable when we will have a better API - Paolo */
 /*
