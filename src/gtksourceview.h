@@ -1,8 +1,11 @@
-/*  gtksourceview.h
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- 
+ *  gtksourceview.h
  *
- *  Copyright (C) 2001
- *  Mikael Hermansson<tyan@linux.se>
+ *  Copyright (C) 2001 - Mikael Hermansson <tyan@linux.se> and
  *  Chris Phelps <chicane@reninet.com>
+ *
+ *  Copyright (C) 2003 - Gustavo Giráldez and Paolo Maggi 
+ *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU Library General Public License as published by
  *  the Free Software Foundation; either version 2 of the License, or
@@ -24,6 +27,7 @@
 
 #include <gtk/gtk.h>
 #include <gtk/gtktextview.h>
+
 #include <gtksourcebuffer.h>
 
 G_BEGIN_DECLS
@@ -39,9 +43,14 @@ G_BEGIN_DECLS
 typedef struct _GtkSourceView GtkSourceView;
 typedef struct _GtkSourceViewClass GtkSourceViewClass;
 
-struct _GtkSourceView {
-	GtkTextView parent;
+typedef struct _GtkSourceViewPrivate GtkSourceViewPrivate;
 
+struct _GtkSourceView 
+{
+	GtkTextView           parent;
+
+	GtkSourceViewPrivate *priv;
+/*
 	guint tab_stop;
 	gint show_line_numbers:1;
 	gint line_number_space;
@@ -50,37 +59,51 @@ struct _GtkSourceView {
 
 	gchar *delete_range;
 	GtkSourceBuffer *source_buffer;
+*/
 };
 
-struct _GtkSourceViewClass {
+struct _GtkSourceViewClass 
+{
 	GtkTextViewClass parent_class;
 
-	void (*undo) ();
-	void (*redo) ();
+	/* FIXME: do we really need it? - Paolo */
+	void (*undo) (GtkSourceView *view);
+	void (*redo) (GtkSourceView *view);
+
+	/* Padding for future expansion */
+	void (*_gtk_reserved1) (void);
+	void (*_gtk_reserved2) (void);
+	void (*_gtk_reserved3) (void);
 };
 
-GType gtk_source_view_get_type (void);
+GType		 gtk_source_view_get_type 		(void) G_GNUC_CONST;
 
-GtkWidget *gtk_source_view_new (void);
-GtkWidget *gtk_source_view_new_with_buffer (GtkSourceBuffer * buffer);
+/* Constructors */
+GtkWidget 	*gtk_source_view_new 			(void);
+GtkWidget 	*gtk_source_view_new_with_buffer	(GtkSourceBuffer     *buffer);
 
-void gtk_source_view_set_show_line_numbers (GtkSourceView * view,
-					    gboolean show);
-gboolean gtk_source_view_get_show_line_numbers (GtkSourceView * view);
-void gtk_source_view_set_show_line_pixmaps (GtkSourceView * view,
-					    gboolean show);
-gboolean gtk_source_view_get_show_line_pixmaps (GtkSourceView * view);
+/* Properties */
+void 		 gtk_source_view_set_show_line_numbers 	(GtkSourceView       *view,
+							 gboolean             show);
+gboolean 	 gtk_source_view_get_show_line_numbers 	(const GtkSourceView *view);
 
-void gtk_source_view_set_tab_stop (GtkSourceView * view, gint tab_stop);
-gint gtk_source_view_get_tab_stop (GtkSourceView * view);
-/* Get the width in pixels */
-gint gtk_source_view_get_tab_stop_width (GtkSourceView * view);
+void 		 gtk_source_view_set_show_line_pixmaps	(GtkSourceView       *view,
+					    		 gboolean             show);
+gboolean	 gtk_source_view_get_show_line_pixmaps	(const GtkSourceView *view);
 
-gboolean gtk_source_view_add_pixbuf (GtkSourceView * view,
-				     const gchar * key, GdkPixbuf * pixbuf,
-				     gboolean overwrite);
-GdkPixbuf *gtk_source_view_get_pixbuf (GtkSourceView * view,
-				       const gchar * key);
+void 		 gtk_source_view_set_tabs_width 	(GtkSourceView       *view, 
+							 guint                width);
+guint            gtk_source_view_get_tabs_width         (const GtkSourceView *view);
 
+
+/* FIXME: Re-enable when we will have a better API - Paolo */
+/*
+gboolean 	 gtk_source_view_add_pixbuf 		(GtkSourceView       *view,
+				     			 const gchar         *key, 
+							 GdkPixbuf           *pixbuf,
+							 gboolean             overwrite);
+GdkPixbuf	*gtk_source_view_get_pixbuf 		(const GtkSourceView *view,
+				       			 const gchar         *key);
+*/
 G_END_DECLS
 #endif				/* end of SOURCE_VIEW_H__ */

@@ -426,6 +426,8 @@ create_window (ViewsData *vd)
 	/* scrolled window */
 	sw = gtk_scrolled_window_new (NULL, NULL);
 	gtk_box_pack_end (GTK_BOX (vbox), sw, TRUE, TRUE, 0);
+	gtk_scrolled_window_set_shadow_type (GTK_SCROLLED_WINDOW (sw),
+                                             GTK_SHADOW_IN);
 	gtk_widget_show (sw);
 	
 	/* view */
@@ -441,9 +443,9 @@ create_window (ViewsData *vd)
 		gtk_widget_modify_font (view, font_desc);
 		pango_font_description_free (font_desc);
 	}
-	g_signal_connect (view, "realize",
-			  (GCallback) gtk_source_view_set_tab_stop,
-			  GINT_TO_POINTER (vd->tab_stop));
+
+	gtk_source_view_set_tabs_width (GTK_SOURCE_VIEW (view), 8);
+
 	gtk_source_view_set_show_line_numbers (GTK_SOURCE_VIEW (view), vd->show_numbers);
 	gtk_source_view_set_show_line_pixmaps (GTK_SOURCE_VIEW (view), vd->show_markers);
 
