@@ -517,6 +517,8 @@ create_main_window (ViewsData *vd)
 	GtkWidget *vbox;
 	GtkWidget *label;
 	GtkWidget *menu;
+	GtkWidget *radio_item;
+	gchar *radio_path;
 	
 	window = create_window (vd);
 	vbox = g_object_get_data (G_OBJECT (window), "vbox");
@@ -557,28 +559,12 @@ create_main_window (ViewsData *vd)
 								"/View/Insert Spaces Instead of Tabs")),
 		vd->insert_spaces);
 
-	/* FIXME */
-	gtk_check_menu_item_set_active (
-		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
-								"/View/Tabs Width/4")),
-		vd->tab_stop == 4);
-	gtk_check_menu_item_set_active (
-		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
-								"/View/Tabs Width/6")),
-		vd->tab_stop == 6);
-	gtk_check_menu_item_set_active (
-		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
-								"/View/Tabs Width/8")),
-		vd->tab_stop == 8);
-	gtk_check_menu_item_set_active (
-		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
-								"/View/Tabs Width/10")),
-		vd->tab_stop == 10);
-	gtk_check_menu_item_set_active (
-		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
-								"/View/Tabs Width/12")),
-		vd->tab_stop == 12);
-
+	radio_path = g_strdup_printf ("/View/Tabs Width/%d", vd->tab_stop);
+	radio_item = gtk_item_factory_get_item (vd->item_factory, radio_path);
+	if (radio_item)
+		gtk_check_menu_item_set_active (GTK_CHECK_MENU_ITEM (radio_item), TRUE);
+	g_free (radio_path);
+	
 	/* cursor position label */
 	label = gtk_label_new ("label");
 	gtk_box_pack_start (GTK_BOX (vbox), label, FALSE, FALSE, 0);

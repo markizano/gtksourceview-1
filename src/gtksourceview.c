@@ -72,6 +72,7 @@ struct _GtkSourceViewPrivate
 	gboolean	 insert_spaces;
 	gboolean	 show_margin;
 	guint		 margin;
+	gint             cached_margin_width;
 	
 	GHashTable 	*pixmap_cache;
 
@@ -157,6 +158,10 @@ static void	gtk_source_view_get_property		(GObject                 *object,
 							 GValue                  *value,
 							 GParamSpec              *pspec);
 
+static void     gtk_source_view_style_set               (GtkWidget               *widget,
+							 GtkStyle                *previous_style);
+
+
 /* Private functions. */
 static void
 gtk_source_view_class_init (GtkSourceViewClass *klass)
@@ -176,6 +181,7 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 	object_class->set_property = gtk_source_view_set_property;
 	
 	widget_class->expose_event = gtk_source_view_expose;
+	widget_class->style_set = gtk_source_view_style_set;
 	
 	textview_class->populate_popup = gtk_source_view_populate_popup;
 	
@@ -224,7 +230,7 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 							       G_PARAM_READWRITE));
 
 	g_object_class_install_property (object_class,
-					 PROP_SHOW_LINE_PIXMAPS,
+					 PROP_SHOW_MARGIN,
 					 g_param_spec_boolean ("show_margin",
 							       _("Show Right Margin"),
 							       _("Whether to display the right margin"),
@@ -401,7 +407,8 @@ gtk_source_view_init (GtkSourceView *view)
 
 	view->priv->tabs_width = DEFAULT_TAB_WIDTH;
 	view->priv->margin = DEFAULT_MARGIN;
-
+	view->priv->cached_margin_width = -1;
+	
 	view->priv->pixmap_cache = g_hash_table_new (g_str_hash, g_str_equal);
 
 	gtk_text_view_set_left_margin (GTK_TEXT_VIEW (view), 2);
@@ -1002,12 +1009,14 @@ gtk_source_view_expose (GtkWidget      *widget,
 			GdkRectangle visible_rect;
 			GdkRectangle redraw_rect;
 
-			gint x = calculate_real_tab_width (view, view->priv->margin);
+			if (view->priv->cached_margin_width < 0)
+				view->priv->cached_margin_width =
+					calculate_real_tab_width (view, view->priv->margin);
 		
 			gtk_text_view_get_visible_rect (text_view, &visible_rect);
 			
 			gtk_text_view_buffer_to_window_coords (text_view,
-						       GTK_TEXT_WINDOW_WIDGET,
+						       GTK_TEXT_WINDOW_TEXT,
 						       visible_rect.x,
 						       visible_rect.y,
 						       &redraw_rect.x,
@@ -1024,15 +1033,16 @@ gtk_source_view_expose (GtkWidget      *widget,
 					 "margin", 
 					 redraw_rect.y, 
 					 redraw_rect.y + redraw_rect.height, 
-					 x);
+					 view->priv->cached_margin_width -
+					 visible_rect.x + redraw_rect.x +
+					 gtk_text_view_get_left_margin (text_view));
 		}
 
 		if (GTK_WIDGET_CLASS (parent_class)->expose_event)
-				event_handled = 
-					(* GTK_WIDGET_CLASS (parent_class)->expose_event)
-					(widget, event);
+			event_handled = 
+				(* GTK_WIDGET_CLASS (parent_class)->expose_event)
+				(widget, event);
 
-				
 	}
 	
 	return event_handled;	
@@ -1071,7 +1081,6 @@ calculate_real_tab_width (GtkSourceView *view, guint tab_size)
 	}
 
 	tab_string [tab_size] = 0;
-	gtk_widget_ensure_style (GTK_WIDGET (view));
 	layout = gtk_widget_create_pango_layout (GTK_WIDGET (view), tab_string);
 	g_free (tab_string);
 
@@ -1249,31 +1258,16 @@ gtk_source_view_get_tabs_width (const GtkSourceView *view)
 	return view->priv->tabs_width;
 }
 
-
-/* This function must be called after the widget is
- * realized 
- */
-void
-gtk_source_view_set_tabs_width (GtkSourceView *view,
-				guint          width)
+static gboolean
+set_tab_stops_internal (GtkSourceView *view)
 {
 	PangoTabArray *tab_array;
 	gint real_tab_width;
 
-	g_return_if_fail (GTK_SOURCE_VIEW (view));
-	g_return_if_fail (width <= MAX_TAB_WIDTH);
-	g_return_if_fail (width > 0);
-
-	if (view->priv->tabs_width == width)
-		return;
-
-	real_tab_width = calculate_real_tab_width (view, width);
+	real_tab_width = calculate_real_tab_width (view, view->priv->tabs_width);
 
 	if (real_tab_width < 0)
-	{
-		g_warning ("Impossible to set tabs width.");
-		return;
-	}
+		return FALSE;
 	
 	tab_array = pango_tab_array_new (1, TRUE);
 	pango_tab_array_set_tab (tab_array, 0, PANGO_TAB_LEFT, real_tab_width);
@@ -1283,9 +1277,35 @@ gtk_source_view_set_tabs_width (GtkSourceView *view,
 
 	pango_tab_array_free (tab_array);
 
-	view->priv->tabs_width = width;
+	return TRUE;
+}
 
-	g_object_notify (G_OBJECT (view), "tabs_width");
+void
+gtk_source_view_set_tabs_width (GtkSourceView *view,
+				guint          width)
+{
+	guint save_width;
+	
+	g_return_if_fail (GTK_SOURCE_VIEW (view));
+	g_return_if_fail (width <= MAX_TAB_WIDTH);
+	g_return_if_fail (width > 0);
+
+	if (view->priv->tabs_width == width)
+		return;
+	
+	gtk_widget_ensure_style (GTK_WIDGET (view));
+	
+	save_width = view->priv->tabs_width;
+	view->priv->tabs_width = width;
+	if (set_tab_stops_internal (view))
+	{
+		g_object_notify (G_OBJECT (view), "tabs_width");
+	}
+	else
+	{
+		g_warning ("Impossible to set tabs width.");
+		view->priv->tabs_width = save_width;
+	}
 }
 
 /*
@@ -1611,4 +1631,28 @@ gtk_source_view_get_margin  (const GtkSourceView *view)
 
 }
 
+static void 
+gtk_source_view_style_set (GtkWidget *widget, GtkStyle *previous_style)
+{
+	GtkSourceView *view;
+	
+	g_return_if_fail (GTK_IS_SOURCE_VIEW (widget));
+	
+	/* call default handler first */
+	if (GTK_WIDGET_CLASS (parent_class)->style_set)
+		(* GTK_WIDGET_CLASS (parent_class)->style_set) (widget, previous_style);
+
+	view = GTK_SOURCE_VIEW (widget);
+	if (previous_style)
+	{
+		/* If previous_style is NULL this is the initial
+		 * emission and we can't set the tab array since the
+		 * text view doesn't have a default style yet */
+		
+		/* re-set tab stops */
+		set_tab_stops_internal (view);
+		/* make sure the margin width is recalculated on next expose */
+		view->priv->cached_margin_width = -1;
+	}
+}
 
