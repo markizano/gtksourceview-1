@@ -1,3 +1,18 @@
+Coding Style
+============
+
+All new code in GtkSourceView should follow the GNOME Programming Guidelines
+(http://developer.gnome.org/doc/guides/programming-guidelines/), except
+braces for which we prefer the "hanging" style. I.e.:
+
+	if (x)
+	{
+		code_block;
+	}
+
+Braces are optional if code_block is just one line of code, but be
+consistent for multiple branched statements suchs as if/else if/else.
+
 CVS guidelines for gtksourceview
 ================================
 
