@@ -50,16 +50,6 @@ struct _GtkSourceView
 	GtkTextView           parent;
 
 	GtkSourceViewPrivate *priv;
-/*
-	guint tab_stop;
-	gint show_line_numbers:1;
-	gint line_number_space;
-	guint show_line_pixmaps:1;
-	GHashTable *pixmap_cache;
-
-	gchar *delete_range;
-	GtkSourceBuffer *source_buffer;
-*/
 };
 
 struct _GtkSourceViewClass 

@@ -1,4 +1,4 @@
-TODO (last update: 25 March 2003)
+TODO (last update: 27 March 2003)
 =================================
 
 Before next release:
@@ -29,7 +29,7 @@ Before next release:
 [X] Auto-indentation and insert spaces instead of tabs (Paolo)
 [X] gtk_source_buffer_new_with_language and gtk_source_view_[get|set]_language
     (Paolo)
-[ ] Properties in GtkSourceView (Paolo)
+[X] Properties in GtkSourceView (Paolo)
 
 Future releases:
 
@@ -44,3 +44,4 @@ Future releases:
     gtk_source_buffer_remove_all_source_tags by using an hash table
 [ ] Moving (and improving) the UTF-8 aware case insensitive search code from gedit
     to gtksourceview (Paolo)
+[ ] Writing a test program showing how to use GtkSourceTag (instead of GtkSourceLanguage)

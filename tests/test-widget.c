@@ -59,6 +59,9 @@ static void       new_view_cb                    (ViewsData       *vd,
 static void       view_toggled_cb                (ViewsData       *vd,
 						  guint            callback_action,
 						  GtkWidget       *widget);
+static void       tabs_toggled_cb                (ViewsData       *vd,
+						  guint            callback_action,
+						  GtkWidget       *widget);
 
 /* Menu definition */
 
@@ -79,9 +82,17 @@ static GtkItemFactoryEntry menu_items[] = {
 	{ "/View/sep1",               NULL,         0,               0, "<Separator>" },
 	{ SHOW_NUMBERS_PATH,          NULL,         view_toggled_cb, 1, "<CheckItem>" },
 	{ SHOW_MARKERS_PATH,          NULL,         view_toggled_cb, 2, "<CheckItem>" },
-	{ "/View/sep1",               NULL,         0,               0, "<Separator>" },
+	{ "/View/sep2",               NULL,         0,               0, "<Separator>" },
 	{ ENABLE_AUTO_INDENT_PATH,    NULL,         view_toggled_cb, 3, "<CheckItem>" },
-	{ INSERT_SPACES_PATH,         NULL,         view_toggled_cb, 4, "<CheckItem>" }
+	{ INSERT_SPACES_PATH,         NULL,         view_toggled_cb, 4, "<CheckItem>" },
+
+	{ "/View/sep3",               NULL,         0,               0, "<Separator>" },
+	{ "/_View/_Tabs Width",	      NULL,         0,	             0, "<Branch>" },
+	{ "/View/Tabs Width/4",	      NULL,         tabs_toggled_cb, 4, "<RadioItem>" },
+	{ "/View/Tabs Width/6",	      NULL,         tabs_toggled_cb, 6, "/View/Tabs Width/4" },
+	{ "/View/Tabs Width/8",	      NULL,         tabs_toggled_cb, 8, "/View/Tabs Width/4" },
+	{ "/View/Tabs Width/10",      NULL,         tabs_toggled_cb, 10, "/View/Tabs Width/4" },
+	{ "/View/Tabs Width/12",      NULL,         tabs_toggled_cb, 12, "/View/Tabs Width/4" }
 };
 
 /* Implementation */
@@ -131,6 +142,24 @@ view_toggled_cb (ViewsData *vd,
 		}
 	}
 }
+
+static void 
+tabs_toggled_cb (ViewsData *vd,
+	         guint      callback_action,
+	         GtkWidget *widget)
+{
+	GList *l;
+
+	vd->tab_stop = callback_action;
+	
+	for (l = vd->windows; l; l = l->next)
+	{
+		GtkWidget *window = l->data;
+		GtkWidget *view = g_object_get_data (G_OBJECT (window), "view");
+		g_object_set (G_OBJECT (view), "tabs_width", vd->tab_stop, NULL);
+	}
+}
+
 
 static void
 error_dialog (GtkWindow *parent, const gchar *msg, ...)
@@ -449,12 +478,14 @@ create_window (ViewsData *vd)
 		gtk_widget_modify_font (view, font_desc);
 		pango_font_description_free (font_desc);
 	}
-	gtk_source_view_set_tabs_width (GTK_SOURCE_VIEW (view), vd->tab_stop);
-
-	gtk_source_view_set_show_line_numbers (GTK_SOURCE_VIEW (view), vd->show_numbers);
-	gtk_source_view_set_show_line_pixmaps (GTK_SOURCE_VIEW (view), vd->show_markers);
-	gtk_source_view_set_auto_indent (GTK_SOURCE_VIEW (view), vd->auto_indent);
-	gtk_source_view_set_insert_spaces_instead_of_tabs (GTK_SOURCE_VIEW (view), vd->insert_spaces);
+	
+	g_object_set (G_OBJECT (view), 
+		      "tabs_width", vd->tab_stop, 
+		      "show_line_numbers", vd->show_numbers,
+		      "show_line_pixmaps", vd->show_markers,
+		      "auto_indent", vd->auto_indent,
+		      "insert_spaces_instead_of_tabs", vd->insert_spaces,
+		      NULL);
 
 	return window;
 }
@@ -512,7 +543,27 @@ create_main_window (ViewsData *vd)
 								"/View/Insert Spaces Instead of Tabs")),
 		vd->insert_spaces);
 
-
+	/* FIXME */
+	gtk_check_menu_item_set_active (
+		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
+								"/View/Tabs Width/4")),
+		vd->tab_stop == 4);
+	gtk_check_menu_item_set_active (
+		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
+								"/View/Tabs Width/6")),
+		vd->tab_stop == 6);
+	gtk_check_menu_item_set_active (
+		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
+								"/View/Tabs Width/8")),
+		vd->tab_stop == 8);
+	gtk_check_menu_item_set_active (
+		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
+								"/View/Tabs Width/10")),
+		vd->tab_stop == 10);
+	gtk_check_menu_item_set_active (
+		GTK_CHECK_MENU_ITEM (gtk_item_factory_get_item (vd->item_factory,
+								"/View/Tabs Width/12")),
+		vd->tab_stop == 12);
 
 	/* cursor position label */
 	label = gtk_label_new ("label");
@@ -579,7 +630,7 @@ main (int argc, char *argv[])
 	vd->windows = NULL;
 
 	vd->show_numbers = TRUE;
-	vd->show_markers = TRUE;
+	vd->show_markers = FALSE;
 	vd->tab_stop = 8;
 	vd->auto_indent = TRUE;
 	vd->insert_spaces = FALSE;

@@ -1412,6 +1412,8 @@ gtk_source_buffer_set_check_brackets (GtkSourceBuffer *buffer,
 {
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 
+	check_brackets = (check_brackets != FALSE);
+
 	if (check_brackets != buffer->priv->check_brackets)
 	{
 		buffer->priv->check_brackets = check_brackets;
@@ -1465,6 +1467,8 @@ gtk_source_buffer_set_highlight (GtkSourceBuffer *buffer,
 	GtkTextIter iter2;
 
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
+
+	highlight = (highlight != FALSE);
 
 	if (buffer->priv->highlight == highlight)
 		return;

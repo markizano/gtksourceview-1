@@ -39,12 +39,24 @@
 #define GUTTER_PIXMAP 			16
 #define DEFAULT_TAB_WIDTH 		8
 #define MIN_NUMBER_WINDOW_WIDTH		20
+#define MAX_TAB_WIDTH			32
 
 enum {
 	UNDO,
 	REDO,
 	LAST_SIGNAL
 };
+
+/* Properties */
+enum {
+	PROP_0,
+	PROP_SHOW_LINE_NUMBERS,
+	PROP_SHOW_LINE_PIXMAPS,
+	PROP_TABS_WIDTH,
+	PROP_AUTO_INDENT,
+	PROP_INSERT_SPACES
+};
+
 
 struct _GtkSourceViewPrivate
 {
@@ -126,6 +138,15 @@ static void 	view_dnd_drop 				(GtkTextView       *view,
 							 guint              time,
 							 gpointer           data);
 
+static void	gtk_source_view_set_property 		(GObject                 *object,
+							 guint                    prop_id,
+							 const GValue            *value,
+							 GParamSpec              *pspec);
+static void	gtk_source_view_get_property		(GObject                 *object,
+							 guint                    prop_id,
+							 GValue                  *value,
+							 GParamSpec              *pspec);
+
 /* Private functions. */
 static void
 gtk_source_view_class_init (GtkSourceViewClass *klass)
@@ -141,12 +162,56 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 	widget_class 	= GTK_WIDGET_CLASS (klass);
 	
 	object_class->finalize = gtk_source_view_finalize;
+	object_class->get_property = gtk_source_view_get_property;
+	object_class->set_property = gtk_source_view_set_property;
+	
 	widget_class->expose_event = gtk_source_view_expose;
 	
 	textview_class->populate_popup = gtk_source_view_populate_popup;
 	
 	klass->undo = gtk_source_view_undo;
 	klass->redo = gtk_source_view_redo;
+
+	g_object_class_install_property (object_class,
+					 PROP_SHOW_LINE_NUMBERS,
+					 g_param_spec_boolean ("show_line_numbers",
+							       _("Show Line Numbers"),
+							       _("Whether to display line numbers"),
+							       FALSE,
+							       G_PARAM_READWRITE));
+	
+	g_object_class_install_property (object_class,
+					 PROP_SHOW_LINE_PIXMAPS,
+					 g_param_spec_boolean ("show_line_pixmaps",
+							       _("Show Line Pixmaps"),
+							       _("Whether to display line pixmaps"),
+							       FALSE,
+							       G_PARAM_READWRITE));
+
+	g_object_class_install_property (object_class,
+					 PROP_TABS_WIDTH,
+					 g_param_spec_uint ("tabs_width",
+							    _("Tabs Width"),
+							    _("Tabs Width"),
+							    1,
+							    MAX_TAB_WIDTH,
+							    DEFAULT_TAB_WIDTH,
+							    G_PARAM_READWRITE));
+	
+	g_object_class_install_property (object_class,
+					 PROP_AUTO_INDENT,
+					 g_param_spec_boolean ("auto_indent",
+							       _("Auto Indentation"),
+							       _("Whether to enable auto indentation"),
+							       FALSE,
+							       G_PARAM_READWRITE));
+	g_object_class_install_property (object_class,
+					 PROP_INSERT_SPACES,
+					 g_param_spec_boolean ("insert_spaces_instead_of_tabs",
+							       _("Insert Spaces Instead of Tabs"),
+							       _("Whether to insert spaces instead of tabs"),
+							       FALSE,
+							       G_PARAM_READWRITE));
 
 	signals [UNDO] =
 		g_signal_new ("undo",
@@ -181,6 +246,101 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 				      "redo", 0);
 }
 
+static void 
+gtk_source_view_set_property (GObject      *object,
+			      guint         prop_id,
+			      const GValue *value,
+			      GParamSpec   *pspec)
+{
+	GtkSourceView *view;
+	
+	g_return_if_fail (GTK_IS_SOURCE_VIEW (object));
+
+	view = GTK_SOURCE_VIEW (object);
+    
+	switch (prop_id)
+	{
+		case PROP_SHOW_LINE_NUMBERS:
+			gtk_source_view_set_show_line_numbers (view,
+							       g_value_get_boolean (value));
+			break;
+			
+		case PROP_SHOW_LINE_PIXMAPS:
+			gtk_source_view_set_show_line_pixmaps (view,
+							       g_value_get_boolean (value));
+			break;
+			
+		case PROP_TABS_WIDTH:
+			gtk_source_view_set_tabs_width (view, 
+							g_value_get_uint (value));
+			break;
+			
+		case PROP_AUTO_INDENT:
+			gtk_source_view_set_auto_indent (view,
+							 g_value_get_boolean (value));
+			break;
+			
+		case PROP_INSERT_SPACES:
+			gtk_source_view_set_insert_spaces_instead_of_tabs (
+							view,
+							g_value_get_boolean (value));
+			break;
+			
+		default:
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+			break;
+	}
+}
+
+static void 
+gtk_source_view_get_property (GObject    *object,
+			      guint       prop_id,
+			      GValue     *value,
+			      GParamSpec *pspec)
+{
+	GtkSourceView *view;
+	
+	g_return_if_fail (GTK_IS_SOURCE_VIEW (object));
+
+	view = GTK_SOURCE_VIEW (object);
+    
+	switch (prop_id)
+	{
+		case PROP_SHOW_LINE_NUMBERS:
+			g_value_set_boolean (value,
+					     gtk_source_view_get_show_line_numbers (view));
+					     
+			break;
+			
+		case PROP_SHOW_LINE_PIXMAPS:
+			g_value_set_boolean (value,
+					     gtk_source_view_get_show_line_pixmaps (view));
+
+			break;
+			
+		case PROP_TABS_WIDTH:
+			g_value_set_uint (value,
+					  gtk_source_view_get_tabs_width (view));
+			break;
+			
+		case PROP_AUTO_INDENT:
+			g_value_set_boolean (value,
+					     gtk_source_view_get_auto_indent (view));
+
+			break;
+			
+		case PROP_INSERT_SPACES:
+			g_value_set_boolean (value,
+					     gtk_source_view_get_insert_spaces_instead_of_tabs (view));
+	
+			break;
+			
+		default:
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+			break;
+	}
+}
+
 static void
 gtk_source_view_init (GtkSourceView *view)
 {
@@ -191,12 +351,6 @@ gtk_source_view_init (GtkSourceView *view)
 	view->priv->tabs_width = DEFAULT_TAB_WIDTH;
 
 	view->priv->pixmap_cache = g_hash_table_new (g_str_hash, g_str_equal);
-
-	/* FIXME: remove when we will use properties - Paolo */
-	gtk_source_view_set_show_line_numbers (view, FALSE);
-	gtk_source_view_set_show_line_pixmaps (view, FALSE);
-	gtk_source_view_set_auto_indent (view, FALSE);
-	gtk_source_view_set_insert_spaces_instead_of_tabs (view, FALSE);
 
 	gtk_text_view_set_left_margin (GTK_TEXT_VIEW (view), 2);
 	gtk_text_view_set_right_margin (GTK_TEXT_VIEW (view), 2);
@@ -915,6 +1069,8 @@ gtk_source_view_set_show_line_numbers (GtkSourceView *view,
 	g_return_if_fail (view != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
 
+	visible = (visible != FALSE);
+
 	if (visible) 
 	{
 		if (!view->priv->show_line_numbers) 
@@ -930,6 +1086,8 @@ gtk_source_view_set_show_line_numbers (GtkSourceView *view,
 				gtk_widget_queue_draw (GTK_WIDGET (view));
 
 			view->priv->show_line_numbers = visible;
+
+			g_object_notify (G_OBJECT (view), "show_line_numbers");
 		}
 	} 
 	else 
@@ -940,6 +1098,8 @@ gtk_source_view_set_show_line_numbers (GtkSourceView *view,
 
 			/* force expose event, which will adjust margin. */
 			gtk_widget_queue_draw (GTK_WIDGET (view));
+
+			g_object_notify (G_OBJECT (view), "show_line_numbers");
 		}
 	}
 }
@@ -960,6 +1120,8 @@ gtk_source_view_set_show_line_pixmaps (GtkSourceView *view,
 	g_return_if_fail (view != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
 
+	visible = (visible != FALSE);
+
 	if (visible) 
 	{
 		if (!view->priv->show_line_pixmaps) 
@@ -975,6 +1137,8 @@ gtk_source_view_set_show_line_pixmaps (GtkSourceView *view,
 				gtk_widget_queue_draw (GTK_WIDGET (view));
 
 			view->priv->show_line_pixmaps = visible;
+
+			g_object_notify (G_OBJECT (view), "show_line_pixmaps");
 		}
 	} 
 	else 
@@ -985,6 +1149,8 @@ gtk_source_view_set_show_line_pixmaps (GtkSourceView *view,
 
 			/* force expose event, which will adjust margin. */
 			gtk_widget_queue_draw (GTK_WIDGET (view));
+
+			g_object_notify (G_OBJECT (view), "show_line_pixmaps");
 		}
 	}
 }
@@ -1010,7 +1176,8 @@ gtk_source_view_set_tabs_width (GtkSourceView *view,
 	gint real_tab_width;
 
 	g_return_if_fail (GTK_SOURCE_VIEW (view));
-	g_return_if_fail (width <= 32);
+	g_return_if_fail (width <= MAX_TAB_WIDTH);
+	g_return_if_fail (width > 0);
 
 	if (view->priv->tabs_width == width)
 		return;
@@ -1032,6 +1199,8 @@ gtk_source_view_set_tabs_width (GtkSourceView *view,
 	pango_tab_array_free (tab_array);
 
 	view->priv->tabs_width = width;
+
+	g_object_notify (G_OBJECT (view), "tabs_width");
 }
 
 /*
@@ -1208,7 +1377,14 @@ gtk_source_view_set_auto_indent (GtkSourceView *view, gboolean enable)
 {
 	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
 
+	enable = (enable != FALSE);
+
+	if (view->priv->auto_indent == enable)
+		return;
+
 	view->priv->auto_indent = enable;
+
+	g_object_notify (G_OBJECT (view), "auto_indent");
 }
 
 gboolean
@@ -1224,7 +1400,14 @@ gtk_source_view_set_insert_spaces_instead_of_tabs (GtkSourceView *view, gboolean
 {
 	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
 
+	enable = (enable != FALSE);
+	
+	if (view->priv->insert_spaces == enable)
+		return;
+	
 	view->priv->insert_spaces = enable;
+
+	g_object_notify (G_OBJECT (view), "insert_spaces_instead_of_tabs");
 }
 
 static void 
