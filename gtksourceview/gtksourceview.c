@@ -1160,14 +1160,7 @@ calculate_real_tab_width (GtkSourceView *view, guint tab_size, gchar c)
 	if (tab_size == 0)
 		return -1;
 
-	tab_string = g_malloc (tab_size + 1);
-
-	while (counter < tab_size) {
-		tab_string [counter] = c;
-		counter++;
-	}
-
-	tab_string [tab_size] = 0;
+	tab_string = g_strnfill (tab_size, c);
 	layout = gtk_widget_create_pango_layout (GTK_WIDGET (view), tab_string);
 	g_free (tab_string);
 
@@ -1497,7 +1490,7 @@ key_press_cb (GtkWidget *widget, GdkEventKey *event, gpointer data)
 
 	key = event->keyval;
 
-	mark = gtk_text_buffer_get_mark (buf, "insert");
+	mark = gtk_text_buffer_get_insert (buf);
 	gtk_text_buffer_get_iter_at_mark (buf, &cur, mark);
 	
 	if ((key == GDK_Return) && gtk_text_iter_ends_line (&cur) && 
@@ -1541,12 +1534,7 @@ key_press_cb (GtkWidget *widget, GdkEventKey *event, gpointer data)
 
 		num_of_equivalent_spaces = tabs_size - (cur_pos % tabs_size); 
 
-		spaces = g_malloc (num_of_equivalent_spaces + 1);
-		
-		for (i = 0; i < num_of_equivalent_spaces; i++)
-			spaces [i] = ' ';
-		
-		spaces [num_of_equivalent_spaces] = '\0';
+		spaces = g_strnfill (num_of_equivalent_spaces, ' ');
 		
 		gtk_text_buffer_begin_user_action (buf);
 		gtk_text_buffer_insert (buf,  &cur, spaces, num_of_equivalent_spaces);

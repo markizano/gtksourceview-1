@@ -178,7 +178,7 @@ static void 	 gtk_source_buffer_real_delete_range 	(GtkTextBuffer           *buf
 							 GtkTextIter             *iter,
 							 GtkTextIter             *end);
 
-static const GtkSyntaxTag *iter_has_syntax_tag 		(GtkTextIter             *iter);
+static const GtkSyntaxTag *iter_has_syntax_tag 		(const GtkTextIter       *iter);
 
 static void 	 get_tags_func 				(GtkTextTag              *tag, 
 		                                         gpointer                 data);
@@ -701,7 +701,7 @@ gtk_source_buffer_move_cursor (GtkTextBuffer *buffer,
 			       GtkTextMark   *mark, 
 			       gpointer       data)
 {
-	GtkTextIter iter1;
+	GtkTextIter iter1, iter2;
 
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 	g_return_if_fail (iter != NULL);
@@ -713,8 +713,6 @@ gtk_source_buffer_move_cursor (GtkTextBuffer *buffer,
 
 	if (GTK_SOURCE_BUFFER (buffer)->priv->bracket_found) 
 	{
-		GtkTextIter iter2;
-
 		gtk_text_buffer_get_iter_at_mark (buffer,
 						  &iter1,
 						  GTK_SOURCE_BUFFER (buffer)->priv->bracket_mark);
@@ -729,25 +727,26 @@ gtk_source_buffer_move_cursor (GtkTextBuffer *buffer,
 	if (!GTK_SOURCE_BUFFER (buffer)->priv->check_brackets || iter_has_syntax_tag (iter))
 		return;
 
-	if (gtk_source_buffer_find_bracket_match_real (iter, MAX_CHARS_BEFORE_FINDING_A_MATCH)) 
+	iter1 = *iter;
+	if (gtk_source_buffer_find_bracket_match_real (&iter1, MAX_CHARS_BEFORE_FINDING_A_MATCH)) 
 	{
 		if (!GTK_SOURCE_BUFFER (buffer)->priv->bracket_mark)
 			GTK_SOURCE_BUFFER (buffer)->priv->bracket_mark =
 				gtk_text_buffer_create_mark (buffer, 
 							     NULL,
-							     iter, 
+							     &iter1, 
 							     FALSE);
 		else
 			gtk_text_buffer_move_mark (buffer,
 						   GTK_SOURCE_BUFFER (buffer)->priv->bracket_mark,
-						   iter);
+						   &iter1);
 
-		iter1 = *iter;
-		gtk_text_iter_forward_char (&iter1);
+		iter2 = iter1;
+		gtk_text_iter_forward_char (&iter2);
 		gtk_text_buffer_apply_tag (buffer,
 					   GTK_SOURCE_BUFFER (buffer)->priv->bracket_match_tag,
-					   iter, 
-					   &iter1);
+					   &iter1, 
+					   &iter2);
 		GTK_SOURCE_BUFFER (buffer)->priv->bracket_found = TRUE;
 	}
 	else
@@ -970,7 +969,7 @@ sync_syntax_regex (GtkSourceBuffer *buffer)
 }
 
 static const GtkSyntaxTag *
-iter_has_syntax_tag (GtkTextIter *iter)
+iter_has_syntax_tag (const GtkTextIter *iter)
 {
 	const GtkSyntaxTag *tag;
 	GSList *list;
