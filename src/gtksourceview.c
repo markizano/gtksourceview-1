@@ -343,7 +343,7 @@ gtk_source_view_get_lines (GtkTextView  *text_view,
 
 		++count;
 
-		if ((y + height) > last_y)
+		if ((y + height) >= last_y)
 			break;
 
 		gtk_text_iter_forward_line (&iter);

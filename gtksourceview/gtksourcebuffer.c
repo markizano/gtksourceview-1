@@ -40,8 +40,10 @@
 
 /*
 #define ENABLE_DEBUG
+#define ENABLE_PROFILE
 */
 #undef ENABLE_DEBUG
+#undef ENABLE_PROFILE
 
 #ifdef ENABLE_DEBUG
 #define DEBUG(x) (x)
@@ -49,17 +51,26 @@
 #define DEBUG(x)
 #endif
 
+#ifdef ENABLE_PROFILE
+#define PROFILE(x) (x)
+#else
+#define PROFILE(x)
+#endif
+
 /* define this to always highlight in an idle handler, and not
  * possibly in the expose method of the view */
 #undef LAZIEST_MODE
 
 /* in milliseconds */
-#define WORKER_TIME_SLICE                   40
+#define WORKER_TIME_SLICE                   30
 #define INITIAL_WORKER_BATCH                40960
 #define MINIMUM_WORKER_BATCH                1024
 
+#define MAX_CHARS_BEFORE_FINDING_A_MATCH    2000
+
 typedef struct _MarkerSubList        MarkerSubList;
 typedef struct _SyntaxDelimiter      SyntaxDelimiter;
+typedef struct _PatternMatch         PatternMatch;
 
 /* Signals */
 enum {
@@ -81,6 +92,12 @@ struct _SyntaxDelimiter
 	GtkSyntaxTag       *tag;
 };
 
+struct _PatternMatch
+{
+	GtkPatternTag        *tag;
+	GtkSourceBufferMatch  match;
+};
+
 struct _GtkSourceBufferPrivate 
 {
 	gint                highlight:1;
@@ -100,6 +117,7 @@ struct _GtkSourceBufferPrivate
 
 	/* Syntax regions data */
 	GArray             *syntax_regions;
+	GArray             *old_syntax_regions;
 	gint                worker_last_offset;
 	gint                worker_batch_size;
 	guint               worker_handler;
@@ -168,13 +186,17 @@ static void      update_syntax_regions                  (GtkSourceBuffer        
 							 gint                     delta);
 
 static void      invalidate_syntax_regions              (GtkSourceBuffer         *source_buffer,
-							 GtkTextIter             *from);
+							 GtkTextIter             *from,
+							 gint                     delta);
 static void      refresh_range                          (GtkSourceBuffer         *buffer,
 							 GtkTextIter             *start,
 							 GtkTextIter             *end);
 static void      ensure_highlighted                     (GtkSourceBuffer         *source_buffer,
 							 GtkTextIter             *start,
 							 GtkTextIter             *end);
+
+static gboolean	 gtk_source_buffer_find_bracket_match_real (GtkTextIter          *orig, 
+							    gint                  max_chars);
 
 
 
@@ -329,6 +351,8 @@ gtk_source_buffer_finalize (GObject *object)
 	g_object_unref (buffer->priv->undo_manager);
 
 	g_array_free (buffer->priv->syntax_regions, TRUE);
+	if (buffer->priv->old_syntax_regions)
+		g_array_free (buffer->priv->old_syntax_regions, TRUE);
 	
 	if (buffer->priv->reg_syntax_all.len > 0)
 		gtk_source_regex_destroy (&buffer->priv->reg_syntax_all);
@@ -473,7 +497,7 @@ gtk_source_buffer_move_cursor (GtkTextBuffer *buffer,
 	if (!GTK_SOURCE_BUFFER (buffer)->priv->check_brackets || iter_has_syntax_tag (iter))
 		return;
 
-	if (gtk_source_buffer_find_bracket_match (iter)) {
+	if (gtk_source_buffer_find_bracket_match_real (iter, MAX_CHARS_BEFORE_FINDING_A_MATCH)) {
 		if (!GTK_SOURCE_BUFFER (buffer)->priv->bracket_mark)
 			GTK_SOURCE_BUFFER (buffer)->priv->bracket_mark =
 				gtk_text_buffer_create_mark (buffer, 
@@ -698,7 +722,7 @@ gtk_source_buffer_install_regex_tags (GtkSourceBuffer *buffer,
 		sync_syntax_regex (buffer);
 
 	if (buffer->priv->highlight)
-		invalidate_syntax_regions (buffer, NULL);
+		invalidate_syntax_regions (buffer, NULL, 0);
 }
 
 static void
@@ -770,8 +794,8 @@ gtk_source_buffer_get_pattern_entries (const GtkSourceBuffer *buffer)
 	return buffer->priv->pattern_items;
 }
 
-gboolean
-gtk_source_buffer_find_bracket_match (GtkTextIter *orig)
+static gboolean
+gtk_source_buffer_find_bracket_match_real (GtkTextIter *orig, gint max_chars)
 {
 	GtkTextIter iter;
 	
@@ -779,12 +803,11 @@ gtk_source_buffer_find_bracket_match (GtkTextIter *orig)
 	gunichar search_char;
 	gunichar cur_char;
 	gint addition;
+	gint char_cont;
 
 	gint counter;
 	
 	gboolean found;
-
-	g_return_val_if_fail (orig != NULL, FALSE);
 
 	iter = *orig;
 
@@ -794,41 +817,41 @@ gtk_source_buffer_find_bracket_match (GtkTextIter *orig)
 	base_char = search_char = cur_char;
 	
 	switch ((int) base_char) {
-	case '{':
-		addition = 1;
-		search_char = '}';
-		break;
-	case '(':
-		addition = 1;
-		search_char = ')';
-		break;
-	case '[':
-		addition = 1;
-		search_char = ']';
-		break;
-	case '<':
-		addition = 1;
-		search_char = '>';
-		break;
-	case '}':
-		addition = -1;
-		search_char = '{';
-		break;
-	case ')':
-		addition = -1;
-		search_char = '(';
-		break;
-	case ']':
-		addition = -1;
-		search_char = '[';
-		break;
-	case '>':
-		addition = -1;
-		search_char = '<';
-		break;
-	default:
-		addition = 0;
-		break;
+		case '{':
+			addition = 1;
+			search_char = '}';
+			break;
+		case '(':
+			addition = 1;
+			search_char = ')';
+			break;
+		case '[':
+			addition = 1;
+			search_char = ']';
+			break;
+		case '<':
+			addition = 1;
+			search_char = '>';
+			break;
+		case '}':
+			addition = -1;
+			search_char = '{';
+			break;
+		case ')':
+			addition = -1;
+			search_char = '(';
+			break;
+		case ']':
+			addition = -1;
+			search_char = '[';
+			break;
+		case '>':
+			addition = -1;
+			search_char = '<';
+			break;
+		default:
+			addition = 0;
+			break;
 	}
 
 	if (addition == 0)
@@ -836,10 +859,12 @@ gtk_source_buffer_find_bracket_match (GtkTextIter *orig)
 
 	counter = 0;
 	found = FALSE;
-
+	char_cont = 0;
+	
 	do {
 		gtk_text_iter_forward_chars (&iter, addition);
 		cur_char = gtk_text_iter_get_char (&iter);
+		++char_cont;
 		
 		if ((cur_char == search_char) && counter == 0) {
 			found = TRUE;
@@ -851,7 +876,8 @@ gtk_source_buffer_find_bracket_match (GtkTextIter *orig)
 			if (cur_char == search_char)
 				counter--;
 	} 
-	while (!gtk_text_iter_is_end (&iter) && !gtk_text_iter_is_start (&iter));
+	while (!gtk_text_iter_is_end (&iter) && !gtk_text_iter_is_start (&iter) && 
+		((char_cont < max_chars) || (max_chars < 0)));
 
 	if (found)
 		*orig = iter;
@@ -859,6 +885,14 @@ gtk_source_buffer_find_bracket_match (GtkTextIter *orig)
 	return found;
 }
 
+gboolean
+gtk_source_buffer_find_bracket_match (GtkTextIter *orig)
+{
+	g_return_val_if_fail (orig != NULL, FALSE);
+
+	return gtk_source_buffer_find_bracket_match_real (orig, -1);
+}
+	
 gboolean
 gtk_source_buffer_can_undo (const GtkSourceBuffer *buffer)
 {
@@ -1157,7 +1191,7 @@ gtk_source_buffer_set_highlight (GtkSourceBuffer *buffer,
 	buffer->priv->highlight = highlight;
 
 	if (highlight) {
-		invalidate_syntax_regions (buffer, NULL);
+		invalidate_syntax_regions (buffer, NULL, 0);
 
 	} else {
 		if (buffer->priv->worker_handler) {
@@ -1182,7 +1216,7 @@ idle_worker (GtkSourceBuffer *source_buffer)
 		/* the syntax regions table is incomplete */
 		build_syntax_regions_table (source_buffer, NULL);
 	}
-	
+
 	if (source_buffer->priv->worker_last_offset < 0 ||
 	    source_buffer->priv->worker_last_offset >=  source_buffer->priv->visible_end) 
 	{
@@ -1357,23 +1391,37 @@ bsearch_offset (GArray *array, gint offset)
 }
 
 static void
-invalidate_syntax_regions (GtkSourceBuffer *source_buffer, GtkTextIter *from)
+adjust_table_offsets (GArray *table, gint start, gint delta)
 {
-	GArray *table;
-	gint region;
+	if (!table)
+		return;
+
+	while (start < table->len) {
+		g_array_index (table, SyntaxDelimiter, start).offset += delta;
+		start++;
+	}
+}
+	
+static void 
+invalidate_syntax_regions (GtkSourceBuffer *source_buffer,
+			   GtkTextIter     *from,
+			   gint             delta)
+{
+	GArray *table, *old_table;
+	gint region, saved_region;
 	gint offset;
 	SyntaxDelimiter *delim;
 	
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (source_buffer));
 	
 	table = source_buffer->priv->syntax_regions;
-	if (!table)
-		return;
+	g_assert (table != NULL);
 	
-	if (from)
+	if (from) {
 		offset = gtk_text_iter_get_offset (from);
-	else
+	} else {
 		offset = 0;
+	}
 
 	DEBUG (g_message ("invalidating from %d", offset));
 	
@@ -1390,23 +1438,130 @@ invalidate_syntax_regions (GtkSourceBuffer *source_buffer, GtkTextIter *from)
 					region - 1);
 		if (delim->tag &&
 		    delim->offset == offset) {
-			/* take previous region if we are
-			   just at the start of a syntax
-			   region */
+			/* take previous region if we are just at the
+			   start of a syntax region (i.e. we're
+			   invalidating because somebody deleted a
+			   opening syntax pattern) */
 			region--;
 		}
+	}
+	
+	/* if delta is negative, some text was deleted and surely some
+	 * syntax delimiters have gone, so we don't need those in the
+	 * saved table */
+	if (delta < 0) {
+		saved_region = bsearch_offset (table, offset - delta);
+	} else {
+		saved_region = region;
+	}
+
+	/* free saved old table */
+	if (source_buffer->priv->old_syntax_regions) {
+		g_array_free (source_buffer->priv->old_syntax_regions, TRUE);
+		source_buffer->priv->old_syntax_regions = NULL;
+	}
+
+	/* we don't want to save information if delta is zero,
+	 * i.e. the invalidation is not because the user edited the
+	 * buffer */
+	if (table->len - saved_region > 0 && delta != 0) {
+		gint old_table_size;
+
+		DEBUG (g_message ("saving table information"));
+				
+		/* save table to try to recover still valid information */
+		old_table_size = table->len - saved_region;
+		old_table = g_array_new (FALSE, FALSE, sizeof (SyntaxDelimiter));
+		g_array_set_size (old_table, old_table_size);
+		source_buffer->priv->old_syntax_regions = old_table;
+
+		/* now copy from r through the end of the table */
+		memcpy (&g_array_index (old_table, SyntaxDelimiter, 0),
+			&g_array_index (table, SyntaxDelimiter, saved_region),
+			sizeof (SyntaxDelimiter) * old_table_size);
+
+		/* adjust saved table offsets */
+		adjust_table_offsets (old_table, 0, delta);
 	}
 	
 	/* chop table */
 	g_array_set_size (table, region);
 
-	if (region > 0)
-		source_buffer->priv->worker_last_offset = g_array_index (
-			table, SyntaxDelimiter, region - 1).offset;
-	else
+	/* update worker_last_offset from the new conditions in the table */
+	if (region > 0) {
+		source_buffer->priv->worker_last_offset =
+			g_array_index (table, SyntaxDelimiter, region - 1).offset;
+	} else {
 		source_buffer->priv->worker_last_offset = 0;
-
+	}
+	
 	install_idle_worker (source_buffer);
+}
+
+static gboolean
+delimiter_is_equal (SyntaxDelimiter *d1, SyntaxDelimiter *d2)
+{
+	return (d1->offset == d2->offset &&
+		d1->depth == d2->depth &&
+		d1->tag == d2->tag);
+}
+
+/**
+ * next_syntax_region:
+ * @source_buffer: the GtkSourceBuffer to work on
+ * @state: the current SyntaxDelimiter
+ * @head: text to analyze
+ * @head_length: length in bytes of @head
+ * @head_offset: offset in the buffer where @head starts
+ * @match: GtkSourceBufferMatch object to get the results
+ * 
+ * This function can be seen as a single iteration in the analyzing
+ * process.  It takes the current @state, searches for the next syntax
+ * pattern in head (starting from byte index 0) and if found, updates
+ * @state to reflect the new state.  @match is also filled with the
+ * matching bounds.
+ * 
+ * Return value: TRUE if a syntax pattern was found in @head.
+ **/
+static gboolean 
+next_syntax_region (GtkSourceBuffer      *source_buffer,
+		    SyntaxDelimiter      *state,
+		    const gchar          *head,
+		    gint                  head_length,
+		    gint                  head_offset,
+		    GtkSourceBufferMatch *match)
+{
+	GtkSyntaxTag *tag;
+	gboolean found;
+	
+	if (!state->tag) {
+		/* we come from a non-syntax colored region, so seek
+		 * for an opening pattern */
+		tag = (GtkSyntaxTag *) get_syntax_start (
+			source_buffer, head, head_length, match);
+
+		if (!tag)
+			return FALSE;
+		
+		state->tag = tag;
+		state->offset = match->startpos + head_offset;
+		state->depth = 1;
+
+	} else {
+		/* seek the closing pattern for the current syntax
+		 * region */
+		found = get_syntax_end (head, head_length,
+					state->tag, match);
+		
+		if (!found)
+			return FALSE;
+		
+		state->offset = match->endpos + head_offset;
+		state->tag = NULL;
+		state->depth = 0;
+		
+	}
+	return TRUE;
 }
 
 static void 
@@ -1415,6 +1570,9 @@ build_syntax_regions_table (GtkSourceBuffer *source_buffer,
 {
 	GArray *table;
 	GtkTextIter start, end;
+	GArray *old_table;
+	gint old_region;
+	gboolean use_old_data;
 	gchar *slice, *head;
 	gint offset, head_length;
 	GtkSourceBufferMatch match;
@@ -1423,8 +1581,6 @@ build_syntax_regions_table (GtkSourceBuffer *source_buffer,
 
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (source_buffer));
 	
-	timer = g_timer_new ();
-
 	/* check if we still have text to analyze */
 	if (source_buffer->priv->worker_last_offset < 0)
 		return;
@@ -1440,35 +1596,25 @@ build_syntax_regions_table (GtkSourceBuffer *source_buffer,
 	gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (source_buffer),
 					    &end, offset + source_buffer->priv->
 					    worker_batch_size);
-
+	
+	/* extend the range to include needed_end if necessary */
 	if (needed_end && gtk_text_iter_compare (&end, needed_end) < 0)
 		end = *needed_end;
 	
+	/* always stop processing at end of lines: this minimizes the
+	 * chance of not getting a syntax pattern because it was split
+	 * in between batches */
 	if (!gtk_text_iter_ends_line (&end))
 		gtk_text_iter_forward_to_line_end (&end);
 
-	/* some sanity checks */
-	g_assert (offset == 0 || source_buffer->priv->syntax_regions);
+	table = source_buffer->priv->syntax_regions;
+	g_assert (table != NULL);
 	
-	if (!source_buffer->priv->syntax_regions) {
-		/* Create the syntax regions table */
-		GtkTextIter sb, eb;
-		gint buffer_size;
-
-		gtk_text_buffer_get_bounds (GTK_TEXT_BUFFER (source_buffer),
-					    &sb, &eb);
-		buffer_size = gtk_text_iter_get_offset (&eb)
-			- gtk_text_iter_get_offset (&sb);
-		/* estimate a syntax pattern every 200 characters... */
-		table = g_array_sized_new (FALSE, FALSE,
-					   sizeof (SyntaxDelimiter),
-					   buffer_size / 200);
-		source_buffer->priv->syntax_regions = table;
-
-	} else {
-		table = source_buffer->priv->syntax_regions;
-	}
-
+	/* get old table information */
+	use_old_data = FALSE;
+	old_table = source_buffer->priv->old_syntax_regions;
+	old_region = old_table ? bsearch_offset (old_table, offset) : 0;
+	
 	/* setup analyzer */
 	if (table->len == 0) {
 		delim.offset = offset;
@@ -1485,36 +1631,42 @@ build_syntax_regions_table (GtkSourceBuffer *source_buffer,
 	head = slice;
 	head_length = strlen (head);
 
-	DEBUG (g_message ("starting batch of %d bytes, %g ms",
-			  head_length,
-			  g_timer_elapsed (timer, NULL) * 1000));
-    
-	/* build the table */
+	timer = g_timer_new ();
+
+	/* MAIN LOOP: build the table */
 	while (head_length > 0) {
-		if (!delim.tag) {
-			delim.tag = (GtkSyntaxTag *) get_syntax_start (
-				source_buffer, head, head_length, &match);
-
-			if (!delim.tag)
-				break;
-		
-			delim.offset = match.startpos + offset;
-			delim.depth = 1;
-
-		} else {
-			gboolean found;
-
-			found = get_syntax_end (head, head_length,
-						delim.tag, &match);
-
-			if (!found)
-				break;
-
-			delim.offset = match.endpos + offset;
-			delim.tag = NULL;
-			delim.depth = 0;
-
+		if (!next_syntax_region (source_buffer,
+					 &delim,
+					 head,
+					 head_length,
+					 offset,
+					 &match)) {
+			/* no further data */
+			break;
 		}
+
+		/* check if we can use the saved table */
+		if (old_table && old_region < old_table->len) {
+			/* don't fall behind the current match */
+			while (old_region < old_table->len &&
+			       g_array_index (old_table,
+					      SyntaxDelimiter,
+					      old_region).offset < delim.offset) {
+				old_region++;
+			}
+			if (old_region < old_table->len &&
+			    delimiter_is_equal (&delim,
+						&g_array_index (old_table,
+								SyntaxDelimiter,
+								old_region))) {
+				/* we have an exact match; we can use
+				 * the saved data */
+				use_old_data = TRUE;
+				break;
+			}
+		}
+
+		/* add the delimiter to the table */
 		g_array_append_val (table, delim);
 			
 		/* move pointers */
@@ -1526,20 +1678,54 @@ build_syntax_regions_table (GtkSourceBuffer *source_buffer,
 	g_free (slice);
 	g_timer_stop (timer);
 
-	/* update worker information */
-	source_buffer->priv->worker_last_offset =
-		gtk_text_iter_is_end (&end) ? -1 : gtk_text_iter_get_offset (&end);
+	if (use_old_data) {
+		/* now we copy the saved information from old_table to
+		 * the end of table */
+		gint region = table->len;
+		gint count = old_table->len - old_region;
+		
+		DEBUG (g_message ("copying %d delimiters from saved table information", count));
 
-	head_length = gtk_text_iter_get_offset (&end) -	gtk_text_iter_get_offset (&start);
+		g_array_set_size (table, table->len + count);
+		memcpy (&g_array_index (table, SyntaxDelimiter, region),
+			&g_array_index (old_table, SyntaxDelimiter, old_region),
+			sizeof (SyntaxDelimiter) * count);
+		
+		/* set worker_last_offset from the last copied
+		 * element, so we can continue to analyze the text in
+		 * case the saved table was incomplete */
+		region = table->len;
+		offset = g_array_index (table, SyntaxDelimiter, region - 1).offset;
+		source_buffer->priv->worker_last_offset = offset;
+		gtk_text_iter_set_offset (&end, offset);
+		
+	} else {
+		/* update worker information */
+		source_buffer->priv->worker_last_offset =
+			gtk_text_iter_is_end (&end) ? -1 : gtk_text_iter_get_offset (&end);
+		
+		head_length = gtk_text_iter_get_offset (&end) -	gtk_text_iter_get_offset (&start);
+		
+		if (head_length > 0) {
+			/* update profile information only if we didn't use the saved data */
+			source_buffer->priv->worker_batch_size =
+				MAX (head_length * WORKER_TIME_SLICE
+				     / (g_timer_elapsed (timer, NULL) * 1000),
+				     MINIMUM_WORKER_BATCH);
+		}
+	}
+		
+	/* make sure the analyzed region gets highlighted */
+	refresh_range (source_buffer, &start, &end);
 	
-	if (head_length > 0) {
-		source_buffer->priv->worker_batch_size =
-			MAX (head_length * WORKER_TIME_SLICE / 
-					(g_timer_elapsed (timer, NULL) * 1000),
-			     MINIMUM_WORKER_BATCH);
-
-		/* make sure the analyzed region gets highlighted */
-		refresh_range (source_buffer, &start, &end);
+	/* forget saved table if we have already "consumed" at least
+	 * two of its delimiters, since that probably means it
+	 * contains invalid, useless data */
+	if (old_table && (use_old_data ||
+			  source_buffer->priv->worker_last_offset < 0 ||
+			  old_region > 1)) {
+		g_array_free (old_table, TRUE);
+		source_buffer->priv->old_syntax_regions = NULL;
 	}
 	
 	DEBUG ({
@@ -1558,146 +1744,158 @@ update_syntax_regions (GtkSourceBuffer *source_buffer,
 {
 	GArray *table;
 	gint region;
-	SyntaxDelimiter begin_delim, end_delim;
+	gint table_index, expected_end_index;
 	gchar *slice, *head;
 	gint head_length, head_offset;
 	GtkTextIter start_iter, end_iter;
 	GtkSourceBufferMatch match;
-	const GtkSyntaxTag *tag;
+	SyntaxDelimiter delim;
+	gboolean mismatch, started_in_syntax;
 	
 	table = source_buffer->priv->syntax_regions;
 	g_assert (table != NULL);
 
 	/* check if the offset is at an unanalyzed region */
-	if ((source_buffer->priv->worker_last_offset >= 0) &&
-	    (start_offset >= source_buffer->priv->worker_last_offset))
+	if (source_buffer->priv->worker_last_offset >= 0 &&
+	    start_offset >= source_buffer->priv->worker_last_offset) {
+		/* update saved table offsets which potentially
+		 * contain the offset */
+		adjust_table_offsets (source_buffer->priv->old_syntax_regions, 0, delta);
 		return;
-	
-	region = bsearch_offset (table, start_offset);
-
-	/* get lower delimiter */
-	if (region > 0) {
-		begin_delim = g_array_index (table,
-					     SyntaxDelimiter,
-					     region - 1);
-	} else {
-		/* there's no beginning delimiter, which means it's
-		 * the start of the buffer */
-		begin_delim.tag = NULL;
-		begin_delim.offset = 0;
-		begin_delim.depth = 0;
 	}
-
-	/* initially set starting iter to the lower delimiter */
-	gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (source_buffer),
-					    &start_iter,
-					    begin_delim.offset);
-
-	/* initially set the ending iter to the end of the buffer */
-	gtk_text_buffer_get_end_iter (GTK_TEXT_BUFFER (source_buffer),
-				      &end_iter);
 	
-	/* get upper delimiter */
+	/* search the edited region */
+	region = bsearch_offset (table, start_offset);
+	
+	/* initialize analyzing context */
+	started_in_syntax = FALSE;
+	delim.tag = NULL;
+	delim.offset = 0;
+	delim.depth = 0;
+	/* first expected match */
+	table_index = region;
+	/* last expected match (i.e. how far table_index is supossed to get) */
+	expected_end_index = region;
+	
+	/* get the syntax region to analyze for changes */
+	if (region > 0) {
+		head_offset = g_array_index (table, SyntaxDelimiter, region - 1).offset;
+		gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (source_buffer),
+						    &start_iter,
+						    head_offset);
+		if (g_array_index (table, SyntaxDelimiter, region - 1).tag) {
+			/* we are inside a syntax colored region, so
+			 * we expect to see the opening delimiter
+			 * first, and up to the closing delimited */
+			started_in_syntax = TRUE;
+			table_index = region - 1;
+			expected_end_index = region + 1;
+		}
+
+		if (table_index > 0) {
+			/* set the initial analyzing context to the
+			 * delimiter right before the next expected
+			 * delimiter */
+			delim = g_array_index (table, SyntaxDelimiter, table_index - 1);
+		}
+		
+	} else {
+		/* no previous delimiter, so start analyzing at the
+		 * start of the buffer */
+		head_offset = 0;
+		gtk_text_buffer_get_start_iter (GTK_TEXT_BUFFER (source_buffer),
+						&start_iter);
+	}
+	/* we can't get past the end of the table */
+	expected_end_index = MIN (expected_end_index, table->len);
+
 	if (region < table->len) {
-		end_delim = g_array_index (table, SyntaxDelimiter, region);
-		end_delim.offset += delta;
-		if (end_delim.offset < start_offset) {
-			/* deleted text makes ending delimiter to disappear
-			   completely, so set bounding iters and rebuild
-			   syntax regions table from starting delimiter */
-			invalidate_syntax_regions (source_buffer, &start_iter);
-			
+		gint end_offset;
+		
+		/* *corrected* end_offset */
+		end_offset = g_array_index (table, SyntaxDelimiter, region).offset + delta;
+
+		/* FIRST INVALIDATION CASE:
+		 * the ending delimiter was deleted */
+		if (end_offset < start_offset) {
+			/* ending delimiter was deleted, so invalidate
+			   from the starting delimiter onwards */
 			DEBUG (g_message ("deleted ending delimiter"));
+			invalidate_syntax_regions (source_buffer, &start_iter, delta);
 			
 			return;
 		}
 
-		/* fix ending iter */
-		gtk_text_buffer_get_iter_at_offset (
-			GTK_TEXT_BUFFER (source_buffer),
-			&end_iter, end_delim.offset);
+		/* set ending iter */
+		gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (source_buffer),
+						    &end_iter,
+						    end_offset);
 	
 	} else {
-		/* there's no ending delimiter, which means it's just
-		 * the end of the buffer */
-		end_delim.tag = begin_delim.tag;
-		end_delim.offset = gtk_text_iter_get_offset (&end_iter);
-		end_delim.depth = begin_delim.depth;
+		/* set the ending iter to the end of the buffer */
+		gtk_text_buffer_get_end_iter (GTK_TEXT_BUFFER (source_buffer),
+					      &end_iter);
 	}
 
 	/* get us the chunk of text to analyze */
 	head = slice = gtk_text_iter_get_slice (&start_iter, &end_iter);
 	head_length = strlen (head);
-	head_offset = begin_delim.offset;
-	
-	/* if we're inside a syntax region */
-	if (begin_delim.tag != NULL) {
-		gboolean found;
 
-		/* verify that the beginning syntax pattern has not changed */
-		tag = get_syntax_start (source_buffer, head,
-					head_length, &match);
-		if (tag != begin_delim.tag || match.startpos != 0) {
-			/* opening pattern has changed... invalidate */
-			gtk_text_buffer_get_end_iter (
-				GTK_TEXT_BUFFER (source_buffer), &end_iter);
-			gtk_text_iter_set_line_offset (&start_iter, 0);
-			invalidate_syntax_regions (source_buffer, &start_iter);
-			g_free (slice);
+	/* We will start analyzing the slice of text and see if it
+	 * matches the information from the table.  When we hit a
+	 * mismatch, it means we need to invalidate. */
+	mismatch = FALSE;
+	while (next_syntax_region (source_buffer,
+				   &delim,
+				   head,
+				   head_length,
+				   head_offset,
+				   &match)) {
+		/* correct offset, since the table has the old offsets */
+		if (delim.offset > start_offset + delta)
+			delim.offset -= delta;
 
-			DEBUG (g_message ("changed starting delimiter"));
-			
-			return;
+		if (table_index > table->len - 1 ||
+		    !delimiter_is_equal (&delim,
+					 &g_array_index (table,
+							 SyntaxDelimiter,
+							 table_index))) {
+			/* SECOND INVALIDATION CASE: a mismatch
+			   against the saved information or a new
+			   delimiter not present in the table */
+			mismatch = TRUE;
+			break;
 		}
-		/* eat up the syntax delimiter */
+		
+		/* move pointers */
 		head += match.endindex;
 		head_length -= match.endindex;
 		head_offset += match.endpos;
-
-		/* FIXME: this is not quite right for end of buffer */
-		/* now search for ending tag (if we support nested
-		 * syntax regions, we need to search for the syntax
-		 * pattern of the ending delimiter) */
-		found = get_syntax_end (head, head_length,
-					begin_delim.tag, &match);
-		if (!found || match.endpos + head_offset != end_delim.offset) {
-			/* not found or changed position */
-			gtk_text_buffer_get_end_iter (
-				GTK_TEXT_BUFFER (source_buffer), &end_iter);
-			invalidate_syntax_regions (source_buffer, &start_iter);
-			g_free (slice);
-		
-			DEBUG (g_message ("changed ending delimiter, %d != %d",
-					  match.endpos + head_offset,
-					  end_delim.offset));
-			
-			return;
-		}
-		/* eat up the ending syntax delimiter */
-		head_length -= (match.endindex - match.startindex);
-	}
-
-	/* search for other starting syntax tags if the region being
-	 * analyzed is not a syntax region (the condition needs to be
-	 * fixed if we are to support nested regions)... if there are
-	 * any we need to invalidate */
-	if (!begin_delim.tag) {
-		tag = get_syntax_start (source_buffer, head,
-					head_length, &match);
-		if (tag) {
-			gtk_text_buffer_get_end_iter (
-				GTK_TEXT_BUFFER (source_buffer), &end_iter);
-			invalidate_syntax_regions (source_buffer, &start_iter);
-			g_free (slice);
-		
-			DEBUG (g_message ("found new starting delimiter at %d",
-					  match.startpos));
-			
-			return;
-		}
+		table_index++;
 	}
 
 	g_free (slice);
+
+	if (mismatch || table_index < expected_end_index) {
+		/* we invalidate if there was a mismatch or we didn't
+		 * advance the table_index enough (which means some
+		 * delimiter was deleted) */
+		DEBUG (g_message ("changed delimiter at %d", delim.offset));
+		
+		invalidate_syntax_regions (source_buffer, &start_iter, delta);
+		
+		return;
+	}
+
+	/* update trailing offsets with delta ... */
+	adjust_table_offsets (table, region, delta);
+
+	/* ... worker data ... */
+	if (source_buffer->priv->worker_last_offset >= start_offset + delta)
+		source_buffer->priv->worker_last_offset += delta;
+	
+	/* ... and saved table offsets */
+	adjust_table_offsets (source_buffer->priv->old_syntax_regions, 0, delta);
 
 	/* the syntax regions have not changed, so set the refreshing bounds */
 	gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (source_buffer),
@@ -1706,27 +1904,127 @@ update_syntax_regions (GtkSourceBuffer *source_buffer,
 	if (delta > 0)
 		gtk_text_iter_forward_chars (&end_iter, delta);
 	
-	if (!begin_delim.tag) {
-		/* we modified a non-syntax region, so we adjust bounds to
-		   line bounds to correctly highlight non-syntax patterns */
+	if (!started_in_syntax) {
+		/* we modified a non-syntax colored region, so we
+		   adjust bounds to line bounds to correctly highlight
+		   non-syntax patterns */
 		gtk_text_iter_set_line_offset (&start_iter, 0);
 		gtk_text_iter_forward_to_line_end (&end_iter);
 	}
-	
-	/* update trailing offsets with delta */
-	while (region < table->len) {
-		g_array_index (table, SyntaxDelimiter, region).offset += delta;
-		region++;
-	}
-
-	/* update worker data too */
-	if (source_buffer->priv->worker_last_offset >= start_offset + delta)
-		source_buffer->priv->worker_last_offset += delta;
 	
 	refresh_range (source_buffer, &start_iter, &end_iter);
 }
 
 /* Beginning of highlighting code ------------ */
+
+/**
+ * search_patterns:
+ * @matches: the starting list of matches to work from (can be NULL)
+ * @text: the text which will be searched for
+ * @length: the length (in bytes) of @text
+ * @offset: the offset the beginning of @text is at
+ * @index: an index to add the match indexes (usually: @text - base_text)
+ * @patterns: additional patterns (can be NULL)
+ * 
+ * This function will fill and return a list of PatternMatch
+ * structures ordered by match position in @text.  The initial list to
+ * work on is @matches and it will be modified in-place.  Additional
+ * new pattern tags might be specified in @patterns.
+ *
+ * From the patterns already in @matches only those whose starting
+ * position is before @offset will be processed, and will be removed
+ * if they don't match again.  New patterns will only be added if they
+ * match.  The returned list is ordered.
+ * 
+ * Return value: the new list of matches
+ **/
+static GList * 
+search_patterns (GList       *matches,
+		 const gchar *text,
+		 gint         length,
+		 gint         offset,
+		 gint         index,
+		 GList       *patterns)
+{
+	GtkSourceBufferMatch match;
+	PatternMatch *pmatch;
+	GList *new_pattern;
+	
+	new_pattern = patterns;
+	while (new_pattern || matches) {
+		GtkPatternTag *tag;
+		gint i;
+		
+		if (new_pattern) {
+			/* process new patterns first */
+			tag = new_pattern->data;
+			new_pattern = new_pattern->next;
+			pmatch = NULL;
+		} else {
+			/* process patterns already in @matches */
+			pmatch = matches->data;
+			tag = pmatch->tag;
+			if (pmatch->match.startpos >= offset) {
+				/* pattern is ahead of offset, so our
+				 * work is done */
+				break;
+			}
+			/* temporarily remove the PatternMatch from
+			 * the list */
+			matches = g_list_delete_link (matches, matches);
+		}
+		
+		/* do the regex search on @text */
+		i = gtk_source_regex_search (&tag->reg_pattern,
+					     text,
+					     0,
+					     length,
+					     &match);
+		
+		if (i >= 0 && match.endpos != i) {
+			GList *p;
+			
+			/* create the match structure */
+			if (!pmatch) {
+				pmatch = g_new0 (PatternMatch, 1);
+				pmatch->tag = tag;
+			}
+			/* adjust offsets (indexes remain relative to
+			 * the current pointer in the text) */
+			pmatch->match.startpos = match.startpos + offset;
+			pmatch->match.endpos = match.endpos + offset;
+			pmatch->match.startindex = match.startindex + index;
+			pmatch->match.endindex = match.endindex + index;
+			
+			/* insert the match in order */
+			for (p = matches; p; p = p->next) {
+				PatternMatch *tmp = p->data;
+				if (tmp->match.startpos > pmatch->match.startpos) {
+					break;
+				}
+			}
+			matches = g_list_insert_before (matches, p, pmatch);
+
+		} else if (pmatch) {
+			/* either no match was found or the match has
+			 * zero length (which probably indicates a
+			 * buggy syntax pattern), so free the
+			 * PatternMatch structure if we were analyzing
+			 * a pattern from @matches */
+			if (i == match.endpos) {
+				gchar *name;
+				g_object_get (G_OBJECT (tag), "name", &name, NULL);
+				g_warning ("The regex for pattern tag `%s' matched "
+					   "a zero length string.  That's probably "
+					   "due to a buggy regular expression.", name);
+				g_free (name);
+			}
+			g_free (pmatch);
+		}
+	}
+
+	return matches;
+}
 
 static void 
 check_pattern (GtkSourceBuffer *source_buffer,
@@ -1734,69 +2032,77 @@ check_pattern (GtkSourceBuffer *source_buffer,
 	       const gchar     *text,
 	       gint             length)
 {
-	GList *patterns = NULL;
-	gint offset;
-	gint utf8_len, len;
+	GList *matches;
+	gint offset, index;
+	GtkTextIter start_iter, end_iter;
+	const gchar *ptr;
+
+#ifdef ENABLE_PROFILE
+	static GTimer *timer = NULL;
+	static gdouble seconds = 0.0;
+	static gint acc_length = 0;
+#endif
 	
-	patterns = gtk_source_buffer_get_pattern_entries (source_buffer);
-
-	if (!patterns)
+	if (length == 0)
 		return;
-
-	/* The cast should be safe in this case - Paolo */
-	utf8_len = (gint) g_utf8_strlen (text, length);
-
-	while (patterns) {
-		GtkTextIter start_iter, end_iter;
-		GtkPatternTag *tag;
-		GtkSourceBufferMatch m;
-		gchar *tmp;
-		gint i;
-
-		offset = gtk_text_iter_get_offset (start);
-		tag = GTK_PATTERN_TAG (patterns->data);
-		start_iter = end_iter = *start;
-		i = 0;
-		len = length;
-		tmp = (gchar *) text;
+	
+	PROFILE ({
+		if (timer == NULL)
+			timer = g_timer_new ();
+		acc_length += length;
+		g_timer_start (timer);
+	});
+	
+	/* setup environment */
+	index = 0;
+	offset = gtk_text_iter_get_offset (start);
+	start_iter = end_iter = *start;
+	ptr = text;
+	
+	/* get the initial list of matches */
+	matches = search_patterns (NULL,
+				   ptr, length,
+				   offset, index,
+				   gtk_source_buffer_get_pattern_entries (source_buffer));
+	
+	while (matches && length > 0) {
+		/* pick the first (nearest) match... */
+		PatternMatch *pmatch = matches->data;
 		
-		while (i < utf8_len && i >= 0) {
-			i = gtk_source_regex_search (&tag->reg_pattern,
-						     tmp,
-						     0,
-						     len,
-						     &m);
+		gtk_text_iter_set_offset (&start_iter,
+					  pmatch->match.startpos);
+		gtk_text_iter_set_offset (&end_iter,
+					  pmatch->match.endpos);
 
-			if (i >= 0) {
-				if (m.endpos == i) {
-					g_warning
-					    ("Zero length regex match. "
-					     "Probably a buggy syntax "
-					     "specification.");
-					offset += i + 1;
-					len -= g_utf8_next_char (tmp) - tmp;
-					tmp = g_utf8_next_char (tmp);
-					continue;
-				}
+		/* ... and apply it */
+		gtk_text_buffer_apply_tag (GTK_TEXT_BUFFER (source_buffer),
+					   GTK_TEXT_TAG (pmatch->tag),
+					   &start_iter,
+					   &end_iter);
 
-				gtk_text_iter_set_offset (&start_iter,
-							  offset + i);
-				gtk_text_iter_set_offset (&end_iter,
-							  offset +
-							  m.endpos);
+		/* now skip it completely */
+		offset = pmatch->match.endpos;
+		index = pmatch->match.endindex;
+		length -= (text + index) - ptr;
+		ptr = text + index;
 
-				gtk_text_buffer_apply_tag (GTK_TEXT_BUFFER (source_buffer),
-							   GTK_TEXT_TAG (tag),
-							   &start_iter,
-							   &end_iter);
-				offset += m.endpos;
-				len -= m.endindex;
-				tmp += m.endindex;
-			}
-		}
-
-		patterns = g_list_next (patterns);
+		/* and update matches from the new position */
+		matches = search_patterns (matches,
+					   ptr, length,
+					   offset, index,
+					   NULL);
 	}
+
+	if (matches) {
+		/* matches should have been consumed completely */
+		g_assert_not_reached ();
+	}
+
+	PROFILE ({
+		g_timer_stop (timer);
+		seconds += g_timer_elapsed (timer, NULL);
+		g_message ("%g bytes/sec", acc_length / seconds);
+	});
 }
 
 static void 
@@ -1814,10 +2120,13 @@ highlight_region (GtkSourceBuffer *source_buffer,
 	GTimer *timer;
 
 	timer = NULL;
-	DEBUG (timer = g_timer_new ());
-	DEBUG (g_message ("highlighting from %d to %d",
-			  gtk_text_iter_get_offset (start),
-			  gtk_text_iter_get_offset (end)));
+	PROFILE ({
+ 		timer = g_timer_new ();
+ 		g_message ("highlighting from %d to %d",
+ 			   gtk_text_iter_get_offset (start),
+ 			   gtk_text_iter_get_offset (end));
+ 	});
+
 	
 	table = source_buffer->priv->syntax_regions;
 	g_return_if_fail (table != NULL);
@@ -1884,7 +2193,8 @@ highlight_region (GtkSourceBuffer *source_buffer,
 
 	g_free (slice);
 
-	DEBUG ({
+ 	PROFILE ({
+
 		g_message ("highlighting took %g ms",
 			   g_timer_elapsed (timer, NULL) * 1000);
 		g_timer_destroy (timer);
@@ -1914,10 +2224,12 @@ ensure_highlighted (GtkSourceBuffer *source_buffer,
 {
 	GtkTextRegion *region;
 	
+#if 0
 	DEBUG (g_message ("ensure_highlighted %d to %d",
 			  gtk_text_iter_get_offset (start),
 			  gtk_text_iter_get_offset (end)));
-
+#endif
+	
 	/* get the subregions not yet highlighted */
 	region = gtk_text_region_intersect (
 		source_buffer->priv->refresh_region, start, end);
@@ -1938,7 +2250,7 @@ ensure_highlighted (GtkSourceBuffer *source_buffer,
 					   start, 
 					   end);
 		gtk_text_region_clear_zero_length_subregions (
-				source_buffer->priv->refresh_region);
+			source_buffer->priv->refresh_region);
 	}
 }
 
