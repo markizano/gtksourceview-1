@@ -1,3 +1,16 @@
+2004-07-10  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	Merge from HEAD to get fixes from the latest stable versions.
+
+	* gtksourceview/gtksourcestackengine.c: Define basic structures to
+	hold engine configuration.
+	(regex_item_destroy, syntactic_context_destroy)
+	(regex_item_id_compare): New functions.
+	(gtk_source_stack_engine_create_context): Create context and hold
+	it in the contexts hash.
+	(gtk_source_stack_engine_add_regex): Add regular expression item
+	to the given context.
+
 2004-02-01  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
 
 	* docs/reference/gtksourceview.types: Remove deleted GtkSyntaxTag
@@ -103,6 +116,246 @@
 	GtkSourceBuffer.
 
 	* gtksourceview/Makefile.am: Added new files.
+
+2004-06-21  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	* gtksourceview/language-specs/lua.lang: Lua syntax language file
+	by b.lindeijer@xs4all.nl
+	* gtksourceview/language-specs/Makefile.am: Added lua.lang
+
+2004-06-21  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	Patch by Paul Bolle:
+	
+	* gtksourceview/gtksourceprintjob.c (print_page): Fixed line
+	numbering (bug #144492)
+
+2004-06-01  Alexander Shopov  <ash@contact.bg>
+
+	* configure.in (ALL_LINGUAS): Added "bg" Bulgarian
+
+2004-05-24  Archit Baweja  <bighead@users.sourceforge.net>
+
+	* gtksourceview/language-specs/ruby.lang: Added syntax file for ruby.
+
+2004-05-21  Archit Baweja  <bighead@users.sourceforge.net>
+
+	* gtksourceview/gtksourceiter.h (GtkSourceSearchFlags): make the flags
+	GFlags by adding bitmasks.
+
+2004-04-26  Benoît Dejean  <tazforever@dlfp.org>
+
+	* gtksourceview/language-specs/ada.lang: Added ADA95 keywords.
+
+2004-04-19  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	* configure.in: Require Gtk+ 2.2.4, but disable tests if Gtk+ 2.4
+	is not found.
+
+2004-04-18  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	* gtksourceview/gtksourceview.c (gtk_source_view_new_with_buffer):
+	Check for buffer parameter to be non-NULL.
+
+2004-04-18  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	* gtksourceview/gtksourceview.c (key_press_cb): Also auto-indent
+	when splitting a line.
+
+2004-04-18  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	Patch by Benoît Dejean <TaZForEver@free.fr>:
+	
+	* gtksourceview/language-specs/c.lang: Updated to highlight C99
+	keywords, types and macros.
+	* gtksourceview/language-specs/python.lang: Highlight Python 2.3
+	keywords, types and functions.
+
+2004-04-14  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	* gtksourceview/gtksourceview.c (compute_indentation): Stop at
+	'\r' as well as '\n' or non-space character (partially fixes
+	#139576, Daniel Borgmann).
+
+2004-04-13  Paolo Borelli  <pborelli@katamail.com>
+
+	* gtksourceview/gtksourceview.c: add documentation.
+
+2004-04-09  Guntupalli Karunakar  <karunakar@freedomink.org>
+
+        * configure.in: Added "gu" (Gujarati) to ALL_LINGUAS.
+
+=== gtksourceview 1.0.0 ===
+
+2004-03-22  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	* configure.in: Version 1.0.0
+	
+	* README:
+	* NEWS: Updated for new release.
+
+2004-03-22  Guntupalli Karunakar  <karunakar@freedomink.org>
+
+	* configure.in: Added "pa" (Punjabi) to ALL_LINGUAS.
+
+2004-03-21  Gareth Owen  <gowen72@yahoo.com>
+
+	* configure.in: Added en_GB to ALL_LINGUAS
+
+2004-03-15  Alexander Winston  <alexander.winston@comcast.net>
+
+	* configure.in (TESTS_LIBS): Added en_CA to ALL_LINGUAS.
+
+2004-03-12  Paolo Borelli  <pborelli@katamail.com>
+
+	* gtksourceview/language-specs/c.lang: handle #if 0 ... #else.
+
+=== gtksourceview 0.9.2 ===
+
+2004-03-08  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	* configure.in: Bump version to 0.9.2
+
+	* README:
+	* NEWS: Updated for new release.
+
+2004-03-07  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	* gtksourceview/gtksourceiter.c (pointer_from_offset_skipping_decomp)
+	(g_utf8_strcasestr, g_utf8_strrcasestr): Correctly return a pointer to
+	the original string, taking into account decompositions in the
+	normalized string which is used for the actual comparing.
+	(forward_chars_with_skipping, lines_match, backward_lines_match): 
+	Really fix searching now (sigh).
+
+2004-03-06  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	* gtksourceview/gtksourceiter.c (forward_chars_with_skipping):
+	Account for extra offsets coming from decomposed UTF8 characters when
+	moving the GtkTextIter forward (bug #135163).
+	(backward_lines_match): Use forward_chars_with_skipping when moving to
+	the start of the line match.
+
+2004-03-06  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	* gtksourceview/gtksourcelanguage.c
+	(gtk_source_language_get_tag_default_style): Return a copy of a default
+	tag style when the style is not found in the style scheme, or when the
+	tag has no style associated with it (bug #136070, Dustin Mulcahey).
+
+2004-03-05  Paolo Maggi  <paolo.maggi@polito.it>
+
+	* gtksourceview/language-specs/csharp.lang: updated mime-types to work
+	with the new shared-mime-info database (patch by 
+	Tim Vismor <tvismor@acm.org>).
+
+=== gtksourceview 0.9.1 ===
+
+2004-02-23  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	* configure.in: Bump version to 0.9.1.
+
+	* NEWS:
+	* README: Update.
+
+2004-02-23  Paolo Maggi  <paolo.maggi@polito.it>
+
+	* gtksourceview/gtksourcestylescheme.[ch]: marked the
+	"Others" style as deprecated
+
+2004-02-22  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	* gtksourceview/gtksourceiter.c (g_utf8_strrcasestr): Position the
+	starting char pointer for the reverse search using UTF-8 aware
+	functions instead of pointer arithmetic.  Ditto for the haystack
+	offset counter (bug #133887, alexhack inbox ru).
+
+2004-02-21  Paolo Maggi  <paolo.maggi@polito.it>
+
+	* gtksourceview/language-specs/per.lang: updated mime-types to work
+	with the new shared-mime-info database (thanks to tvismor AT acm org).
+
+2004-02-20  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	* autogen.sh: 
+	* configure.in: Set DEPRECATED_FLAGS variable and compiler
+	warnings according to maintainer mode (i.e. full deprecated flags
+	and error compiler warnings if maintainer mode is on).
+
+	* gtksourceview/Makefile.am: 
+	* tests/Makefile.am: Use DEPRECATED_FLAGS.
+
+	* gtksourceview/language-specs/csharp.lang: Highlight "value" in
+	C# (bug #134405, algol firenze linux it).
+	
+	* gtksourceview/gtksourceregex.h: 
+	* gtksourceview/gtksourceregex.c (gtk_source_regex_search)
+	(gtk_source_regex_match): Added options to disable beginning and
+	end of line anchor matching at string ends.
+
+	* gtksourceview/gtksourcebuffer.c (get_syntax_start)
+	(get_syntax_end, next_syntax_region)
+	(build_syntax_regions_table, update_syntax_regions)
+	(search_patterns, check_pattern, highlight_region): Determine if
+	the slice of text being analyzed starts at the beginning of a line
+	or ends at the end of line and pass matching options to
+	gtk_source_regex_* functions (bug #120347, Evert Verhellen).
+
+2004-02-20  Albert Chin-A-Young  <china@thewrittenword.com>
+
+	* gtksourceview/gtksourceprintjob.c: IBM C compiler does not like
+	  trailing comma after last enum constant.
+
+2004-02-21 Alejandro Dubrovsky <alito@organicrobot.com>
+
+	* tests/test-widget.c (create_view_window): Make pixmap directory relative
+	to DATADIR, and check the returned gdk_pixbufs.
+
+2004-02-20  Paolo Maggi  <paolo.maggi@polito.it>
+
+	* gtksourceview/language-specs/ada.lang:
+	* gtksourceview/language-specs/c.lang:
+	* gtksourceview/language-specs/cpp.lang:
+	* gtksourceview/language-specs/po.lang:
+	* gtksourceview/language-specs/python.lang: updated mime-types to work
+	with the new shared-mime-info database.
+
+2004-02-13  Paolo Maggi  <paolo.maggi@polito.it>
+
+	* gtksourceview/language-specs/xml.lang:
+	* gtksourceview/language-specs/html.lang: fixed bug #120602 -
+	highlighting is not correct after an apostrophe. I'm not very happy
+	with the fix since it is a sort of workaround, but probably it is the best
+	we can do with the current highlight engine.
+
+=== gtksourceview 0.9.0 ===
+
+2004-02-12  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	* configure.in: Bump version number to 0.9.0.  Require intltool 0.30.
+
+	* README: 
+	* NEWS: Update for new release
+
+2004-02-12  Jeroen Zwartepoorte  <jeroen@xs4all.nl>
+
+	* gtksourceview/language-specs/csharp.lang: Added an escape character
+	to properly highlight things like strings-in-strings.
+
+2004-02-11  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	* gtksourceview/gnu-regex/regex.h: Redefine POSIX regular
+	expression API entries to avoid symbols clashes in systems which
+	implement them but don't have GNU regular expressions (patch by
+	Julio M. Merino Vidal, bug #133734).
+
+2004-02-10  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	* gtksourceview/gtksourcebuffer.c (update_syntax_regions):
+	Invalidate saved syntax regions information if a change is being
+	made in an offset included in them, since we have no way to know
+	if syntax regions have been added/removed and later reusing
+	those regions can lead to crashes (bug #133901, Dan Williams).
 
 2004-01-21 Alastair McKinstry <mckinstry@computer.org>
 

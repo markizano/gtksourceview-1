@@ -32,12 +32,34 @@
 
 #define GTK_TEXT_UNKNOWN_CHAR 0xFFFC
 
-static gchar *
+/* this function acts like g_utf8_offset_to_pointer() except that if it finds a
+ * decomposable character it consumes the decomposition length from the given
+ * offset.  So it's useful when the offset was calculated for the normalized
+ * version of str, but we need a pointer to str itself. */
+static const gchar *
+pointer_from_offset_skipping_decomp (const gchar *str, gint offset)
+{
+	gsize decomp_len;
+	gunichar *decomp;
+	const gchar *p;
+
+	p = str;
+	while (offset > 0)
+	{
+		decomp = g_unicode_canonical_decomposition (g_utf8_get_char (p), &decomp_len);
+		g_free (decomp);
+		p = g_utf8_next_char (p);
+		offset -= decomp_len;
+	}
+	return p;
+}
+
+static const gchar *
 g_utf8_strcasestr (const gchar *haystack, const gchar *needle)
 {
 	gsize needle_len;
 	gsize haystack_len;
-	gchar *ret = NULL;
+	const gchar *ret = NULL;
 	gchar *p;
 	gchar *casefold;
 	gchar *caseless_haystack;
@@ -73,7 +95,7 @@ g_utf8_strcasestr (const gchar *haystack, const gchar *needle)
 	{
 		if ((strncmp (p, needle, needle_len) == 0))
 		{
-			ret = g_utf8_offset_to_pointer (haystack, i);
+			ret = pointer_from_offset_skipping_decomp (haystack, i);
 			goto finally_1;
 		}
 
@@ -87,12 +109,12 @@ finally_1:
 	return ret;
 }
 
-static gchar *
+static const gchar *
 g_utf8_strrcasestr (const gchar *haystack, const gchar *needle)
 {
 	gsize needle_len;
 	gsize haystack_len;
-	gchar *ret = NULL;
+	const gchar *ret = NULL;
 	gchar *p;
 	gchar *casefold;
 	gchar *caseless_haystack;
@@ -120,16 +142,15 @@ g_utf8_strrcasestr (const gchar *haystack, const gchar *needle)
 		goto finally_1;
 	}
 
-	haystack_len = strlen (caseless_haystack);
-	needle_len = strlen (needle);
-	p = (gchar *)caseless_haystack + haystack_len - needle_len;
 	i = haystack_len - needle_len;
+	p = g_utf8_offset_to_pointer (caseless_haystack, i);
+	needle_len = strlen (needle);
 
 	while (p >= caseless_haystack)
 	{
-		if (strncasecmp (p, needle, needle_len) == 0)
+		if (strncmp (p, needle, needle_len) == 0)
 		{
-			ret = g_utf8_offset_to_pointer (haystack, i);
+			ret = pointer_from_offset_skipping_decomp (haystack, i);
 			goto finally_1;
 		}
 
@@ -186,7 +207,8 @@ static void
 forward_chars_with_skipping (GtkTextIter *iter,
 			     gint         count,
 			     gboolean     skip_invisible,
-			     gboolean     skip_nontext)
+			     gboolean     skip_nontext,
+			     gboolean     skip_decomp)
 {
 	gint i;
 
@@ -204,6 +226,20 @@ forward_chars_with_skipping (GtkTextIter *iter,
 		if (!ignored && skip_invisible &&
 		    /* _gtk_text_btree_char_is_invisible (iter)*/ FALSE)
 			ignored = TRUE;
+
+		if (!ignored && skip_decomp)
+		{
+			/* being UTF8 correct sucks; this accounts for extra
+			   offsets coming from canonical decompositions of
+			   UTF8 characters (e.g. accented characters) which 
+			   g_utf8_normalize() performs */
+			gunichar *decomp;
+			gsize decomp_len;
+			decomp = g_unicode_canonical_decomposition (
+				gtk_text_iter_get_char (iter), &decomp_len);
+			i -= (decomp_len - 1);
+			g_free (decomp);
+		}
 
 		gtk_text_iter_forward_char (iter);
 
@@ -286,18 +322,14 @@ lines_match (const GtkTextIter *start,
 	/* If match start needs to be returned, set it to the
 	 * start of the search string.
 	 */
+	forward_chars_with_skipping (&next, offset, visible_only, !slice, FALSE);
 	if (match_start)
 	{
 		*match_start = next;
-
-		forward_chars_with_skipping (match_start, offset,
-					     visible_only, !slice);
 	}
 
 	/* Go to end of search string */
-	offset += g_utf8_strlen (*lines, -1);
-
-	forward_chars_with_skipping (&next, offset, visible_only, !slice);
+	forward_chars_with_skipping (&next, g_utf8_strlen (*lines, -1), visible_only, !slice, TRUE);
 
 	g_free (line_text);
 
@@ -383,19 +415,18 @@ backward_lines_match (const GtkTextIter *start,
 	/* Get offset to start of search string */
 	offset = g_utf8_strlen (line_text, found - line_text);
 
+	forward_chars_with_skipping (&next, offset, visible_only, !slice, FALSE);
+
 	/* If match start needs to be returned, set it to the
 	 * start of the search string.
 	 */
 	if (match_start)
 	{
 		*match_start = next;
-		gtk_text_iter_set_visible_line_offset (match_start, offset);
 	}
 
 	/* Go to end of search string */
-	offset += g_utf8_strlen (*lines, -1);
-
-	forward_chars_with_skipping (&next, offset, visible_only, !slice);
+	forward_chars_with_skipping (&next, g_utf8_strlen (*lines, -1), visible_only, !slice, TRUE);
 
 	g_free (line_text);
 

@@ -10,11 +10,13 @@ EXTRA_DIST = 			\
 	idl.lang		\
 	java.lang		\
 	latex.lang		\
+	lua.lang		\
 	msil.lang		\
 	perl.lang		\
 	php.lang		\
 	po.lang			\
 	python.lang		\
+	ruby.lang		\
 	sql.lang		\
 	verilog.lang		\
 	xml.lang

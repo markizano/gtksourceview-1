@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE language SYSTEM "language.dtd">
-<language _name="C" version="1.0" _section="Sources" mimetypes="text/x-c;text/x-csrc">
+<language _name="C" version="1.0" _section="Sources" mimetypes="text/x-c;text/x-chdr;text/x-csrc">
 	
 	<escape-char>\</escape-char>
 
@@ -15,9 +15,8 @@
 
 	<block-comment _name = "'#if 0' Comment" style = "Comment">
 		<start-regex>^[ \t]*#[ \t]*if[ \t]*0</start-regex>
-        	<end-regex>[ \t]*#[ \t]*endif</end-regex>
+        	<end-regex>[ \t]*#[ \t]*(endif|else)</end-regex>
 	</block-comment>
-
 
 	<string _name = "String" style = "String" end-at-line-end = "TRUE">
 		<start-regex>&quot;</start-regex>
@@ -48,6 +47,9 @@
 	</keyword-list>
 
 	<keyword-list _name = "Types" style = "Data Type" case-sensitive="TRUE">
+		<keyword>_Bool</keyword>
+		<keyword>_Complex</keyword>
+		<keyword>_Imaginary</keyword>
 		<keyword>auto</keyword>
 		<keyword>char</keyword>
 		<keyword>const</keyword>
@@ -56,8 +58,10 @@
 		<keyword>extern</keyword>
 		<keyword>float</keyword>
 		<keyword>int</keyword>
+		<keyword>inline</keyword>
 		<keyword>long</keyword>
 		<keyword>register</keyword>
+		<keyword>restrict</keyword>
 		<keyword>short</keyword>
 		<keyword>signed</keyword>
 		<keyword>static</keyword>
@@ -99,6 +103,7 @@
 		<keyword>__LINE__</keyword>
 		<keyword>__DATA__</keyword>
 		<keyword>__FILE__</keyword>
+		<keyword>__func__</keyword>
 		<keyword>__TIME__</keyword>
 		<keyword>__STDC__</keyword>
 	</keyword-list>

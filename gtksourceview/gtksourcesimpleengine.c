@@ -828,6 +828,7 @@ static const SyntaxPattern *
 get_syntax_start (GtkSourceSimpleEngine *se,
 		  const gchar           *text,
 		  gint                   length,
+		  guint                  match_options,
 		  GtkSourceBufferMatch  *match)
 {
 	GList *list;
@@ -850,7 +851,8 @@ get_syntax_start (GtkSourceSimpleEngine *se,
 			text,
 			pos,
 			length,
-			match);
+			match,
+			match_options);
 		if (pos < 0 || !is_escaped (se, text, match->startindex))
 			break;
 		pos = match->startpos + 1;
@@ -863,7 +865,8 @@ get_syntax_start (GtkSourceSimpleEngine *se,
 		sp = list->data;
 		
 		if (gtk_source_regex_match (sp->reg_start, text,
-					    pos, match->endindex))
+					    pos, match->endindex,
+					    match_options))
 			return sp;
 
 		list = g_list_next (list);
@@ -876,6 +879,7 @@ static gboolean
 get_syntax_end (GtkSourceSimpleEngine *se,
 		const gchar           *text,
 		gint                   length,
+		guint                  match_options,
 		const SyntaxPattern   *sp,
 		GtkSourceBufferMatch  *match)
 {
@@ -892,7 +896,7 @@ get_syntax_end (GtkSourceSimpleEngine *se,
 	pos = 0;
 	do {
 		pos = gtk_source_regex_search (sp->reg_end, text, pos,
-					       length, match);
+					       length, match, match_options);
 		if (pos < 0 || !is_escaped (se, text, match->startindex))
 			break;
 		pos = match->startpos + 1;
@@ -1077,6 +1081,7 @@ delimiter_is_equal (SyntaxDelimiter *d1, SyntaxDelimiter *d2)
  * @head: text to analyze
  * @head_length: length in bytes of @head
  * @head_offset: offset in the buffer where @head starts
+ * @match_options:
  * @match: GtkSourceBufferMatch object to get the results
  * 
  * This function can be seen as a single iteration in the analyzing
@@ -1093,6 +1098,7 @@ next_syntax_region (GtkSourceSimpleEngine *se,
 		    const gchar           *head,
 		    gint                   head_length,
 		    gint                   head_offset,
+		    guint                  head_options,
 		    GtkSourceBufferMatch  *match)
 {
 	const SyntaxPattern *pat;
@@ -1101,7 +1107,7 @@ next_syntax_region (GtkSourceSimpleEngine *se,
 	if (!state->pattern) {
 		/* we come from a non-syntax colored region, so seek
 		 * for an opening pattern */
-		pat = get_syntax_start (se, head, head_length, match);
+		pat = get_syntax_start (se, head, head_length, head_options, match);
 
 		if (!pat)
 			return FALSE;
@@ -1113,7 +1119,8 @@ next_syntax_region (GtkSourceSimpleEngine *se,
 	} else {
 		/* seek the closing pattern for the current syntax
 		 * region */
-		found = get_syntax_end (se, head, head_length, state->pattern, match);
+		found = get_syntax_end (se, head, head_length, head_options,
+					state->pattern, match);
 		
 		if (!found)
 			return FALSE;
@@ -1137,6 +1144,7 @@ build_syntax_regions_table (GtkSourceSimpleEngine *se,
 	gboolean use_old_data;
 	gchar *slice, *head;
 	gint offset, head_length;
+	guint slice_options;
 	GtkSourceBufferMatch match;
 	SyntaxDelimiter delim;
 	GTimer *timer;
@@ -1200,6 +1208,10 @@ build_syntax_regions_table (GtkSourceSimpleEngine *se,
 	head = slice;
 	head_length = strlen (head);
 
+	/* we always stop processing at line ends */
+	slice_options = (gtk_text_iter_get_line_offset (&start) != 0 ?
+			 GTK_SOURCE_REGEX_NOT_BOL : 0);
+
 	timer = g_timer_new ();
 
 	/* MAIN LOOP: build the table */
@@ -1209,6 +1221,7 @@ build_syntax_regions_table (GtkSourceSimpleEngine *se,
 					 head,
 					 head_length,
 					 offset,
+					 slice_options,
 					 &match)) {
 			/* no further data */
 			break;
@@ -1242,6 +1255,18 @@ build_syntax_regions_table (GtkSourceSimpleEngine *se,
 		head += match.endindex;
 		head_length -= match.endindex;
 		offset += match.endpos;
+		
+		/* recalculate b-o-l matching options */
+		if (match.endindex > 0)
+		{
+			GtkTextIter tmp;
+			gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (se->priv->buffer),
+							    &tmp, offset);
+			if (gtk_text_iter_get_line_offset (&tmp) != 0)
+				slice_options |= GTK_SOURCE_REGEX_NOT_BOL;
+			else
+				slice_options &= ~GTK_SOURCE_REGEX_NOT_BOL;
+		}
 	}
     
 	g_free (slice);
@@ -1313,6 +1338,7 @@ update_syntax_regions (GtkSourceSimpleEngine *se,
 	gint first_region, region;
 	gint table_index, expected_end_index;
 	gchar *slice, *head;
+	guint slice_options;
 	gint head_length, head_offset;
 	GtkTextIter start_iter, end_iter;
 	GtkSourceBufferMatch match;
@@ -1346,7 +1372,21 @@ update_syntax_regions (GtkSourceSimpleEngine *se,
 		/* update saved table offsets which potentially
 		 * contain the offset */
 		region = bsearch_offset (se->priv->old_syntax_regions, start_offset);
-		adjust_table_offsets (se->priv->old_syntax_regions, region, delta);
+		if (region > 0)
+		{
+			/* Changes to the uncontrolled regions. We can't possibly
+			   know if some of the syntax regions changed, so we
+			   invalidate the saved information */
+			if (se->priv->old_syntax_regions) {
+				g_array_free (se->priv->old_syntax_regions, TRUE);
+				se->priv->old_syntax_regions = NULL;
+			}
+		}
+		else
+		{
+			adjust_table_offsets (se->priv->old_syntax_regions,
+					      region, delta);
+		}
 		return;
 	}
 	
@@ -1435,6 +1475,12 @@ update_syntax_regions (GtkSourceSimpleEngine *se,
 	head = slice = gtk_text_iter_get_slice (&start_iter, &end_iter);
 	head_length = strlen (head);
 
+	/* eol match options is constant for this run */
+	slice_options = ((gtk_text_iter_get_line_offset (&start_iter) != 0 ?
+			  GTK_SOURCE_REGEX_NOT_BOL : 0) |
+			 (!gtk_text_iter_ends_line (&end_iter) ?
+			  GTK_SOURCE_REGEX_NOT_EOL : 0));
+
 	/* We will start analyzing the slice of text and see if it
 	 * matches the information from the table.  When we hit a
 	 * mismatch, it means we need to invalidate. */
@@ -1444,6 +1490,7 @@ update_syntax_regions (GtkSourceSimpleEngine *se,
 				   head,
 				   head_length,
 				   head_offset,
+				   slice_options,
 				   &match)) {
 		/* correct offset, since the table has the old offsets */
 		if (delim.offset > start_offset + delta)
@@ -1466,6 +1513,18 @@ update_syntax_regions (GtkSourceSimpleEngine *se,
 		head_length -= match.endindex;
 		head_offset += match.endpos;
 		table_index++;
+		
+		/* recalculate b-o-l matching options */
+		if (match.endindex > 0)
+		{
+			GtkTextIter tmp;
+			gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (se->priv->buffer),
+							    &tmp, head_offset);
+			if (gtk_text_iter_get_line_offset (&tmp) != 0)
+				slice_options |= GTK_SOURCE_REGEX_NOT_BOL;
+			else
+				slice_options &= ~GTK_SOURCE_REGEX_NOT_BOL;
+		}
 	}
 
 	g_free (slice);
@@ -1518,6 +1577,7 @@ update_syntax_regions (GtkSourceSimpleEngine *se,
  * @length: the length (in bytes) of @text
  * @offset: the offset the beginning of @text is at
  * @index: an index to add the match indexes (usually: @text - base_text)
+ * @match_options: 
  * @patterns: additional patterns (can be NULL)
  * 
  * This function will fill and return a list of PatternMatch
@@ -1538,6 +1598,7 @@ search_patterns (GList       *matches,
 		 gint         length,
 		 gint         offset,
 		 gint         index,
+		 guint        match_options,
 		 GList       *patterns)
 {
 	GtkSourceBufferMatch match;
@@ -1573,7 +1634,8 @@ search_patterns (GList       *matches,
 					     text,
 					     0,
 					     length,
-					     &match);
+					     &match,
+					     match_options);
 		
 		if (i >= 0 && match.endpos != i) {
 			GList *p;
@@ -1623,7 +1685,8 @@ static void
 check_pattern (GtkSourceSimpleEngine *se,
 	       GtkTextIter           *start,
 	       const gchar           *text,
-	       gint                   length)
+	       gint                   length,
+	       guint                  match_options)
 {
 	GList *matches;
 	gint offset, index;
@@ -1656,6 +1719,7 @@ check_pattern (GtkSourceSimpleEngine *se,
 	matches = search_patterns (NULL,
 				   ptr, length,
 				   offset, index,
+				   match_options,
 				   gtk_source_simple_engine_get_pattern_entries (se));
 	
 	while (matches && length > 0) {
@@ -1684,6 +1748,7 @@ check_pattern (GtkSourceSimpleEngine *se,
 		matches = search_patterns (matches,
 					   ptr, length,
 					   offset, index,
+					   match_options,
 					   NULL);
 	}
 
@@ -1739,6 +1804,7 @@ highlight_region (GtkSourceSimpleEngine *se,
 	GArray *table;
 	gint region;
 	gchar *slice, *slice_ptr;
+	guint slice_options;
 	GTimer *timer;
 
 	timer = NULL;
@@ -1805,7 +1871,16 @@ highlight_region (GtkSourceSimpleEngine *se,
 			   non-syntax patterns */
 			tmp = g_utf8_offset_to_pointer (slice_ptr,
 							e_off - b_off);
-			check_pattern (se, &b_iter, slice_ptr, tmp - slice_ptr);
+			
+			/* calculate beginning and end of line match options */
+			slice_options = ((gtk_text_iter_get_line_offset (&b_iter) != 0 ?
+					  GTK_SOURCE_REGEX_NOT_BOL : 0) |
+					 (!gtk_text_iter_ends_line (&e_iter) ?
+					  GTK_SOURCE_REGEX_NOT_EOL : 0));
+
+			check_pattern (se, &b_iter,
+				       slice_ptr, tmp - slice_ptr,
+				       slice_options);
 			slice_ptr = tmp;
 		}
 

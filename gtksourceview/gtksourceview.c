@@ -1299,6 +1299,15 @@ calculate_real_tab_width (GtkSourceView *view, guint tab_size, gchar c)
  * Public interface 
  * ---------------------------------------------------------------------- */
 
+/**
+ * gtk_source_view_new:
+ *
+ * Creates a new #GtkSourceView. An empty default buffer will be
+ * created for you. If you want to specify your own buffer, consider
+ * gtk_source_view_new_with_buffer().
+ *
+ * Return value: a new #GtkSourceView
+ **/
 GtkWidget *
 gtk_source_view_new ()
 {
@@ -1311,11 +1320,22 @@ gtk_source_view_new ()
 	return widget;
 }
 
+/**
+ * gtk_source_view_new_with_buffer:
+ * @buffer: a #GtkSourceBuffer
+ *
+ * Creates a new #GtkSourceView widget displaying the buffer
+ * @buffer. One buffer can be shared among many widgets.
+ *
+ * Return value: a new #GtkTextView.
+ **/
 GtkWidget *
 gtk_source_view_new_with_buffer (GtkSourceBuffer *buffer)
 {
 	GtkWidget *view;
 
+	g_return_val_if_fail (buffer != NULL && GTK_IS_SOURCE_BUFFER (buffer), NULL);
+	
 	view = g_object_new (GTK_TYPE_SOURCE_VIEW, NULL);
 	gtk_text_view_set_buffer (GTK_TEXT_VIEW (view), GTK_TEXT_BUFFER (buffer));
 
@@ -1348,6 +1368,14 @@ gtk_source_view_get_type (void)
 	return our_type;
 }
 
+/**
+ * gtk_source_view_get_show_line_numbers:
+ * @view: a #GtkSourceView
+ *
+ * Returns whether line numbers are displayed beside the text.
+ *
+ * Return value: TRUE if the line numbers are displayed.
+ **/
 gboolean
 gtk_source_view_get_show_line_numbers (GtkSourceView *view)
 {
@@ -1357,16 +1385,24 @@ gtk_source_view_get_show_line_numbers (GtkSourceView *view)
 	return view->priv->show_line_numbers;
 }
 
+/**
+ * gtk_source_view_set_show_line_numbers:
+ * @view: a #GtkSourceView
+ * @show: whether line numbers should be displayed
+ *
+ * If TRUE line numbers will be displayed beside the text.
+ *
+ **/
 void
 gtk_source_view_set_show_line_numbers (GtkSourceView *view,
-				       gboolean       visible)
+				       gboolean       show)
 {
 	g_return_if_fail (view != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
 
-	visible = (visible != FALSE);
+	show = (show != FALSE);
 
-	if (visible) 
+	if (show) 
 	{
 		if (!view->priv->show_line_numbers) 
 		{
@@ -1380,16 +1416,16 @@ gtk_source_view_set_show_line_numbers (GtkSourceView *view,
 			else
 				gtk_widget_queue_draw (GTK_WIDGET (view));
 
-			view->priv->show_line_numbers = visible;
+			view->priv->show_line_numbers = show;
 
 			g_object_notify (G_OBJECT (view), "show_line_numbers");
 		}
-	} 
+	}
 	else 
 	{
 		if (view->priv->show_line_numbers) 
 		{
-			view->priv->show_line_numbers = visible;
+			view->priv->show_line_numbers = show;
 
 			/* force expose event, which will adjust margin. */
 			gtk_widget_queue_draw (GTK_WIDGET (view));
@@ -1399,6 +1435,14 @@ gtk_source_view_set_show_line_numbers (GtkSourceView *view,
 	}
 }
 
+/**
+ * gtk_source_view_get_show_line_markers:
+ * @view: a #GtkSourceView
+ *
+ * Returns whether line markers are displayed beside the text.
+ *
+ * Return value: TRUE if the line markers are displayed.
+ **/
 gboolean
 gtk_source_view_get_show_line_markers (GtkSourceView *view)
 {
@@ -1408,16 +1452,24 @@ gtk_source_view_get_show_line_markers (GtkSourceView *view)
 	return view->priv->show_line_markers;
 }
 
+/**
+ * gtk_source_view_set_show_line_markers:
+ * @view: a #GtkSourceView
+ * @show: whether line markers should be displayed
+ *
+ * If TRUE line markers will be displayed beside the text.
+ *
+ **/
 void
 gtk_source_view_set_show_line_markers (GtkSourceView *view,
-				       gboolean       visible)
+				       gboolean       show)
 {
 	g_return_if_fail (view != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
 
-	visible = (visible != FALSE);
+	show = (show != FALSE);
 
-	if (visible) 
+	if (show) 
 	{
 		if (!view->priv->show_line_markers) 
 		{
@@ -1431,7 +1483,7 @@ gtk_source_view_set_show_line_markers (GtkSourceView *view,
 			else
 				gtk_widget_queue_draw (GTK_WIDGET (view));
 
-			view->priv->show_line_markers = visible;
+			view->priv->show_line_markers = show;
 
 			g_object_notify (G_OBJECT (view), "show_line_markers");
 		}
@@ -1440,7 +1492,7 @@ gtk_source_view_set_show_line_markers (GtkSourceView *view,
 	{
 		if (view->priv->show_line_markers) 
 		{
-			view->priv->show_line_markers = visible;
+			view->priv->show_line_markers = show;
 
 			/* force expose event, which will adjust margin. */
 			gtk_widget_queue_draw (GTK_WIDGET (view));
@@ -1450,6 +1502,14 @@ gtk_source_view_set_show_line_markers (GtkSourceView *view,
 	}
 }
 
+/**
+ * gtk_source_view_get_tabs_width:
+ * @view: a #GtkSourceView
+ *
+ * Returns the width of tabulation in characters.
+ *
+ * Return value: width of tab.
+ **/
 guint
 gtk_source_view_get_tabs_width (GtkSourceView *view)
 {
@@ -1481,6 +1541,14 @@ set_tab_stops_internal (GtkSourceView *view)
 	return TRUE;
 }
 
+/**
+ * gtk_source_view_set_tabs_width:
+ * @view: a #GtkSourceView
+ * @width: width of tab in characters
+ *
+ * Sets the width of tabulation in characters.
+ *
+ **/
 void
 gtk_source_view_set_tabs_width (GtkSourceView *view,
 				guint          width)
@@ -1509,6 +1577,14 @@ gtk_source_view_set_tabs_width (GtkSourceView *view,
 	}
 }
 
+/**
+ * gtk_source_view_set_marker_pixbuf:
+ * @view: a #GtkSourceView
+ * @marker_type: 
+ * @pixbuf:
+ *
+ *
+ **/
 void
 gtk_source_view_set_marker_pixbuf (GtkSourceView *view,
 				   const gchar   *marker_type,
@@ -1551,6 +1627,13 @@ gtk_source_view_set_marker_pixbuf (GtkSourceView *view,
 	}
 }
 
+/**
+ * gtk_source_view_get_marker_pixbuf:
+ * @view: a #GtkSourceView
+ * @marker_type: 
+ *
+ * Return value:
+ **/
 GdkPixbuf * 
 gtk_source_view_get_marker_pixbuf (GtkSourceView *view,
 				   const gchar   *marker_type)
@@ -1583,7 +1666,7 @@ compute_indentation (GtkSourceView *view, gint line)
 	end = start;
 
 	ch = gtk_text_iter_get_char (&end);
-	while (g_unichar_isspace (ch) && ch != '\n')
+	while (g_unichar_isspace (ch) && ch != '\n' && ch != '\r')
 	{
 		if (!gtk_text_iter_forward_char (&end))
 			break;
@@ -1614,8 +1697,7 @@ key_press_cb (GtkWidget *widget, GdkEventKey *event, gpointer data)
 	mark = gtk_text_buffer_get_insert (buf);
 	gtk_text_buffer_get_iter_at_mark (buf, &cur, mark);
 	
-	if ((key == GDK_Return) && gtk_text_iter_ends_line (&cur) && 
-	    view->priv->auto_indent)
+	if ((key == GDK_Return) && view->priv->auto_indent)
 	{
 		/* Auto-indent means that when you press ENTER at the end of a
 		 * line, the new line is automatically indented at the same
@@ -1671,6 +1753,14 @@ key_press_cb (GtkWidget *widget, GdkEventKey *event, gpointer data)
 	return FALSE;
 }
 
+/**
+ * gtk_source_view_get_auto_indent:
+ * @view: a #GtkSourceView
+ *
+ * Returns whether auto indentation of text is enabled.
+ *
+ * Return value: TRUE if auto indentation is enabled.
+ **/
 gboolean
 gtk_source_view_get_auto_indent (GtkSourceView *view)
 {
@@ -1679,6 +1769,14 @@ gtk_source_view_get_auto_indent (GtkSourceView *view)
 	return view->priv->auto_indent;
 }
 
+/**
+ * gtk_source_view_set_auto_indent:
+ * @view: a #GtkSourceView
+ * @enable: whether to enable auto indentation
+ *
+ * If TRUE auto indentation of text is enabled.
+ *
+ **/
 void
 gtk_source_view_set_auto_indent (GtkSourceView *view, gboolean enable)
 {
@@ -1694,6 +1792,15 @@ gtk_source_view_set_auto_indent (GtkSourceView *view, gboolean enable)
 	g_object_notify (G_OBJECT (view), "auto_indent");
 }
 
+/**
+ * gtk_source_view_get_insert_spaces_instead_of_tabs:
+ * @view: a #GtkSourceView
+ *
+ * Returns whether when inserting a tabulator character it should
+ * be replaced by a group of space characters.
+ *
+ * Return value: TRUE if spaces are inserted instead of tabs.
+ **/
 gboolean
 gtk_source_view_get_insert_spaces_instead_of_tabs (GtkSourceView *view)
 {
@@ -1702,6 +1809,15 @@ gtk_source_view_get_insert_spaces_instead_of_tabs (GtkSourceView *view)
 	return view->priv->insert_spaces;
 }
 
+/**
+ * gtk_source_view_set_insert_spaces_instead_of_tabs:
+ * @view: a #GtkSourceView
+ * @enable: whether to insert spaces instead of tabs
+ *
+ * If TRUE any tabulator character inserted is replaced by a group
+ * of space characters.
+ *
+ **/
 void
 gtk_source_view_set_insert_spaces_instead_of_tabs (GtkSourceView *view, gboolean enable)
 {
@@ -1782,6 +1898,30 @@ view_dnd_drop (GtkTextView *view,
 	}
 }
 
+/**
+ * gtk_source_view_get_show_margin:
+ * @view: a #GtkSourceView
+ *
+ * Returns whether a margin is displayed
+ *
+ * Return value: TRUE if the margin is showed
+ **/
+gboolean 
+gtk_source_view_get_show_margin (GtkSourceView *view)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
+
+	return view->priv->show_margin;
+}
+
+/**
+ * gtk_source_view_set_show_margin:
+ * @view: a #GtkSourceView
+ * @show: whether to show a margin
+ *
+ * If TRUE a margin is displayed
+ *
+ **/
 void 
 gtk_source_view_set_show_margin (GtkSourceView *view, gboolean show)
 {
@@ -1799,14 +1939,30 @@ gtk_source_view_set_show_margin (GtkSourceView *view, gboolean show)
 	g_object_notify (G_OBJECT (view), "show_margin");
 }
 
-gboolean 
-gtk_source_view_get_show_margin (GtkSourceView *view)
+/**
+ * gtk_source_view_get_margin:
+ * @view: a #GtkSourceView
+ *
+ *
+ *
+ * Return value:
+ **/
+guint
+gtk_source_view_get_margin  (GtkSourceView *view)
 {
-	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
+	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), DEFAULT_MARGIN);
 
-	return view->priv->show_margin;
+	return view->priv->margin;
+
 }
 
+/**
+ * gtk_source_view_set_margin:
+ * @view: a #GtkSourceView
+ *
+ *
+ *
+ **/
 void 
 gtk_source_view_set_margin (GtkSourceView *view, guint margin)
 {
@@ -1824,16 +1980,16 @@ gtk_source_view_set_margin (GtkSourceView *view, guint margin)
 
 	g_object_notify (G_OBJECT (view), "margin");
 }
-		
-guint
-gtk_source_view_get_margin  (GtkSourceView *view)
-{
-	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), DEFAULT_MARGIN);
 
-	return view->priv->margin;
-
-}
-
+/**
+ * gtk_source_view_set_smart_home_end:
+ * @view: a #GtkSourceView
+ * @enable: whether to enable smart behavior for HOME and END keys
+ *
+ * If TRUE HOME and END keys will move to the first/last non-space
+ * character of the line before moving to the start/end.
+ *
+ **/
 void
 gtk_source_view_set_smart_home_end (GtkSourceView *view, gboolean enable)
 {
@@ -1849,6 +2005,15 @@ gtk_source_view_set_smart_home_end (GtkSourceView *view, gboolean enable)
 	g_object_notify (G_OBJECT (view), "smart_home_end");
 }
 
+/**
+ * gtk_source_view_get_smart_home_end:
+ * @view: a #GtkSourceView
+ *
+ * Returns whether HOME and END keys will move to the first/last non-space
+ * character of the line before moving to the start/end.
+ *
+ * Return value: TRUE if smart behavior for HOME and END keys is enabled
+ **/
 gboolean
 gtk_source_view_get_smart_home_end (GtkSourceView *view)
 {
@@ -1857,6 +2022,13 @@ gtk_source_view_get_smart_home_end (GtkSourceView *view)
 	return view->priv->smart_home_end;
 }
 
+/**
+ * gtk_source_view_style_set:
+ * @widget: a #GtkSourceView
+ * @previous_style:
+ *
+ *
+ **/
 static void 
 gtk_source_view_style_set (GtkWidget *widget, GtkStyle *previous_style)
 {
@@ -1881,5 +2053,4 @@ gtk_source_view_style_set (GtkWidget *widget, GtkStyle *previous_style)
 		view->priv->cached_margin_width = -1;
 	}
 }
-
 

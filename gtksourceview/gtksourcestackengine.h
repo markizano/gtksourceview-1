@@ -43,7 +43,6 @@ enum _GtkSourceStackAction {
 
 typedef struct _GtkSourceStackEngine        GtkSourceStackEngine;
 typedef struct _GtkSourceStackEngineClass   GtkSourceStackEngineClass;
-typedef struct _GtkSourceStackEnginePrivate GtkSourceStackEnginePrivate;
 
 struct _GtkSourceStackEngine 
 {
