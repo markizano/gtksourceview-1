@@ -2584,6 +2584,9 @@ gtk_source_buffer_set_language (GtkSourceBuffer   *buffer,
 
 		g_slist_foreach (list, (GFunc)g_object_unref, NULL);
 		g_slist_free (list);
+
+		gtk_source_buffer_set_escape_char (
+			buffer, gtk_source_language_get_escape_char (language));
 	}
 
 	g_object_notify (G_OBJECT (buffer), "language");

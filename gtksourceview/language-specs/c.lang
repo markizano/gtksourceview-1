@@ -2,6 +2,8 @@
 <!-- <!DOCTYPE language SYSTEM "language.dtd"> -->
 <language name="C" version="1.0" section="Sources" mimetypes="text/x-c;text/x-c-header">
 	
+	<escape-char>\</escape-char>
+
 	<line-comment name = "Line Comment" style= "Comment">
 		<start-regex>//</start-regex>
 	</line-comment>

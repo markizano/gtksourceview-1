@@ -41,6 +41,9 @@ struct _GtkSourceLanguagePrivate
 	gchar			*gconf_base_dir;
 
 	GtkSourceStyleScheme 	*style_scheme;
+
+	gunichar                 escape_char;
+	gboolean                 escape_char_valid;
 };
 
 GtkSourceLanguage *_gtk_source_language_new_from_file (const gchar			*filename,

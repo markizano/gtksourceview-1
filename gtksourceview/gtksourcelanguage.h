@@ -65,6 +65,8 @@ gchar			*gtk_source_language_get_section		(GtkSourceLanguage       *language);
 /* The list must be freed and the tags unrefed */
 GSList			*gtk_source_language_get_tags			(GtkSourceLanguage       *language);
 
+gunichar                 gtk_source_language_get_escape_char            (GtkSourceLanguage       *language);
+
 const GSList		*gtk_source_language_get_mime_types		(GtkSourceLanguage       *language);
 void			 gtk_source_language_set_mime_types		(GtkSourceLanguage       *language,
 								 	 const GSList		 *mime_types);

@@ -1047,49 +1047,93 @@ parseTag (GtkSourceLanguage *language,
 	return tag_list;
 }
 
-GSList *
-gtk_source_language_get_tags (GtkSourceLanguage *language)
+static GSList *
+language_file_parse (GtkSourceLanguage *language,
+		     gboolean           get_tags,
+		     gboolean           populate_styles_table)
 {
 	GSList *tag_list = NULL;
-	gboolean populate_styles_table = FALSE;
-
 	xmlDocPtr doc;
 	xmlNodePtr cur;
 
-	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
-	
 	xmlKeepBlanksDefault (0);
 
 	doc = xmlParseFile (language->priv->lang_file_name);
 	if (doc == NULL)
 	{
-		g_warning ("Impossible to parse file '%s'", 
+		g_warning ("Impossible to parse file '%s'",
 			   language->priv->lang_file_name);
 		return NULL;
 	}
 
-	cur = xmlDocGetRootElement(doc);
+	cur = xmlDocGetRootElement (doc);
 	
 	if (cur == NULL) 
 	{
-		g_warning ("The lang file '%s' is empty", 
+		g_warning ("The lang file '%s' is empty",
 			   language->priv->lang_file_name);
 
-		xmlFreeDoc(doc);
+		xmlFreeDoc (doc);
 		return NULL;
 	}
 
-	if (xmlStrcmp(cur->name, (const xmlChar *) "language")) {
+	if (xmlStrcmp (cur->name, (const xmlChar *) "language")) {
 		g_warning ("File '%s' is of the wrong type",
 			   language->priv->lang_file_name);
 		
-		xmlFreeDoc(doc);
+		xmlFreeDoc (doc);
 		return NULL;
 	}
 
 	/* FIXME: check that the language name, version, etc. are the 
 	 * right ones - Paolo */
 
+	cur = xmlDocGetRootElement (doc);
+	cur = cur->xmlChildrenNode;
+	g_return_val_if_fail (cur != NULL, NULL);
+	
+	while (cur != NULL)
+	{
+		if (!xmlStrcmp (cur->name, (const xmlChar *)"escape-char"))
+		{
+			xmlChar *escape;
+		
+			escape = xmlNodeListGetString (doc, cur->xmlChildrenNode, 1);
+			language->priv->escape_char = g_utf8_get_char (escape);
+			xmlFree (escape);
+
+			if (!get_tags)
+				break;
+		}
+		else if (get_tags)
+		{
+			tag_list = parseTag (language,
+					     doc, 
+					     cur, 
+					     tag_list, 
+					     populate_styles_table ?
+					     language->priv->tag_name_to_style_name : NULL);
+		}
+		
+		cur = cur->next;
+	}
+	language->priv->escape_char_valid = TRUE;
+
+	tag_list = g_slist_reverse (tag_list);
+      
+	xmlFreeDoc (doc);
+
+	return tag_list;
+}
+
+GSList *
+gtk_source_language_get_tags (GtkSourceLanguage *language)
+{
+	GSList *tag_list = NULL;
+	gboolean populate_styles_table = FALSE;
+
+	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
+	
 	if (language->priv->tag_name_to_style_name == NULL)
 	{
 		language->priv->tag_name_to_style_name = g_hash_table_new_full ((GHashFunc)g_str_hash,
@@ -1100,24 +1144,7 @@ gtk_source_language_get_tags (GtkSourceLanguage *language)
 		populate_styles_table = TRUE;
 	}
 
-
-	cur = cur->xmlChildrenNode;
-	g_return_val_if_fail (cur != NULL, NULL);
-	
-	while (cur != NULL)
-	{
-		tag_list = parseTag (language,
-				     doc, 
-				     cur, 
-				     tag_list, 
-				     populate_styles_table ? language->priv->tag_name_to_style_name : NULL);
-		
-		cur = cur->next;
-	}
-
-	tag_list = g_slist_reverse (tag_list);
-      
-	xmlFreeDoc(doc);
+	tag_list = language_file_parse (language, TRUE, populate_styles_table);
 
 	return tag_list;
 }
@@ -1523,4 +1550,13 @@ gtk_source_language_set_style_scheme (GtkSourceLanguage    *language,
 	}
 }
 
+gunichar 
+gtk_source_language_get_escape_char (GtkSourceLanguage *language)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), 0);
 
+	if (!language->priv->escape_char_valid)
+		language_file_parse (language, FALSE, FALSE);
+		
+	return language->priv->escape_char;
+}

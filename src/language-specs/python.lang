@@ -2,6 +2,8 @@
 <!-- <!DOCTYPE language SYSTEM "language.dtd"> -->
 <language name="Python" version="1.0" section="Scripts" mimetypes="text/x-python">
 
+	<escape-char>\</escape-char>
+
 	<string name = "Multiline String" style = "String" end-at-line-end = "FALSE">
 		<start-regex>[uUrR]?&quot;&quot;&quot;</start-regex>
 		<end-regex>&quot;&quot;&quot;</end-regex>

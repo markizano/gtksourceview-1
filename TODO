@@ -1,4 +1,4 @@
-TODO (last update: 11 April 2003)
+TODO (last update: 12 April 2003)
 =================================
 
 Before next release:
@@ -17,7 +17,7 @@ Before next release:
 [ ] Renaming the src dir to gtksourceview (Paolo)
 [X] Moving the test programs in a tests directory
 [X] Cleaning up the test-widget demo (Gustavo)
-[ ] "escape_char" property.  We probably want to put it 
+[X] "escape_char" property.  We probably want to put it 
     into the .lang file too? (Gustavo)
 [X] gtk_source_buffer_set_bracket_tag_style (or whatever we name it :-)
     (Gustavo)
