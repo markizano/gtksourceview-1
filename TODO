@@ -1,5 +1,5 @@
-TODO (last update: 27 March 2003)
-=================================
+TODO (last update: 9 April 2003)
+================================
 
 Before next release:
 
@@ -7,15 +7,12 @@ Before next release:
 [X] Support for multiple views (Gustavo)
 [X] Removing the style themes stuff (Paolo)
 [X] Finishing the .lang file stuff (Paolo)
-[ ] Reviewing the markers stuff code
+[X] Rewriting the markers stuff code (Gustavo)
 [X] Writing a gtk_source_buffer_remove_all_source_tags and 
     use it in GtkSourceBuffer instead of gtk_text_buffer_remove_all_tags (Paolo)
 [X] Reviewing the build stuff (Gustavo)
 [X] i18n (Gustavo)
-[ ] Creating a bugzilla product (Paolo)
-[ ] Convert .lang files to the new format (we could write a perl 
-    script to translate UltraEdit or TextPad syntax files in 
-    our format) (Gustavo)
+[X] Creating a bugzilla product (Paolo)
 [X] Removing gtktextsearch.[ch] files (Paolo)
 [ ] Renaming the src dir to gtksourceview (Paolo)
 [X] Moving the test programs in a tests directory
@@ -33,6 +30,9 @@ Before next release:
 
 Future releases:
 
+[ ] Convert .lang files to the new format (we could write a perl 
+    script to translate UltraEdit or TextPad syntax files in 
+    our format) (Gustavo)
 [ ] Implementing smart indentation (Paolo)
 [ ] Writing documentation
 [ ] Monitor gconf values in GtkSourceLanguage (Paolo)
