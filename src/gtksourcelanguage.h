@@ -62,7 +62,7 @@ GType            	 gtk_source_language_get_type 			(void) G_GNUC_CONST;
 gchar	 		*gtk_source_language_get_name			(GtkSourceLanguage       *language);
 gchar			*gtk_source_language_get_section		(GtkSourceLanguage       *language);
 
-/* The list must be free and the tags unref */
+/* The list must be freed and the tags unrefed */
 GSList			*gtk_source_language_get_tags			(GtkSourceLanguage       *language);
 
 const GSList		*gtk_source_language_get_mime_types		(GtkSourceLanguage       *language);

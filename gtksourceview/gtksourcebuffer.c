@@ -32,6 +32,7 @@
 
 #include "gtksourceview-i18n.h"
 #include "gtksourcebuffer.h"
+#include "gtksourcetag.h"
 
 #include "gtksourceundomanager.h"
 #include "gtksourceview-marshal.h"

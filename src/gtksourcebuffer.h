@@ -27,7 +27,6 @@
 #define __GTK_SOURCE_BUFFER_H__
 
 #include <gtk/gtk.h>
-#include <gtksourcetag.h>
 #include <gtksourcetagtable.h>
 #include <gtksourcelanguage.h>
 
