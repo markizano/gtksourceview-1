@@ -1,3 +1,7 @@
+2003-04-15  Christian Neumair  <chris@gnome-de.org>
+
+	* configure.in: Changed AC_PROG_LIBTOOL macro to AM_PROG_LIBTOOL.
+
 2003-01-05  Jeroen Zwartepoorte  <jeroen@xs4all.nl>
 
 	* src/gtksourcebuffer.c: (check_syntax),
