@@ -1570,11 +1570,12 @@ is_escaped (GtkSourceBuffer *source_buffer, const gchar *text, gint index)
 	gchar *tmp = (gchar *) text + index;
 	gboolean retval = FALSE;
 
-	if (!source_buffer->priv->escape_char)
+	if (source_buffer->priv->escape_char == 0)
 		return FALSE;
 	
 	tmp = g_utf8_find_prev_char (text, tmp);
-	while (tmp && g_utf8_get_char (tmp) == source_buffer->priv->escape_char) {
+	while (tmp && g_utf8_get_char (tmp) == source_buffer->priv->escape_char) 
+	{
 		retval = !retval;
 		tmp = g_utf8_find_prev_char (text, tmp);
 	}

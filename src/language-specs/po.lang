@@ -24,6 +24,7 @@
 		match-empty-string-at-beginning = "FALSE"
 		match-empty-string-at-end = "TRUE"
 		beginning-regex = "^">
+		<keyword>domain</keyword>
 		<keyword>msgid</keyword>
 		<keyword>msgstr</keyword>
 	</keyword-list>
