@@ -9,6 +9,7 @@ EXTRA_DIST = 			\
 	java.lang		\
 	latex.lang		\
 	perl.lang		\
+	po.lang			\
 	python.lang
 
 languagesdir = $(datadir)/gtksourceview-1.0/language-specs
