@@ -1,4 +1,5 @@
-/*  gtksourceview.c
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- 
+ *  gtksourceview.c
  *
  *  Copyright (C) 2001
  *  Mikael Hermansson<tyan@linux.se>
@@ -24,7 +25,7 @@
 #include "gtksourceview.h"
 
 #define GUTTER_PIXMAP 16
-#define TAB_STOP 4
+#define TAB_STOP 8
 #define MIN_NUMBER_WINDOW_WIDTH 20
 
 enum {
@@ -146,6 +147,8 @@ gtk_source_view_finalize (GObject *object)
 					     NULL);
 		g_hash_table_destroy (view->pixmap_cache);
 	}
+
+	G_OBJECT_CLASS (parent_class)->finalize (object);
 }
 
 static void
@@ -509,36 +512,27 @@ gtk_source_view_expose (GtkWidget      *widget,
 
 	event_handled = FALSE;
 	
-#if 0
 	/* check if the expose event is for the text window first, and
-	 * highlight the exposed region */
-	if (event->window == gtk_text_view_get_window (text_view, GTK_TEXT_WINDOW_TEXT)) {
+	 * make sure the visible region is highlighted */
+	if (event->window == gtk_text_view_get_window (text_view,
+						       GTK_TEXT_WINDOW_TEXT)) {
+		GdkRectangle visible_rect;
 		GtkTextIter iter1, iter2;
-		gint y;
 		
-		/* make sure the exposed area is highlighted */
-		gtk_text_view_window_to_buffer_coords (text_view,
-						       GTK_TEXT_WINDOW_TEXT,
-						       0,
-						       event->area.y,
-						       NULL,
-						       &y);
-		gtk_text_view_get_line_at_y (text_view, &iter1, y, NULL);
+		gtk_text_view_get_visible_rect (text_view, &visible_rect);
+		gtk_text_view_get_line_at_y (text_view, &iter1,
+					     visible_rect.y, NULL);
 		gtk_text_iter_backward_line (&iter1);
-		
-		gtk_text_view_window_to_buffer_coords (text_view,
-						       GTK_TEXT_WINDOW_TEXT,
-						       0,
-						       event->area.y + event->area.height,
-						       NULL,
-						       &y);
-		gtk_text_view_get_line_at_y (text_view, &iter2, y, NULL);
+		gtk_text_view_get_line_at_y (text_view, &iter2,
+					     visible_rect.y
+					     + visible_rect.height, NULL);
 		gtk_text_iter_forward_line (&iter2);
 
-		gtk_source_buffer_highlight_region (GTK_SOURCE_BUFFER (text_view->buffer),
-						    &iter1, &iter2);
+		gtk_source_buffer_highlight_region (
+			GTK_SOURCE_BUFFER (text_view->buffer),
+			&iter1, &iter2);
 	}
-#endif	
+
 	/* now check for the left window, which contains the margin */
 	if (event->window == gtk_text_view_get_window (text_view,
 						       GTK_TEXT_WINDOW_LEFT)) {
@@ -611,6 +605,7 @@ gtk_source_view_new ()
 
 	buffer = gtk_source_buffer_new (NULL);
 	widget = gtk_source_view_new_with_buffer (buffer);
+	g_object_unref (buffer);
 	return widget;
 }
 

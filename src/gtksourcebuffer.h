@@ -1,4 +1,5 @@
-/*  gtksourcebuffer.h
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- 
+ *  gtksourcebuffer.h
  *
  *  Copyright (C) 1999,2000,2001,2002 by:
  *          Mikael Hermansson <tyan@linux.se>
@@ -117,6 +118,11 @@ GList           *gtk_source_buffer_get_all_markers	(const GtkSourceBuffer  *buff
 gint             gtk_source_buffer_remove_all_markers	(GtkSourceBuffer        *buffer,
 							 gint                    line_start,
 							 gint                    line_end);
+
+void             gtk_source_buffer_highlight_region     (GtkSourceBuffer        *source_buffer,
+							 GtkTextIter            *start,
+							 GtkTextIter            *end);
+
 G_END_DECLS
 
 #endif /* __GTK_SOURCE_BUFFER_H__ */

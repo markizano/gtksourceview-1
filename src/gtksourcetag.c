@@ -1,4 +1,5 @@
-/*  gtksourcetag.c
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- 
+ *  gtksourcetag.c
  *
  *  Copyright (C) 2001
  *  Mikael Hermansson<tyan@linux.se>

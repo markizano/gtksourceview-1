@@ -21,6 +21,7 @@
 #include <gtk/gtk.h>
 #include "gtktextsearch.h"
 #include "gtksourceview.h"
+#include "gtksourcelanguage.h"
 
 static GtkTextBuffer *test_source (GtkSourceBuffer *buf);
 static void cb_move_cursor (GtkTextBuffer *buf, GtkTextIter *cursoriter, GtkTextMark *mark,
@@ -251,8 +252,8 @@ gtk_source_buffer_load_with_character_encoding (GtkSourceBuffer * buffer,
 		return FALSE;
 	}
 
-	if (highlight)
-		gtk_source_buffer_set_highlight (buffer, FALSE);
+/* 	if (highlight) */
+/* 		gtk_source_buffer_set_highlight (buffer, FALSE); */
 
 	gtk_source_buffer_begin_not_undoable_action (buffer);
 
@@ -269,8 +270,8 @@ gtk_source_buffer_load_with_character_encoding (GtkSourceBuffer * buffer,
 
 	gtk_text_buffer_set_modified (GTK_TEXT_BUFFER (buffer), FALSE);
 
-	if (highlight)
-		gtk_source_buffer_set_highlight (buffer, TRUE);
+/* 	if (highlight) */
+/* 		gtk_source_buffer_set_highlight (buffer, TRUE); */
 
 	return TRUE;
 }
@@ -400,10 +401,12 @@ test_source (GtkSourceBuffer *buffer)
 	list = g_list_append (list, (gpointer) tag);
 
 	gtk_source_buffer_install_regex_tags (buffer, list);
+	g_list_foreach (list, (GFunc) g_object_unref, NULL);
 	g_list_free (list);
 
 #if 0
 	gtk_source_buffer_load (buffer, "test-widget.c", &err);
+	gtk_source_buffer_load (buffer, "/home/gustavo/cvs/gnome/gnome-python/pygtk/gtk/gtk.c", &err);
 #else
 	gtk_source_buffer_load (buffer, "gtksourcebuffer.c", &err);	
 #endif
@@ -499,6 +502,7 @@ cb_move_cursor (GtkTextBuffer *b, GtkTextIter *cursoriter, GtkTextMark *mark, gp
 	gtk_label_set_text (GTK_LABEL (data), buf);
 }
 
+
 int
 main (int argc, char *argv[])
 {
@@ -515,9 +519,9 @@ main (int argc, char *argv[])
 	int i;
 	*/
 	PangoFontDescription *font_desc = NULL;
-
+	
 	gtk_init (&argc, &argv);
-
+	
 	window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 	gtk_signal_connect (GTK_OBJECT (window), "destroy", GTK_SIGNAL_FUNC (gtk_main_quit), NULL);
 
@@ -544,15 +548,18 @@ main (int argc, char *argv[])
 	g_signal_connect_closure (G_OBJECT (buf), "mark_set",
 				  g_cclosure_new ((GCallback) cb_move_cursor, label, NULL), TRUE);
 	tw = gtk_source_view_new_with_buffer (GTK_SOURCE_BUFFER (buf));
+	g_object_unref (buf);
+	
 	gtk_source_view_set_show_line_numbers (GTK_SOURCE_VIEW (tw), TRUE);
 	gtk_source_view_set_show_line_pixmaps (GTK_SOURCE_VIEW (tw), TRUE);
-	gtk_source_view_set_tab_stop (GTK_SOURCE_VIEW (tw), 8);
 
 	font_desc = pango_font_description_from_string ("monospace 10");
 	if (font_desc != NULL) {
 		gtk_widget_modify_font (tw, font_desc);
 		pango_font_description_free (font_desc);
 	}
+
+	gtk_source_view_set_tab_stop (GTK_SOURCE_VIEW (tw), 8);
 
 	gtk_container_add (GTK_CONTAINER (scrolled), tw);
 
@@ -566,11 +573,16 @@ main (int argc, char *argv[])
 
 	pixbuf = gdk_pixbuf_new_from_file ("/usr/share/pixmaps/apple-green.png", NULL);
 	gtk_source_view_add_pixbuf (GTK_SOURCE_VIEW (tw), "one", pixbuf, FALSE);
+	g_object_unref (pixbuf);
+	
 	pixbuf = gdk_pixbuf_new_from_file ("/usr/share/pixmaps/no.xpm", NULL);
 	gtk_source_view_add_pixbuf (GTK_SOURCE_VIEW (tw), "two", pixbuf, FALSE);
+	g_object_unref (pixbuf);
+	
 	pixbuf = gdk_pixbuf_new_from_file ("/usr/share/pixmaps/yes.xpm", NULL);
 	gtk_source_view_add_pixbuf (GTK_SOURCE_VIEW (tw), "three", pixbuf, FALSE);
-
+	g_object_unref (pixbuf);
+	
 	/*
 	for (i = 1; i < 200; i += 20) {
 		gtk_source_buffer_line_set_marker (GTK_SOURCE_BUFFER (GTK_TEXT_VIEW (tw)->buffer),
@@ -585,7 +597,40 @@ main (int argc, char *argv[])
 						   i, "three");
 	}
 	*/
+	{
+		GSList *dirs = NULL;
+		const GSList *langs;
+		
+		dirs = g_slist_prepend (dirs, ".");
+				
+		gtk_source_set_language_specs_directories (dirs);
+		g_slist_free (dirs);
 
+		langs = gtk_source_get_available_languages ();
+
+		while (langs != NULL)
+		{
+			const GSList *mime_types;
+			GtkSourceLanguage *l = GTK_SOURCE_LANGUAGE (langs->data);
+
+			g_print ("Name: %s\n", gtk_source_language_get_name (l));
+			g_print ("Section: %s\n", gtk_source_language_get_section (l));
+
+			mime_types = gtk_source_language_get_mime_types (l);
+			g_print ("Mime types: ");
+			while (mime_types != NULL)
+			{
+				g_print ("%s ", (const gchar*)mime_types->data);
+
+				mime_types = g_slist_next (mime_types);
+			}
+
+			g_print ("\n");
+
+			langs = g_slist_next (langs);
+		}
+					
+	}
 
 	gtk_widget_set_usize (window, 400, 500);
 	gtk_widget_show_all (window);

@@ -31,8 +31,11 @@ typedef struct _GtkSourceRegex           GtkSourceRegex;
 
 struct _GtkSourceBufferMatch
 {
-	gint startpos;
-	gint endpos;
+	gint 			 startpos;
+	gint			 endpos;
+	
+	gint 			 startindex;
+	gint			 endindex;
 };
 
 struct _GtkSourceRegex 
@@ -50,6 +53,7 @@ void		gtk_source_regex_destroy	(GtkSourceRegex       *regex);
 gint		gtk_source_regex_search 	(GtkSourceRegex       *regex,
 			 			 const gchar          *text,
 			 			 gint                  pos,
+						 gint                  length,
 			 			 GtkSourceBufferMatch *match);
 
 gint		gtk_source_regex_match 		(GtkSourceRegex       *regex,

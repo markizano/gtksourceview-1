@@ -113,9 +113,11 @@ gtk_text_region_destroy (GtkTextRegion *region)
 
 	while (region->subregions) {
 		Subregion *sr = region->subregions->data;
-		gtk_text_buffer_delete_mark (region->buffer, sr->start);
-		gtk_text_buffer_delete_mark (region->buffer, sr->end);
 		g_free (sr);
+		/* We don't delete marks here since gtk_text_region_destroy
+		   is normally called from gtk_source_buffer_finalize and
+		   in that situation the buffer has a zero ref_count.
+		   Besides we never really owned the marks */
 		region->subregions = g_list_delete_link (region->subregions,
 							 region->subregions);
 	}
@@ -192,7 +194,8 @@ gtk_text_region_add (GtkTextRegion *region,
 
 		} else {
 			/* we are in the middle of two subregions */
-			g_list_prepend (start_node, sr);
+			region->subregions = g_list_insert_before (region->subregions,
+								   start_node, sr);
 
 		}
 	}
@@ -270,7 +273,7 @@ gtk_text_region_substract (GtkTextRegion *region,
 			new_sr->end = sr->end;
 			new_sr->start = gtk_text_buffer_create_mark (region->buffer,
 								     NULL, end, TRUE);
-			g_list_append (start_node, new_sr);
+			g_list_insert_before (start_node, start_node->next, new_sr);
 
 			sr->end = gtk_text_buffer_create_mark (region->buffer,
 							       NULL, start, FALSE);
