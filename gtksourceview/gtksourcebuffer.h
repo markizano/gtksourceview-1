@@ -92,7 +92,8 @@ gint			 gtk_source_buffer_get_max_undo_levels	(const GtkSourceBuffer *buffer);
 void			 gtk_source_buffer_set_max_undo_levels	(GtkSourceBuffer       *buffer,
 							    	 gint                   max_undo_levels);
 
-const GtkSourceLanguage *gtk_source_buffer_get_language 	(GtkSourceBuffer       *buffer);
+/* Returned value must be unref */
+GtkSourceLanguage 	*gtk_source_buffer_get_language 	(GtkSourceBuffer       *buffer);
 void			 gtk_source_buffer_set_language 	(GtkSourceBuffer       *buffer, 
 								 GtkSourceLanguage     *language);
 

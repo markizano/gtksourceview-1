@@ -105,7 +105,6 @@ static GtkItemFactoryEntry menu_items[] = {
 };
 
 /* Implementation */
-
 static void 
 view_toggled_cb (ViewsData *vd,
 		 guint      callback_action,
@@ -138,7 +137,6 @@ view_toggled_cb (ViewsData *vd,
 		case 5: 
 			vd->show_margin = active;
 			set_func = gtk_source_view_set_show_margin;
-			
 		default:
 			break;
 	}
@@ -342,14 +340,25 @@ open_file (GtkSourceBuffer *buffer, const gchar *filename)
 										     mime_type);
 
 		if (language == NULL)
+		{
 			g_print ("No language found for mime type `%s'\n", mime_type);
-		
-		gtk_source_buffer_set_language (buffer, language);
+			g_object_set (G_OBJECT (buffer), "highlight", FALSE, NULL);
+		}
+		else
+		{	
+			g_object_set (G_OBJECT (buffer), "highlight", TRUE, NULL);
 
+			gtk_source_buffer_set_language (buffer, language);
+
+			g_object_unref (language);
+		}
+			
 		g_free (mime_type);
 	}
 	else
 	{
+		g_object_set (G_OBJECT (buffer), "highlight", FALSE, NULL);
+
 		g_warning ("Couldn't get mime type for file `%s'", filename);
 	}
 

@@ -5,7 +5,12 @@
 	<line-comment name="Comment" style="Comment">
 		<start-regex>%</start-regex>
 	</line-comment>
-	
+
+	<block-comment name = "Math" style = "Comment">
+		<start-regex>\$</start-regex>
+        	<end-regex>\$</end-regex>
+	</block-comment>
+
 	<keyword-list name="Include" style="Preprocessor" case-sensitive="TRUE"
 		match-empty-string-at-beginning="FALSE"
 		match-empty-string-at-end="FALSE"

@@ -151,7 +151,8 @@ static void 	view_dnd_drop 				(GtkTextView       *view,
 							 gpointer           data);
 
 static gint	calculate_real_tab_width 		(GtkSourceView     *view, 
-							 guint              tab_size);
+							 guint              tab_size,
+							 gchar              c);
 
 static void	gtk_source_view_set_property 		(GObject                 *object,
 							 guint                    prop_id,
@@ -242,7 +243,7 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 							       G_PARAM_READWRITE));
 
 	g_object_class_install_property (object_class,
-					 PROP_TABS_WIDTH,
+					 PROP_MARGIN,
 					 g_param_spec_uint ("margin",
 							    _("Margin position"),
 							    _("Position of the right margin"),
@@ -1130,7 +1131,7 @@ gtk_source_view_expose (GtkWidget      *widget,
 
 			if (view->priv->cached_margin_width < 0)
 				view->priv->cached_margin_width =
-					calculate_real_tab_width (view, view->priv->margin);
+					calculate_real_tab_width (view, view->priv->margin, '_');
 		
 			gtk_text_view_get_visible_rect (text_view, &visible_rect);
 			
@@ -1182,7 +1183,7 @@ gtk_source_view_expose (GtkWidget      *widget,
  *"^\(\t\| \)+" would probably do the trick for that.
  */
 static gint
-calculate_real_tab_width (GtkSourceView *view, guint tab_size)
+calculate_real_tab_width (GtkSourceView *view, guint tab_size, gchar c)
 {
 	PangoLayout *layout;
 	gchar *tab_string;
@@ -1195,7 +1196,7 @@ calculate_real_tab_width (GtkSourceView *view, guint tab_size)
 	tab_string = g_malloc (tab_size + 1);
 
 	while (counter < tab_size) {
-		tab_string [counter] = ' ';
+		tab_string [counter] = c;
 		counter++;
 	}
 
@@ -1383,7 +1384,7 @@ set_tab_stops_internal (GtkSourceView *view)
 	PangoTabArray *tab_array;
 	gint real_tab_width;
 
-	real_tab_width = calculate_real_tab_width (view, view->priv->tabs_width);
+	real_tab_width = calculate_real_tab_width (view, view->priv->tabs_width, ' ');
 
 	if (real_tab_width < 0)
 		return FALSE;

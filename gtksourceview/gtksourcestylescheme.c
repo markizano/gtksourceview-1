@@ -184,8 +184,7 @@ static GtkSourceTagStyle *
 new_tag_style (gchar* foreground,
 	       gchar* background,
 	       gboolean bold,
-	       gboolean italic,
-	       gboolean use_default)
+	       gboolean italic)
 {
 	GtkSourceTagStyle *ts;
 
@@ -203,7 +202,7 @@ new_tag_style (gchar* foreground,
 	
 	ts->italic	= italic;
 	ts->bold	= bold;
-	ts->use_default	= use_default;
+	ts->is_default	= TRUE;
 
 	return ts;
 }
@@ -219,72 +218,70 @@ gtk_source_default_style_scheme_init (GtkSourceDefaultStyleScheme *scheme)
 					        (GDestroyNotify)g_free,
 					        (GDestroyNotify)g_free);
 
-	ts = new_tag_style ("#FF00FF", NULL, FALSE, FALSE, TRUE);
+	ts = new_tag_style ("#FF00FF", NULL, FALSE, FALSE);
 	g_hash_table_insert (scheme->styles, 
 			     g_strdup (N_("Base-N Integer")),
 			     ts);
 
-	ts = new_tag_style ("#FF00FF", NULL, FALSE, FALSE, TRUE);
+	ts = new_tag_style ("#FF00FF", NULL, FALSE, FALSE);
 	g_hash_table_insert (scheme->styles, 
 			     g_strdup (N_("Character")),
 			     ts);
 
-	ts = new_tag_style ("#0000FF", NULL, FALSE, FALSE, TRUE);
+	ts = new_tag_style ("#0000FF", NULL, FALSE, FALSE);
 	g_hash_table_insert (scheme->styles, 
 			     g_strdup (N_("Comment")),
 			     ts);
 
-	ts = new_tag_style ("#2E8B57", NULL, TRUE, FALSE, TRUE);
+	ts = new_tag_style ("#2E8B57", NULL, TRUE, FALSE);
 	g_hash_table_insert (scheme->styles, 
 			     g_strdup (N_("Data Type")),
 			     ts);
 
-	ts = new_tag_style ("#FF00FF", NULL, FALSE, FALSE, TRUE);
+	ts = new_tag_style ("#FF00FF", NULL, FALSE, FALSE);
 	g_hash_table_insert (scheme->styles, 
 			     g_strdup (N_("Decimal")),
 			     ts);
 
-	ts = new_tag_style ("#FF00FF", NULL, FALSE, FALSE, TRUE);
+	ts = new_tag_style ("#FF00FF", NULL, FALSE, FALSE);
 	g_hash_table_insert (scheme->styles, 
 			     g_strdup (N_("Floating Point")),
 			     ts);
 
-	ts = new_tag_style ("#A52A2A", NULL, TRUE, FALSE, TRUE);
+	ts = new_tag_style ("#A52A2A", NULL, TRUE, FALSE);
 	g_hash_table_insert (scheme->styles, 
 			     g_strdup (N_("Keyword")),
 			     ts);
 	
-	ts = new_tag_style ("#A020F0", NULL, FALSE, FALSE, TRUE);
+	ts = new_tag_style ("#A020F0", NULL, FALSE, FALSE);
 	g_hash_table_insert (scheme->styles, 
 			     g_strdup (N_("Preprocessor")),
 			     ts);
 
-	ts = new_tag_style ("#FF00FF", NULL, FALSE, FALSE, TRUE);
+	ts = new_tag_style ("#FF00FF", NULL, FALSE, FALSE);
 	g_hash_table_insert (scheme->styles, 
 			     g_strdup (N_("String")),
 			     ts);
 
-	ts = new_tag_style ("#FFFFFF", "#FF0000", FALSE, FALSE, TRUE);
+	ts = new_tag_style ("#FFFFFF", "#FF0000", FALSE, FALSE);
 	g_hash_table_insert (scheme->styles, 
 			     g_strdup (N_("Specials")),
 			     ts);
 
-	ts = new_tag_style ("#2E8B57", NULL, TRUE, FALSE, TRUE);
+	ts = new_tag_style ("#2E8B57", NULL, TRUE, FALSE);
 	g_hash_table_insert (scheme->styles, 
 			     g_strdup (N_("Others")),
 			     ts);
 
-	ts = new_tag_style ("#008B8B", NULL, FALSE, FALSE, TRUE);
+	ts = new_tag_style ("#008B8B", NULL, FALSE, FALSE);
 	g_hash_table_insert (scheme->styles, 
 			     g_strdup (N_("Others 2")),
 			     ts);
 
-	ts = new_tag_style ("#6A5ACD", NULL, FALSE, FALSE, TRUE);
+	ts = new_tag_style ("#6A5ACD", NULL, FALSE, FALSE);
 	g_hash_table_insert (scheme->styles, 
 			     g_strdup (N_("Others 3")),
 			     ts);
-
-
 }
 
 static void 

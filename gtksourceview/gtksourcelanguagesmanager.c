@@ -325,7 +325,9 @@ gtk_source_languages_manager_get_language_from_mime_type (GtkSourceLanguagesMana
 		{
 			/* FIXME: is this right ? - Paolo */
 			if (strcmp ((const gchar*)mime_types->data, mime_type) == 0)
-			{				
+			{		
+				g_object_ref (lang);
+		
 				return lang;
 			}
 

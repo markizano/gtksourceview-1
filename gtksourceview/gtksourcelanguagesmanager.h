@@ -51,17 +51,19 @@ struct _GtkSourceLanguagesManagerClass
 };
 
 
-GType            gtk_source_languages_manager_get_type 		(void) G_GNUC_CONST;
+GType            gtk_source_languages_manager_get_type 		      (void) G_GNUC_CONST;
 
-GtkSourceLanguagesManager *gtk_source_languages_manager_new	(void);
+GtkSourceLanguagesManager 
+		*gtk_source_languages_manager_new		      (void);
 
 
 const GSList	*gtk_source_languages_manager_get_available_languages (GtkSourceLanguagesManager *lm);
 
 /* The GtkSourceLanguage life cycle is managed by the Manager */
-GtkSourceLanguage *gtk_source_languages_manager_get_language_from_mime_type 
-								(GtkSourceLanguagesManager	 *lm,
-							  	 const gchar 			 *mime_type);
+GtkSourceLanguage 
+		*gtk_source_languages_manager_get_language_from_mime_type 
+								      (GtkSourceLanguagesManager *lm,
+							  	       const gchar               *mime_type);
 
 
 G_END_DECLS				

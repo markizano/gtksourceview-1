@@ -33,9 +33,12 @@ struct _GtkSourceTagStyle {
 	gboolean italic;
 	gboolean bold;
 
+	/* use_background must be TRUE is background contain
+	 * a valid value */
 	gboolean use_background;
 
-	gboolean use_default;
+	/* readonly */
+	gboolean is_default;
 };
 
 G_END_DECLS

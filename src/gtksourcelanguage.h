@@ -51,32 +51,36 @@ struct _GtkSourceLanguage
 struct _GtkSourceLanguageClass 
 {
 	GObjectClass              parent_class;
+
+	void			  (*tag_style_changed) (GtkSourceLanguage *language,
+							const gchar       *name);
 };
 
 
 GType            	 gtk_source_language_get_type 			(void) G_GNUC_CONST;
 
-const gchar	 	*gtk_source_language_get_name			(const GtkSourceLanguage *language);
-const gchar		*gtk_source_language_get_section		(const GtkSourceLanguage *language);
+gchar	 		*gtk_source_language_get_name			(GtkSourceLanguage       *language);
+gchar			*gtk_source_language_get_section		(GtkSourceLanguage       *language);
 
-const GSList		*gtk_source_language_get_tags			(const GtkSourceLanguage *language);
+/* The list must be free and the tags unref */
+GSList			*gtk_source_language_get_tags			(GtkSourceLanguage       *language);
 
-const GSList		*gtk_source_language_get_mime_types		(const GtkSourceLanguage *language);
+const GSList		*gtk_source_language_get_mime_types		(GtkSourceLanguage       *language);
 void			 gtk_source_language_set_mime_types		(GtkSourceLanguage       *language,
-								 	 GSList			 *mime_types);
+								 	 const GSList		 *mime_types);
 
 const GtkSourceStyleScheme 
 			*gtk_source_language_get_style_scheme		(GtkSourceLanguage       *language);
 void			 gtk_source_language_set_style_scheme		(GtkSourceLanguage       *language,
 									 GtkSourceStyleScheme    *scheme);
 
-const GtkSourceTagStyle	*gtk_source_language_get_tag_style		(const GtkSourceLanguage *language,
+GtkSourceTagStyle	*gtk_source_language_get_tag_style		(GtkSourceLanguage       *language,
 									 const gchar		 *tag_name);
-void			 gtk_source_language_set_tag_style		(const GtkSourceLanguage *language,
+void			 gtk_source_language_set_tag_style		(GtkSourceLanguage       *language,
 									 const gchar		 *tag_name,
 								 	 const GtkSourceTagStyle *style);
 
-const GtkSourceTagStyle	*gtk_source_language_get_tag_default_style	(const GtkSourceLanguage *language,
+GtkSourceTagStyle	*gtk_source_language_get_tag_default_style	(GtkSourceLanguage       *language,
 								 	 const gchar		 *tag_name);
 
 G_END_DECLS				

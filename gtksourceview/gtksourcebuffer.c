@@ -295,7 +295,7 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 							       _("Highlight"),
 							       _("Whether to syntax highlight "
 								 "the buffer"),
-							       TRUE,
+							       FALSE,
 							       G_PARAM_READWRITE));
 	
 	g_object_class_install_property (object_class,
@@ -382,7 +382,6 @@ gtk_source_buffer_init (GtkSourceBuffer *buffer)
 					       NULL, (GDestroyNotify) g_object_unref);
 
 	/* highlight data */
-	priv->highlight = TRUE;
 	priv->refresh_region =  gtk_text_region_new (GTK_TEXT_BUFFER (buffer));
 	priv->syntax_regions =  g_array_new (FALSE, FALSE,
 					     sizeof (SyntaxDelimiter));
@@ -740,7 +739,8 @@ gtk_source_buffer_move_cursor (GtkTextBuffer *buffer,
 	if (mark != gtk_text_buffer_get_insert (buffer))
 		return;
 
-	if (GTK_SOURCE_BUFFER (buffer)->priv->bracket_mark) {
+	if (GTK_SOURCE_BUFFER (buffer)->priv->bracket_mark) 
+	{
 		GtkTextIter iter2;
 
 		gtk_text_buffer_get_iter_at_mark (buffer,
@@ -757,7 +757,8 @@ gtk_source_buffer_move_cursor (GtkTextBuffer *buffer,
 	if (!GTK_SOURCE_BUFFER (buffer)->priv->check_brackets || iter_has_syntax_tag (iter))
 		return;
 
-	if (gtk_source_buffer_find_bracket_match_real (iter, MAX_CHARS_BEFORE_FINDING_A_MATCH)) {
+	if (gtk_source_buffer_find_bracket_match_real (iter, MAX_CHARS_BEFORE_FINDING_A_MATCH)) 
+	{
 		if (!GTK_SOURCE_BUFFER (buffer)->priv->bracket_mark)
 			GTK_SOURCE_BUFFER (buffer)->priv->bracket_mark =
 				gtk_text_buffer_create_mark (buffer, 
@@ -801,12 +802,18 @@ gtk_source_buffer_real_insert_text (GtkTextBuffer *buffer,
 	 */
 	parent_class->insert_text (buffer, iter, text, len);
 
+	gtk_source_buffer_move_cursor (buffer, 
+				       iter, 
+				       gtk_text_buffer_get_insert (buffer),
+				       NULL);
+
 	if (!GTK_SOURCE_BUFFER (buffer)->priv->highlight)
 		return;
 
 	update_syntax_regions (GTK_SOURCE_BUFFER (buffer), 
 			       start_offset,
 			       g_utf8_strlen (text, len));
+
 }
 
 static void
@@ -815,23 +822,31 @@ gtk_source_buffer_real_delete_range (GtkTextBuffer *buffer,
 				     GtkTextIter   *end)
 {
 	gint delta;
-
+	GtkTextMark *mark;
+	GtkTextIter iter;
+		
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 	g_return_if_fail (start != NULL);
 	g_return_if_fail (end != NULL);
 	g_return_if_fail (gtk_text_iter_get_buffer (start) == buffer);
 	g_return_if_fail (gtk_text_iter_get_buffer (end) == buffer);
 
-	if (!GTK_SOURCE_BUFFER (buffer)->priv->highlight) {
-		parent_class->delete_range (buffer, start, end);
-		return;
-	}
-
 	gtk_text_iter_order (start, end);
 	delta = gtk_text_iter_get_offset (start) - 
 			gtk_text_iter_get_offset (end);
-	
+
 	parent_class->delete_range (buffer, start, end);
+
+	mark = gtk_text_buffer_get_insert (buffer);
+	gtk_text_buffer_get_iter_at_mark (buffer, &iter, mark),
+		
+	gtk_source_buffer_move_cursor (buffer,
+				       &iter,
+				       mark,
+				       NULL);
+
+	if (!GTK_SOURCE_BUFFER (buffer)->priv->highlight) 
+		return;
 
 	update_syntax_regions (GTK_SOURCE_BUFFER (buffer),
 			       gtk_text_iter_get_offset (start),
@@ -852,8 +867,6 @@ gtk_source_buffer_get_source_tags (const GtkSourceBuffer *buffer)
 	
 	return list;
 }
-
-
 
 static void
 sync_with_tag_table (GtkSourceBuffer *buffer)
@@ -2447,6 +2460,7 @@ gtk_source_buffer_remove_all_source_tags (GtkSourceBuffer   *buffer,
 	GtkTextIter first, second, tmp;
 	GSList *tags;
 	GSList *tmp_list;
+	GSList *tmp_list2;
 	GSList *prev;
 	GtkTextTag *tag;
   
@@ -2464,15 +2478,28 @@ gtk_source_buffer_remove_all_source_tags (GtkSourceBuffer   *buffer,
 	gtk_text_iter_order (&first, &second);
 
 	/* Get all tags turned on at the start */
-	tags = gtk_text_iter_get_tags (&first);
-  
+	tags = NULL;
+	tmp_list = gtk_text_iter_get_tags (&first);
+	tmp_list2 = tmp_list;
+	
+	while (tmp_list2 != NULL)
+	{
+		if (GTK_IS_SOURCE_TAG (tmp_list2->data))
+		{
+			tags = g_slist_prepend (tags, tmp_list2->data);
+		}
+
+		tmp_list2 = g_slist_next (tmp_list2);
+	}
+	
+	g_slist_free (tmp_list);
+	
 	/* Find any that are toggled on within the range */
 	tmp = first;
 	while (gtk_text_iter_forward_to_tag_toggle (&tmp, NULL))
 	{
 		GSList *toggled;
-		GSList *tmp_list2;
-
+		
 		if (gtk_text_iter_compare (&tmp, &second) >= 0)
 			break; /* past the end of the range */
       
@@ -2572,16 +2599,19 @@ gtk_source_buffer_set_language (GtkSourceBuffer   *buffer,
 
 	if (language != NULL)
 	{
-		const GSList *list = NULL;
+		GSList *list = NULL;
 			
 		list = gtk_source_language_get_tags (language);		
  		gtk_source_tag_table_add_all (table, list);
+
+		g_slist_foreach (list, (GFunc)g_object_unref, NULL);
+		g_slist_free (list);
 	}
 
 	g_object_notify (G_OBJECT (buffer), "language");
 }
 
-const GtkSourceLanguage *
+GtkSourceLanguage *
 gtk_source_buffer_get_language (GtkSourceBuffer *buffer)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);

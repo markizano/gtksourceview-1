@@ -1,3 +1,5 @@
 src/gtksourceview.c
-src/gtksourcetagstyle.c
+src/gtksourcebuffer.c
+src/gtksourcelanguagesmanager.c
+src/gtksourcestylescheme.c
 
