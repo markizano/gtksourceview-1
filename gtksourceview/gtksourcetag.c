@@ -375,46 +375,60 @@ gtk_keyword_list_tag_new (const gchar  *name,
 	
 	GtkTextTag *tag;
 	GString *str;
-
+	gint keyword_count;
+	
 	g_return_val_if_fail (keywords != NULL, NULL);
 
 	str =  g_string_new ("");
 
-	if (match_empty_string_at_beginning)
-		g_string_append (str, "\\b");
-
-	if (beginning_regex != NULL)
-		g_string_append (str, beginning_regex);
-
-	g_string_append (str, "\\(");
-	
 	while (keywords != NULL)
 	{
-		gchar *k;
+		if (match_empty_string_at_beginning)
+			g_string_append (str, "\\b");
+
+		if (beginning_regex != NULL)
+			g_string_append (str, beginning_regex);
+
+		g_string_append (str, "\\(");
+	
+		keyword_count = 0;
+		/* Split long keyword lists due to glibc regex's
+		 * implementation limitations/bugs.  In fact, we could
+		 * split at 256 keywords, but 200 feels safer :-) See
+		 * bug #110991 */
+		while (keywords != NULL && keyword_count < 200)
+		{
+			gchar *k;
+			
+			if (case_sensitive)
+				k = (gchar*)keywords->data;
+			else
+				k = case_insesitive_keyword ((gchar*)keywords->data);
+			
+			g_string_append (str, k);
+			
+			if (!case_sensitive)
+				g_free (k);
+			
+			keywords = g_slist_next (keywords);
+			
+			if (keywords != NULL)
+				g_string_append (str, "\\|");
+			
+			keyword_count++;
+		}
+
+		g_string_append (str, "\\)");
 		
-		if (case_sensitive)
-			k = (gchar*)keywords->data;
-		else
-			k = case_insesitive_keyword ((gchar*)keywords->data);
-
-		g_string_append (str, k);
-
-		if (!case_sensitive)
-			g_free (k);
-
-		keywords = g_slist_next (keywords);
+		if (end_regex != NULL)
+			g_string_append (str, end_regex);
+		
+		if (match_empty_string_at_end)
+			g_string_append (str, "\\b");
 
 		if (keywords != NULL)
 			g_string_append (str, "\\|");
 	}
-
-	g_string_append (str, "\\)");
-
-	if (end_regex != NULL)
-		g_string_append (str, end_regex);
-
-	if (match_empty_string_at_end)
-		g_string_append (str, "\\b");
 
 	tag = gtk_pattern_tag_new (name, str->str);
 

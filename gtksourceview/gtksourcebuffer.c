@@ -111,7 +111,8 @@ struct _GtkSourceBufferPrivate
 
 	GtkTextTag            *bracket_match_tag;
 	GtkTextMark           *bracket_mark;
-
+	guint                  bracket_found:1;
+	
 	GArray                *markers;
 
 	GList                 *syntax_items;
@@ -375,6 +376,7 @@ gtk_source_buffer_init (GtkSourceBuffer *buffer)
 
 	priv->check_brackets = TRUE;
 	priv->bracket_mark = NULL;
+	priv->bracket_found = FALSE;
 	
 	priv->markers = g_array_new (FALSE, FALSE, sizeof (GtkSourceMarker *));
 
@@ -709,7 +711,7 @@ gtk_source_buffer_move_cursor (GtkTextBuffer *buffer,
 	if (mark != gtk_text_buffer_get_insert (buffer))
 		return;
 
-	if (GTK_SOURCE_BUFFER (buffer)->priv->bracket_mark) 
+	if (GTK_SOURCE_BUFFER (buffer)->priv->bracket_found) 
 	{
 		GtkTextIter iter2;
 
@@ -746,6 +748,11 @@ gtk_source_buffer_move_cursor (GtkTextBuffer *buffer,
 					   GTK_SOURCE_BUFFER (buffer)->priv->bracket_match_tag,
 					   iter, 
 					   &iter1);
+		GTK_SOURCE_BUFFER (buffer)->priv->bracket_found = TRUE;
+	}
+	else
+	{
+		GTK_SOURCE_BUFFER (buffer)->priv->bracket_found = FALSE;
 	}
 }
 
