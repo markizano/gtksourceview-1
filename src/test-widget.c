@@ -626,6 +626,8 @@ main (int argc, char *argv[])
 
 			g_print ("\n\n");
 
+			gtk_source_language_get_tags (l);
+
 			langs = g_slist_next (langs);
 		}
 

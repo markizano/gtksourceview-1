@@ -67,9 +67,7 @@ GtkSourceLanguage	*gtk_source_language_get_from_mime_type		(const gchar         
 const gchar	 	*gtk_source_language_get_name			(const GtkSourceLanguage *language);
 const gchar		*gtk_source_language_get_section		(const GtkSourceLanguage *language);
 
-/*
 const GSList		*gtk_source_language_get_tags			(const GtkSourceLanguage *language);
-*/
 
 const GSList		*gtk_source_language_get_mime_types		(const GtkSourceLanguage *language);
 

@@ -29,6 +29,7 @@
 #include <gconf/gconf-client.h>
 
 #include "gtksourcelanguage.h"
+#include "gtksourcetag.h"
 
 struct _GtkSourceLanguagePrivate 
 {
@@ -682,5 +683,119 @@ gtk_source_language_set_mime_types (GtkSourceLanguage	*language,
 	}
 
 }
+
+static void
+parseTag (xmlDocPtr doc, xmlNodePtr cur, GSList *tag_list)
+{
+	GtkTextTag *tag = NULL;
+	xmlChar *name;
+	xmlChar *style;
+	
+	xmlNodePtr child;
+
+	name = xmlGetProp(cur, "name");
+	style = xmlGetProp(cur, "style");
+
+	if (name == NULL)
+	{
+		g_warning ("Impossible to get the tag name (%s, line %ld)", 
+			   doc->name, xmlGetLineNo (cur));
+		return;	
+	}
+	if (style == NULL)
+	{
+		xmlFree (name);
+
+		g_warning ("Impossible to get the tag style (%s, line %ld)", 
+			   doc->name, xmlGetLineNo (cur));
+		return;	
+
+	}
+	
+	if (!xmlStrcmp (cur->name, (const xmlChar *)"line-comment"))
+	{
+		child = cur->xmlChildrenNode;
+		
+		if ((child != NULL) && !xmlStrcmp (child->name, (const xmlChar *)"start-regex"))
+		{
+			xmlChar *start_regex;
+			
+			start_regex = xmlNodeListGetString (doc, child->xmlChildrenNode, 1);
+			
+			tag = gtk_line_comment_tag_new (name, start_regex);
+
+			g_print ("line commen: %s, %s, %s", name, style, start_regex);
+
+			xmlFree (start_regex);
+		}
+		else
+		{
+			g_warning ("Missing start-regex in tag 'line-comment' (%s, line %ld)", 
+				   doc->name, xmlGetLineNo (child));
+		}
+	}
+
+	if (tag != NULL)
+		tag_list = g_slist_prepend (tag_list, tag);
+
+	xmlFree (name);
+	xmlFree (style);
+}
+
+const GSList *
+gtk_source_language_get_tags (const GtkSourceLanguage *language)
+{
+	GSList *tag_list = NULL;
+	
+	xmlDocPtr doc;
+	xmlNodePtr cur;
+
+	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
+
+	xmlKeepBlanksDefault (0);
+
+	doc = xmlParseFile (language->priv->lang_file_name);
+	if (doc == NULL)
+	{
+		g_warning ("Impossible to parse file '%s'", 
+			   language->priv->lang_file_name);
+		return NULL;
+	}
+
+	cur = xmlDocGetRootElement(doc);
+	
+	if (cur == NULL) 
+	{
+		g_warning ("The lang file '%s' is empty", 
+			   language->priv->lang_file_name);
+
+		xmlFreeDoc(doc);
+		return NULL;
+	}
+
+	if (xmlStrcmp(cur->name, (const xmlChar *) "language")) {
+		g_warning ("File '%s' is of the wrong type",
+			   language->priv->lang_file_name);
+		
+		xmlFreeDoc(doc);
+		return NULL;
+	}
+
+	/* FIXME: check that the language name, version, etcc are the 
+	 * right ones - Paolo */
+
+	cur = cur->xmlChildrenNode;
+	while (cur != NULL)
+	{
+		parseTag (doc, cur, tag_list);
+		
+		cur = cur->next;
+	}
+      
+	xmlFreeDoc(doc);
+
+	return tag_list;
+}
+
 
 
