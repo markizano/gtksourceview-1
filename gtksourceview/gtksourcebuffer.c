@@ -1,4 +1,4 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- 
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*- 
  *  gtksourcebuffer.c
  *
  *  Copyright (C) 1999,2000,2001,2002 by:
@@ -67,7 +67,6 @@
 
 #define MAX_CHARS_BEFORE_FINDING_A_MATCH    2000
 
-typedef struct _MarkerSubList        MarkerSubList;
 typedef struct _SyntaxDelimiter      SyntaxDelimiter;
 typedef struct _PatternMatch         PatternMatch;
 
@@ -76,6 +75,7 @@ enum {
 	CAN_UNDO = 0,
 	CAN_REDO,
 	HIGHLIGHT_UPDATED,
+	MARKER_UPDATED,
 	LAST_SIGNAL
 };
 
@@ -87,12 +87,6 @@ enum {
 	PROP_HIGHLIGHT,
 	PROP_MAX_UNDO_LEVELS,
 	PROP_LANGUAGE
-};
-
-struct _MarkerSubList 
-{
-	gint                line;
-	GList              *marker_list;
 };
 
 struct _SyntaxDelimiter 
@@ -116,7 +110,7 @@ struct _GtkSourceBufferPrivate
 	GtkTextTag            *bracket_match_tag;
 	GtkTextMark           *bracket_mark;
 
-	GHashTable            *line_markers;
+	GHashTable            *markers;
 
 	GList                 *syntax_items;
 	GList                 *pattern_items;
@@ -188,9 +182,6 @@ static gboolean	 iter_backward_to_tag_start 		(GtkTextIter             *iter,
 static gboolean	 iter_forward_to_tag_end 		(GtkTextIter             *iter,
 							 GtkTextTag              *tag);
 
-static void	 hash_remove_func 			(gpointer                 key, 
-							 gpointer                 value,
-							 gpointer                 user_data);
 static void 	 get_tags_func 				(GtkTextTag              *tag, 
 		                                         gpointer                 data);
 
@@ -273,7 +264,8 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 	klass->can_undo 	 = NULL;
 	klass->can_redo 	 = NULL;
 	klass->highlight_updated = NULL;
-
+	klass->marker_updated    = NULL;
+	
 	/* Do not set these signals handlers directly on the parent_class since
 	 * that will cause problems (a loop). */
 	tb_class->insert_text 	= gtk_source_buffer_real_insert_text;
@@ -359,6 +351,17 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 			  2, 
 			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE,
 			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE);
+
+	buffer_signals[MARKER_UPDATED] =
+	    g_signal_new ("marker_updated",
+			  G_OBJECT_CLASS_TYPE (object_class),
+			  G_SIGNAL_RUN_LAST,
+			  G_STRUCT_OFFSET (GtkSourceBufferClass, marker_updated),
+			  NULL, NULL,
+			  gtksourceview_marshal_VOID__BOXED,
+			  G_TYPE_NONE, 
+			  1, 
+			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE);
 }
 
 static void
@@ -375,7 +378,8 @@ gtk_source_buffer_init (GtkSourceBuffer *buffer)
 	priv->check_brackets = TRUE;
 	priv->bracket_mark = NULL;
 	
-	priv->line_markers = g_hash_table_new (NULL, NULL);
+	priv->markers = g_hash_table_new_full (g_direct_hash, g_direct_equal,
+					       NULL, (GDestroyNotify) g_object_unref);
 
 	/* highlight data */
 	priv->highlight = TRUE;
@@ -485,19 +489,6 @@ gtk_source_buffer_constructor (GType                  type,
 }
 
 static void
-hash_remove_func (gpointer key, gpointer value, gpointer user_data)
-{
-	GList *iter = value;
-
-	while (iter != NULL) {
-		g_free (iter->data);
-		iter = g_list_next (iter);
-	}
-	
-	g_list_free (iter);
-}
-
-static void
 gtk_source_buffer_finalize (GObject *object)
 {
 	GtkSourceBuffer *buffer;
@@ -508,11 +499,9 @@ gtk_source_buffer_finalize (GObject *object)
 	buffer = GTK_SOURCE_BUFFER (object);
 	g_return_if_fail (buffer->priv != NULL);
 	
-	if (buffer->priv->line_markers) {
-		g_hash_table_foreach_remove (buffer->priv->line_markers,
-					     (GHRFunc)hash_remove_func,
-					     NULL);
-		g_hash_table_destroy (buffer->priv->line_markers);
+	if (buffer->priv->markers)
+	{
+		g_hash_table_destroy (buffer->priv->markers);
 	}
 
 	if (buffer->priv->worker_handler) {
@@ -849,37 +838,6 @@ gtk_source_buffer_real_delete_range (GtkTextBuffer *buffer,
 			       delta);
 }
 
-static void
-add_marker (gpointer data, gpointer user_data)
-{
-	char *name = data;
-	MarkerSubList *sublist = user_data;
-	GtkSourceBufferMarker *marker;
-
-	marker = g_new0 (GtkSourceBufferMarker, 1);
-	marker->line = sublist->line;
-	marker->name = g_strdup (name);
-
-	sublist->marker_list =
-	    g_list_append (sublist->marker_list, marker);
-}
-
-static void
-add_markers (gpointer key, gpointer value, gpointer user_data)
-{
-	GList **list = user_data;
-	GList *markers = value;
-	MarkerSubList *sublist;
-
-	sublist = g_new0 (MarkerSubList, 1);
-	sublist->line = GPOINTER_TO_INT (key);
-	sublist->marker_list = *list;
-
-	g_list_foreach (markers, add_marker, sublist);
-
-	g_free (sublist);
-}
-
 static GSList *
 gtk_source_buffer_get_source_tags (const GtkSourceBuffer *buffer)
 {
@@ -1198,204 +1156,6 @@ gtk_source_buffer_end_not_undoable_action (GtkSourceBuffer *buffer)
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 
 	gtk_source_undo_manager_end_not_undoable_action (buffer->priv->undo_manager);
-}
-
-/* Add a marker to a line.
- * If the list doesnt already exist, it will call set_marker. If the list does
- * exist, the new marker will be appended. If the marker already exists, it will
- * be removed from its current order and then prepended.
- */
-void
-gtk_source_buffer_line_add_marker (GtkSourceBuffer *buffer,
-				   gint             line, 
-				   const gchar     *marker)
-{
-	GList *list = NULL;
-	GList *iter;
-	gint line_count;
-
-	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
-	g_return_if_fail (marker != NULL);
-	
-	line_count =
-	    gtk_text_buffer_get_line_count (GTK_TEXT_BUFFER (buffer));
-	
-	line = CLAMP (line, 0, line_count - 1);
-
-	list = (GList *) g_hash_table_lookup (buffer->priv->line_markers,
-					      GINT_TO_POINTER (line));
-	if (list) {
-		iter = list;
-		
-		while (iter != NULL) {
-			if ((iter->data != NULL) && 
-			    (strcmp (marker, (gchar *) iter->data) == 0)) {
-				list = g_list_remove (list, iter->data);
-				g_free (iter->data);
-				break;
-			}
-
-			iter = g_list_next (iter);
-		}
-
-		list = g_list_append (list, g_strdup (marker));
-	} else 
-		gtk_source_buffer_line_set_marker (buffer, line, marker);
-}
-
-void
-gtk_source_buffer_line_set_marker (GtkSourceBuffer * buffer,
-				   gint line, const gchar * marker)
-{
-	GList *new_list = NULL;
-	gint line_count;
-
-	g_return_if_fail (buffer != NULL);
-	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
-
-	line_count =
-	    gtk_text_buffer_get_line_count (GTK_TEXT_BUFFER (buffer));
-	g_return_if_fail (line_count > line);
-
-	gtk_source_buffer_line_remove_markers (buffer, line);
-	if (marker) {
-		new_list = g_list_append (new_list, g_strdup (marker));
-		g_hash_table_insert (buffer->priv->line_markers,
-				     GINT_TO_POINTER (line), new_list);
-	}
-}
-
-gboolean
-gtk_source_buffer_line_remove_marker (GtkSourceBuffer * buffer,
-				      gint line, const gchar * marker)
-{
-	gboolean removed = FALSE;
-	GList *list;
-	GList *iter;
-	gint line_count;
-
-	g_return_val_if_fail (buffer != NULL, FALSE);
-	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), FALSE);
-
-	line_count =
-	    gtk_text_buffer_get_line_count (GTK_TEXT_BUFFER (buffer));
-	if (line > line_count)
-		return FALSE;
-
-	list = (GList *) g_hash_table_lookup (buffer->priv->line_markers,
-					      GINT_TO_POINTER (line));
-	for (iter = list; iter; iter = iter->next) {
-		if (iter->data && !strcmp (marker, (gchar *) iter->data)) {
-			list = g_list_remove (list, iter->data);
-
-			g_hash_table_insert (buffer->priv->line_markers,
-					     GINT_TO_POINTER (line), list);
-			removed = TRUE;
-			break;
-		}
-	}
-
-	return removed;
-}
-
-const GList *
-gtk_source_buffer_line_get_markers (const GtkSourceBuffer *buffer, 
-				    gint                   line)
-{
-	g_return_val_if_fail (buffer != NULL, NULL);
-	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
-
-	return (const GList *) g_hash_table_lookup (buffer->priv->
-						    line_markers,
-						    GINT_TO_POINTER
-						    (line));
-}
-
-gint
-gtk_source_buffer_line_has_markers (const GtkSourceBuffer *buffer, 
-				    gint                   line)
-{
-	gpointer data;
-	gint count = 0;
-
-	g_return_val_if_fail (buffer != NULL, 0);
-	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), 0);
-
-	data = g_hash_table_lookup (buffer->priv->line_markers,
-				    GINT_TO_POINTER (line));
-
-	if (data)
-		count = g_list_length ((GList *) data);
-
-	return count;
-}
-
-gint
-gtk_source_buffer_line_remove_markers (GtkSourceBuffer * buffer, gint line)
-{
-	GList *list = NULL;
-	GList *iter = NULL;
-	gint remove_count = 0;
-	gint line_count = 0;
-
-	g_return_val_if_fail (buffer != NULL, 0);
-	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), 0);
-
-	line_count =
-	    gtk_text_buffer_get_line_count (GTK_TEXT_BUFFER (buffer));
-	if (line > line_count)
-		return 0;
-
-	list = (GList *) g_hash_table_lookup (buffer->priv->line_markers,
-					      GINT_TO_POINTER (line));
-	if (list) {
-		for (iter = list; iter; iter = iter->next) {
-			if (iter->data)
-				g_free (iter->data);
-			remove_count++;
-		}
-		g_hash_table_remove (buffer->priv->line_markers,
-				     GINT_TO_POINTER (line));
-		g_list_free (list);
-	}
-
-	return remove_count;
-}
-
-GList *
-gtk_source_buffer_get_all_markers (const GtkSourceBuffer *buffer)
-{
-	GList *list = NULL;
-
-	g_hash_table_foreach (buffer->priv->line_markers, add_markers,
-			      &list);
-
-	return list;
-}
-
-gint
-gtk_source_buffer_remove_all_markers (GtkSourceBuffer *buffer,
-				      gint line_start, 
-				      gint line_end)
-{
-	gint remove_count = 0;
-	gint line_count;
-	gint counter;
-
-	g_return_val_if_fail (buffer != NULL, 0);
-	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), 0);
-
-	line_count =
-	    gtk_text_buffer_get_line_count (GTK_TEXT_BUFFER (buffer));
-	line_start = line_start < 0 ? 0 : line_start;
-	line_end = line_end > line_count ? line_count : line_end;
-
-	for (counter = line_start; counter <= line_end; counter++)
-		remove_count +=
-		    gtk_source_buffer_line_remove_markers (buffer,
-							   counter);
-
-	return remove_count;
 }
 
 gboolean
@@ -2851,3 +2611,138 @@ gtk_source_buffer_set_escape_char (GtkSourceBuffer *buffer,
 		g_object_notify (G_OBJECT (buffer), "escape_char");
 	}
 }
+
+GtkSourceMarker *
+gtk_source_buffer_create_marker (GtkSourceBuffer   *buffer,
+				 const gchar       *name,
+				 const GtkTextIter *where)
+{
+	GtkTextMark *text_mark;
+
+	g_return_val_if_fail (buffer != NULL, NULL);
+	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
+	g_return_val_if_fail (where != NULL, NULL);
+
+	text_mark = gtk_text_buffer_create_mark (GTK_TEXT_BUFFER (buffer),
+						 name,
+						 where,
+						 TRUE);
+	if (text_mark)
+	{
+		g_object_ref (text_mark);
+		g_hash_table_insert (buffer->priv->markers, text_mark, text_mark);
+		_gtk_source_marker_changed (GTK_SOURCE_MARKER (text_mark));
+
+		return GTK_SOURCE_MARKER (text_mark);
+	}
+
+	return NULL;
+}
+
+
+void 
+gtk_source_buffer_move_marker (GtkSourceBuffer   *buffer,
+			       GtkSourceMarker   *marker,
+			       const GtkTextIter *where)
+{
+	g_return_if_fail (buffer != NULL && marker != NULL);
+	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
+	g_return_if_fail (GTK_IS_SOURCE_MARKER (marker));
+	g_return_if_fail (where != NULL);
+
+	g_return_if_fail (g_hash_table_lookup (buffer->priv->markers, marker));
+
+	_gtk_source_marker_changed (marker);
+	gtk_text_buffer_move_mark (GTK_TEXT_BUFFER (buffer),
+				   GTK_TEXT_MARK (marker),
+				   where);
+	_gtk_source_marker_changed (marker);
+}
+
+void 
+gtk_source_buffer_delete_marker (GtkSourceBuffer *buffer,
+				 GtkSourceMarker *marker)
+{
+	g_return_if_fail (buffer != NULL && marker != NULL);
+	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
+	g_return_if_fail (GTK_IS_SOURCE_MARKER (marker));
+
+	g_return_if_fail (g_hash_table_lookup (buffer->priv->markers, marker));
+
+	/* this will unref the marker */
+	g_hash_table_remove (buffer->priv->markers, marker);
+
+	_gtk_source_marker_changed (marker);
+	gtk_text_buffer_delete_mark (GTK_TEXT_BUFFER (buffer),
+				     GTK_TEXT_MARK (marker));
+}
+
+GtkSourceMarker *
+gtk_source_buffer_get_marker (GtkSourceBuffer *buffer,
+			      const gchar     *name)
+{
+	GtkTextMark *text_mark;
+
+	g_return_val_if_fail (buffer != NULL, NULL);
+	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
+	g_return_val_if_fail (name != NULL, NULL);
+
+	text_mark = gtk_text_buffer_get_mark (GTK_TEXT_BUFFER (buffer), name);
+
+	if (text_mark && g_hash_table_lookup (buffer->priv->markers, text_mark) == NULL)
+		text_mark = NULL;
+
+	if (text_mark)
+		return GTK_SOURCE_MARKER (text_mark);
+	else
+		return NULL;
+}
+
+static void
+mark_in_region (GtkSourceMarker *marker,
+		gpointer         value,
+		gpointer         user_data)
+{
+	GtkTextIter iter;
+	struct {
+		GtkSourceBuffer *buffer;
+		GtkTextIter begin, end;
+		GSList *result;
+	} *data = user_data;
+
+	gtk_text_buffer_get_iter_at_mark (GTK_TEXT_BUFFER (data->buffer),
+					  &iter,
+					  GTK_TEXT_MARK (marker));
+	if (gtk_text_iter_compare (&iter, &data->begin) >= 0 &&
+	    gtk_text_iter_compare (&iter, &data->end) <= 0)
+		data->result = g_slist_prepend (data->result, marker);
+}
+
+GSList * 
+gtk_source_buffer_get_markers_in_region (GtkSourceBuffer   *buffer,
+					 const GtkTextIter *begin,
+					 const GtkTextIter *end)
+{
+	struct {
+		GtkSourceBuffer *buffer;
+		GtkTextIter begin, end;
+		GSList *result;
+	} data;
+	
+	g_return_val_if_fail (buffer != NULL, NULL);
+	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
+	g_return_val_if_fail (begin != NULL && end != NULL, NULL);
+
+	data.buffer = buffer;
+	data.begin = *begin;
+	data.end = *end;
+	data.result = NULL;
+	
+	gtk_text_iter_order (&data.begin, &data.end);
+
+	g_hash_table_foreach (buffer->priv->markers, (GHFunc) mark_in_region, &data);
+
+	return data.result;
+}
+
+

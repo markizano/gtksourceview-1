@@ -1,4 +1,4 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- 
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*- 
  *  test-widget.c
  *
  *  Copyright (C) 2001
@@ -48,6 +48,9 @@ typedef struct {
 } ViewsData;
 
 #define READ_BUFFER_SIZE   4096
+
+#define MARKER_TYPE_1      "one"
+#define MARKER_TYPE_2      "two"
 
 
 /* Private prototypes */
@@ -286,6 +289,23 @@ gtk_source_buffer_load_with_encoding (GtkSourceBuffer *source_buffer,
 	return TRUE;
 }
 
+static void
+remove_all_markers (GtkSourceBuffer *buffer)
+{
+	GSList *markers;
+	GtkTextIter begin, end;
+
+	gtk_text_buffer_get_bounds (GTK_TEXT_BUFFER (buffer), &begin, &end);
+	markers = gtk_source_buffer_get_markers_in_region (buffer, &begin, &end);
+	while (markers)
+	{
+		GtkSourceMarker *marker = markers->data;
+		
+		gtk_source_buffer_delete_marker (buffer, marker);
+		markers = g_slist_delete_link (markers, markers);
+	}
+}
+
 static gboolean
 open_file (GtkSourceBuffer *buffer, const gchar *filename)
 {
@@ -333,6 +353,7 @@ open_file (GtkSourceBuffer *buffer, const gchar *filename)
 		g_warning ("Couldn't get mime type for file `%s'", filename);
 	}
 
+	remove_all_markers (buffer);
 	gtk_source_buffer_load_with_encoding (buffer, filename, "utf-8", &err);
 	
 	if (err != NULL)
@@ -448,11 +469,93 @@ window_deleted_cb (GtkWidget *widget, GdkEvent *ev, ViewsData *vd)
 	return TRUE;
 }
 
+static gboolean
+button_press_cb (GtkWidget *widget, GdkEventButton *ev, gpointer user_data)
+{
+	GtkSourceView *view;
+	GtkSourceBuffer *buffer;
+	
+	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (widget), FALSE);
+	
+	view = GTK_SOURCE_VIEW (widget);
+	buffer = GTK_SOURCE_BUFFER (gtk_text_view_get_buffer (GTK_TEXT_VIEW (view)));
+	
+	if (!gtk_source_view_get_show_line_pixmaps (view))
+		return FALSE;
+	
+	/* check that the click was on the left gutter */
+	if (ev->window == gtk_text_view_get_window (GTK_TEXT_VIEW (view),
+						    GTK_TEXT_WINDOW_LEFT))
+	{
+		gint y_buf;
+		GtkTextIter line_start, line_end;
+		GSList *marker_list, *list_iter;
+		GtkSourceMarker *marker;
+		const gchar *marker_type;
+		
+		if (ev->button == 1)
+			marker_type = MARKER_TYPE_1;
+		else
+			marker_type = MARKER_TYPE_2;
+		
+		gtk_text_view_window_to_buffer_coords (GTK_TEXT_VIEW (view),
+						       GTK_TEXT_WINDOW_LEFT,
+						       ev->x, ev->y,
+						       NULL, &y_buf);
+
+		/* get line bounds */
+		gtk_text_view_get_line_at_y (GTK_TEXT_VIEW (view),
+					     &line_start,
+					     y_buf,
+					     NULL);
+		
+		line_end = line_start;
+		gtk_text_iter_forward_to_line_end (&line_end);
+
+		/* get the markers already in the line */
+		marker_list = gtk_source_buffer_get_markers_in_region (buffer,
+								       &line_start,
+								       &line_end);
+
+		/* search for the marker corresponding to the button pressed */
+		marker = NULL;
+		for (list_iter = marker_list;
+		     list_iter && !marker;
+		     list_iter = g_slist_next (list_iter))
+		{
+			GtkSourceMarker *tmp = list_iter->data;
+			gchar *tmp_type = gtk_source_marker_get_marker_type (tmp);
+			
+			if (tmp_type && !strcmp (tmp_type, marker_type))
+			{
+				marker = tmp;
+			}
+			g_free (tmp_type);
+		}
+		g_slist_free (marker_list);
+		
+		if (marker)
+		{
+			/* a marker was found, so delete it */
+			gtk_source_buffer_delete_marker (buffer, marker);
+		}
+		else
+		{
+			/* no marker found -> create one */
+			marker = gtk_source_buffer_create_marker (buffer, NULL, &line_start);
+			gtk_source_marker_set_marker_type (marker, marker_type);
+		}
+	}
+	
+	return FALSE;
+}
+
 static GtkWidget *
 create_window (ViewsData *vd)
 {
 	GtkWidget *window, *sw, *view, *vbox;
 	PangoFontDescription *font_desc = NULL;
+	GdkPixbuf *pixbuf;
 	
 	/* window */
 	window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
@@ -497,6 +600,17 @@ create_window (ViewsData *vd)
 		      "insert_spaces_instead_of_tabs", vd->insert_spaces,
 		      NULL);
 
+	g_signal_connect (view, "button-press-event", (GCallback) button_press_cb, NULL);
+	
+	/* add marker pixbufs */
+	pixbuf = gdk_pixbuf_new_from_file ("/usr/share/pixmaps/apple-green.png", NULL);
+	gtk_source_view_set_pixbuf (GTK_SOURCE_VIEW (view), MARKER_TYPE_1, pixbuf);
+	g_object_unref (pixbuf);
+	
+	pixbuf = gdk_pixbuf_new_from_file ("/usr/share/pixmaps/apple-red.png", NULL);
+	gtk_source_view_set_pixbuf (GTK_SOURCE_VIEW (view), MARKER_TYPE_2, pixbuf);
+	g_object_unref (pixbuf);
+	
 	return window;
 }
 
@@ -574,22 +688,6 @@ create_main_window (ViewsData *vd)
 			  (GCallback) update_cursor_position, vd);
 	gtk_widget_show (vd->pos_label);
 	
-#if 0
-	/* FIXME: update when we have a stable marker API */
-	
-	pixbuf = gdk_pixbuf_new_from_file ("/usr/share/pixmaps/apple-green.png", NULL);
-	gtk_source_view_add_pixbuf (GTK_SOURCE_VIEW (tw), "one", pixbuf, FALSE);
-	g_object_unref (pixbuf);
-	
-	pixbuf = gdk_pixbuf_new_from_file ("/usr/share/pixmaps/no.xpm", NULL);
-	gtk_source_view_add_pixbuf (GTK_SOURCE_VIEW (tw), "two", pixbuf, FALSE);
-	g_object_unref (pixbuf);
-	
-	pixbuf = gdk_pixbuf_new_from_file ("/usr/share/pixmaps/yes.xpm", NULL);
-	gtk_source_view_add_pixbuf (GTK_SOURCE_VIEW (tw), "three", pixbuf, FALSE);
-	g_object_unref (pixbuf);
-#endif
-	
 	return window;
 }
 
@@ -626,7 +724,7 @@ main (int argc, char *argv[])
 	vd->windows = NULL;
 
 	vd->show_numbers = TRUE;
-	vd->show_markers = FALSE;
+	vd->show_markers = TRUE;
 	vd->show_margin = TRUE;
 	vd->tab_stop = 8;
 	vd->auto_indent = TRUE;

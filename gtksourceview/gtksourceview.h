@@ -1,4 +1,4 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- 
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*- 
  *  gtksourceview.h
  *
  *  Copyright (C) 2001 - Mikael Hermansson <tyan@linux.se> and
@@ -103,15 +103,11 @@ void		 gtk_source_view_set_margin 		(GtkSourceView       *view,
 							 guint                margin);
 guint		 gtk_source_view_get_margin 		(const GtkSourceView *view);
 
-
-/* FIXME: Re-enable when we will have a better API - Paolo */
-/*
-gboolean 	 gtk_source_view_add_pixbuf 		(GtkSourceView       *view,
-				     			 const gchar         *key, 
-							 GdkPixbuf           *pixbuf,
-							 gboolean             overwrite);
+void             gtk_source_view_set_pixbuf             (GtkSourceView       *view,
+							 const gchar         *key,
+							 GdkPixbuf           *pixbuf);
 GdkPixbuf	*gtk_source_view_get_pixbuf 		(const GtkSourceView *view,
 				       			 const gchar         *key);
-*/
+
 G_END_DECLS
 #endif				/* end of SOURCE_VIEW_H__ */

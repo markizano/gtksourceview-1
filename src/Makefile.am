@@ -44,6 +44,8 @@ libgtksourceview_1_0_la_SOURCES = 		\
 	gtksourcetagtable.c		\
 	gtksourcestylescheme.h		\
 	gtksourcestylescheme.c		\
+	gtksourcemarker.h		\
+	gtksourcemarker.c		\
 	$(BUILT_SOURCES)
 
 libgtksourceview_1_0_la_LIBADD = $(DEP_LIBS)
@@ -60,6 +62,7 @@ libgtksourceview_1_0_include_HEADERS = 	\
 	gtksourcetagstyle.h 		\
 	gtksourcetagtable.h		\
 	gtksourcestylescheme.h		\
+	gtksourcemarker.h		\
 	gtktextregion.h
 
 gtksourceview-marshal.h: gtksourceview-marshal.list $(GLIB_GENMARSHAL)

@@ -1,4 +1,4 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- 
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*- 
  *  gtksourcebuffer.h
  *
  *  Copyright (C) 1999,2000,2001,2002 by:
@@ -26,10 +26,8 @@
 #ifndef __GTK_SOURCE_BUFFER_H__
 #define __GTK_SOURCE_BUFFER_H__
 
-#include <regex.h>
 #include <gtk/gtk.h>
 #include <gtksourcetag.h>
-
 #include <gtksourcetagtable.h>
 #include <gtksourcelanguage.h>
 
@@ -45,7 +43,6 @@ G_BEGIN_DECLS
 typedef struct _GtkSourceBuffer			GtkSourceBuffer;
 typedef struct _GtkSourceBufferClass		GtkSourceBufferClass;
 typedef struct _GtkSourceBufferPrivate		GtkSourceBufferPrivate;
-typedef struct _GtkSourceBufferMarker		GtkSourceBufferMarker;
 
 struct _GtkSourceBuffer 
 {
@@ -65,13 +62,11 @@ struct _GtkSourceBufferClass
 	void (* highlight_updated)      (GtkSourceBuffer *buffer,
 					 GtkTextIter     *start,
 					 GtkTextIter     *end);
+	void (* marker_updated)         (GtkSourceBuffer *buffer,
+					 GtkTextIter     *where);
 };
 
-struct _GtkSourceBufferMarker 
-{
-	gint   line;
-	gchar *name;
-};
+#include <gtksourcemarker.h>
 
 GType           	 gtk_source_buffer_get_type 		(void) G_GNUC_CONST;
 
@@ -118,26 +113,22 @@ void			 gtk_source_buffer_redo			(GtkSourceBuffer       *buffer);
 void			 gtk_source_buffer_begin_not_undoable_action (GtkSourceBuffer  *buffer);
 void			 gtk_source_buffer_end_not_undoable_action   (GtkSourceBuffer  *buffer);
 
-/* Line marker methods. */
-void			 gtk_source_buffer_line_add_marker	(GtkSourceBuffer        *buffer,
-								 gint                    line,
-								 const gchar            *marker);
-void			 gtk_source_buffer_line_set_marker	(GtkSourceBuffer        *buffer,
-								gint                    line,
-								 const gchar            *marker);
-gboolean		 gtk_source_buffer_line_remove_marker	(GtkSourceBuffer        *buffer,
-							 gint                    line,
-							 const gchar            *marker);
-const GList		*gtk_source_buffer_line_get_markers	(const GtkSourceBuffer  *buffer,
-								 gint                    line);
-gint			 gtk_source_buffer_line_has_markers	(const GtkSourceBuffer  *buffer,
-								 gint                    line);
-gint			 gtk_source_buffer_line_remove_markers	(GtkSourceBuffer        *buffer,
-								 gint                    line);
-GList			*gtk_source_buffer_get_all_markers	(const GtkSourceBuffer  *buffer);
-gint			 gtk_source_buffer_remove_all_markers	(GtkSourceBuffer        *buffer,
-								 gint                    line_start,
-								 gint                    line_end);
+/* marker methods. */
+GtkSourceMarker         *gtk_source_buffer_create_marker        (GtkSourceBuffer       *buffer,
+								 const gchar           *name,
+								 const GtkTextIter     *where);
+
+void                     gtk_source_buffer_move_marker          (GtkSourceBuffer       *buffer,
+								 GtkSourceMarker       *marker,
+								 const GtkTextIter     *where);
+void                     gtk_source_buffer_delete_marker        (GtkSourceBuffer       *buffer,
+								 GtkSourceMarker       *marker);
+GtkSourceMarker         *gtk_source_buffer_get_marker           (GtkSourceBuffer       *buffer,
+								 const gchar           *name);
+GSList                  *gtk_source_buffer_get_markers_in_region 
+                                                                (GtkSourceBuffer       *buffer,
+								 const GtkTextIter     *begin,
+								 const GtkTextIter     *end);
 
 /* INTERNAL private stuff - not even exported from the library on
  * many platforms

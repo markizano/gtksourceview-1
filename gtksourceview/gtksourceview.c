@@ -1,4 +1,4 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- 
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*- 
  *  gtksourceview.c
  *
  *  Copyright (C) 2001 - Mikael Hermansson <tyan@linux.se> and
@@ -35,7 +35,19 @@
 #include "gtksourceview-marshal.h"
 #include "gtksourceview.h"
 
+/*
+#define ENABLE_DEBUG
+*/
+#undef ENABLE_DEBUG
 
+#ifdef ENABLE_DEBUG
+#define DEBUG(x) (x)
+#else
+#define DEBUG(x)
+#endif
+
+
+#define COMPOSITE_ALPHA                 225
 #define GUTTER_PIXMAP 			16
 #define DEFAULT_TAB_WIDTH 		8
 #define MIN_NUMBER_WINDOW_WIDTH		20
@@ -80,6 +92,12 @@ struct _GtkSourceViewPrivate
 	gint		 old_lines;
 };
 
+/* internal structure to handle line markers */
+typedef struct {
+	gint             line_number;
+	gchar           *marker_type;
+} LineMarker;
+
 /* Implement DnD for application/x-color drops */
 typedef enum {
 	TARGET_COLOR = 200
@@ -100,10 +118,6 @@ static void	gtk_source_view_class_init 		(GtkSourceViewClass *klass);
 static void	gtk_source_view_init 			(GtkSourceView      *view);
 static void 	gtk_source_view_finalize 		(GObject            *object);
 
-static void 	gtk_source_view_pixbuf_foreach_unref 	(gpointer            key,
-						  	 gpointer            value,
-						  	 gpointer            user_data);
-
 static void	gtk_source_view_undo 			(GtkSourceView      *view);
 static void	gtk_source_view_redo 			(GtkSourceView      *view);
 
@@ -114,16 +128,6 @@ static void	gtk_source_view_populate_popup 		(GtkTextView        *view,
 					    		 GtkMenu            *menu);
 static void 	menu_item_activate_cb 			(GtkWidget          *menu_item,
 				  			 GtkTextView        *text_view);
-
-static void 	gtk_source_view_draw_line_markers 	(GtkSourceView      *view,
-					       		 gint                line,
-					       		 gint                x,
-					       		 gint                y);
-
-#if 0
-static GdkPixbuf *gtk_source_view_get_line_marker (GtkSourceView *view,
-						   GList *list);
-#endif
 
 static void 	gtk_source_view_get_lines 		(GtkTextView       *text_view,
 				       			 gint               first_y,
@@ -409,7 +413,9 @@ gtk_source_view_init (GtkSourceView *view)
 	view->priv->margin = DEFAULT_MARGIN;
 	view->priv->cached_margin_width = -1;
 	
-	view->priv->pixmap_cache = g_hash_table_new (g_str_hash, g_str_equal);
+	view->priv->pixmap_cache = g_hash_table_new_full (g_str_hash, g_str_equal,
+							  (GDestroyNotify) g_free,
+							  (GDestroyNotify) g_object_unref);
 
 	gtk_text_view_set_left_margin (GTK_TEXT_VIEW (view), 2);
 	gtk_text_view_set_right_margin (GTK_TEXT_VIEW (view), 2);
@@ -441,12 +447,7 @@ gtk_source_view_finalize (GObject *object)
 	view = GTK_SOURCE_VIEW (object);
 
 	if (view->priv->pixmap_cache) 
-	{
-		g_hash_table_foreach_remove (view->priv->pixmap_cache,
-					     (GHRFunc) gtk_source_view_pixbuf_foreach_unref,
-					     NULL);
 		g_hash_table_destroy (view->priv->pixmap_cache);
-	}
 	
 	set_source_buffer (view, NULL);
 
@@ -501,6 +502,51 @@ highlight_updated_cb (GtkSourceBuffer *buffer,
 	}
 }
 
+static void 
+marker_updated_cb (GtkSourceBuffer *buffer,
+		   GtkTextIter     *where,
+		   GtkTextView     *text_view)
+{
+	GdkRectangle visible_rect;
+	GdkRectangle updated_rect;	
+	GdkRectangle redraw_rect;
+	gint y, height;
+	
+	g_return_if_fail (text_view != NULL && GTK_IS_SOURCE_VIEW (text_view));
+
+	if (!GTK_SOURCE_VIEW (text_view)->priv->show_line_pixmaps)
+		return;
+	
+	/* get visible area */
+	gtk_text_view_get_visible_rect (text_view, &visible_rect);
+	
+	/* get updated rectangle */
+	gtk_text_view_get_line_yrange (text_view, where, &y, &height);
+	updated_rect.y = y;
+	updated_rect.height = height;
+	updated_rect.x = visible_rect.x;
+	updated_rect.width = visible_rect.width;
+
+	/* intersect both rectangles to see whether we need to queue a redraw */
+	if (gdk_rectangle_intersect (&updated_rect, &visible_rect, &redraw_rect)) 
+	{
+		gint y_win, width;
+		
+		gtk_text_view_buffer_to_window_coords (text_view,
+						       GTK_TEXT_WINDOW_WIDGET,
+						       0,
+						       redraw_rect.y,
+						       NULL,
+						       &y_win);
+		
+		width = gtk_text_view_get_border_window_size (text_view,
+							      GTK_TEXT_WINDOW_LEFT);
+		
+		gtk_widget_queue_draw_area (GTK_WIDGET (text_view),
+					    0, y_win, width, height);
+	}
+}
+
 static void
 set_source_buffer (GtkSourceView *view, GtkTextBuffer *buffer)
 {
@@ -515,6 +561,9 @@ set_source_buffer (GtkSourceView *view, GtkTextBuffer *buffer)
 		g_signal_handlers_disconnect_by_func (view->priv->source_buffer,
 						      highlight_updated_cb,
 						      view);
+		g_signal_handlers_disconnect_by_func (view->priv->source_buffer,
+						      marker_updated_cb,
+						      view);
 		g_object_remove_weak_pointer (G_OBJECT (view->priv->source_buffer),
 					      (gpointer *) &view->priv->source_buffer);
 	}
@@ -528,19 +577,15 @@ set_source_buffer (GtkSourceView *view, GtkTextBuffer *buffer)
 				  "highlight_updated",
 				  G_CALLBACK (highlight_updated_cb),
 				  view);
+		g_signal_connect (buffer,
+				  "marker_updated",
+				  G_CALLBACK (marker_updated_cb),
+				  view);
 	}
 	else 
 	{
 		view->priv->source_buffer = NULL;
 	}
-}
-
-static void
-gtk_source_view_pixbuf_foreach_unref (gpointer key,
-				      gpointer value,
-				      gpointer user_data)
-{
-	g_object_unref (G_OBJECT (value));
 }
 
 static void
@@ -640,84 +685,6 @@ menu_item_activate_cb (GtkWidget   *menu_item,
 	g_signal_emit_by_name (G_OBJECT (text_view), signal);
 }
 
-#if 0
-static GdkPixbuf *
-gtk_source_view_get_line_marker (GtkSourceView *view,
-				 GList         *list)
-{
-	GdkPixbuf *pixbuf;
-	GdkPixbuf *composite;
-	GList *iter;
-
-	pixbuf = gtk_source_view_get_pixbuf (view, (const gchar *) list->data);
-	if (!pixbuf) {
-		g_warning ("Unknown marker '%s' used.", (char*)list->data);
-		return NULL;
-	}
-
-	if (!list->next)
-		g_object_ref (pixbuf);
-	else {
-		pixbuf = gdk_pixbuf_copy (pixbuf);
-		for (iter = list->next; iter; iter = iter->next) {
-			composite = gtk_source_view_get_pixbuf (view,
-								(const gchar *) iter->data);
-			if (composite) {
-				gint width;
-				gint height;
-				gint comp_width;
-				gint comp_height;
-
-				width = gdk_pixbuf_get_width (pixbuf);
-				height = gdk_pixbuf_get_height (pixbuf);
-				comp_width = gdk_pixbuf_get_width (composite);
-				comp_height = gdk_pixbuf_get_height (composite);
-				gdk_pixbuf_composite ((const GdkPixbuf *) composite,
-						      pixbuf,
-						      0, 0,
-						      width, height,
-						      0, 0,
-						      width / comp_width,
-						      height / comp_height,
-						      GDK_INTERP_BILINEAR,
-						      225);
-			} else
-				g_warning ("Unknown marker '%s' used", (char*)iter->data);
-		}
-	}
-
-	return pixbuf;
-}
-#endif
-static void
-gtk_source_view_draw_line_markers (GtkSourceView *view,
-				   gint           line,
-				   gint           x,
-				   gint           y)
-{
-#if 0
-	GList *list;
-	GdkPixbuf *pixbuf;
-	GdkWindow *win = gtk_text_view_get_window (GTK_TEXT_VIEW (view),
-						   GTK_TEXT_WINDOW_LEFT);
-
-	list = (GList *)
-		gtk_source_buffer_line_get_markers (GTK_SOURCE_BUFFER
-						    (GTK_TEXT_VIEW (view)->buffer), line);
-	if (list) {
-		if ((pixbuf = gtk_source_view_get_line_marker (view, list))) {
-			gdk_pixbuf_render_to_drawable_alpha (pixbuf, GDK_DRAWABLE (win), 0, 0,
-							     x, y,
-							     gdk_pixbuf_get_width (pixbuf),
-							     gdk_pixbuf_get_height (pixbuf),
-							     GDK_PIXBUF_ALPHA_BILEVEL,
-							     127, GDK_RGB_DITHER_NORMAL, 0, 0);
-			g_object_unref (pixbuf);
-		}
-	}
-#endif 
-}
-
 /* This function is taken from gtk+/tests/testtext.c */
 static void
 gtk_source_view_get_lines (GtkTextView  *text_view,
@@ -782,6 +749,98 @@ gtk_source_view_get_lines (GtkTextView  *text_view,
 	*countp = count;
 }
 
+static gint
+line_marker_cmp (gconstpointer ptr_a, gconstpointer ptr_b)
+{
+	const LineMarker *a = ptr_a;
+	const LineMarker *b = ptr_b;
+
+	if (a->line_number == b->line_number)
+		return 0;
+	else if (a->line_number < b->line_number)
+		return -1;
+	else
+		return 1;
+}
+
+static GSList * 
+draw_line_markers (GtkSourceView *view, GSList *current_marker, gint x, gint y)
+{
+	GdkPixbuf *pixbuf, *composite;
+	LineMarker *lm;
+	gint line_number;
+	gint width, height;
+
+	g_assert (current_marker);
+	
+	composite = NULL;
+	width = height = 0;
+	lm = current_marker->data;
+	line_number = lm->line_number;
+
+	/* composite all the pixbufs for the markers present at the line */
+	do
+	{
+		lm = current_marker->data;
+
+		if (lm->line_number != line_number)
+			break;
+		
+		pixbuf = gtk_source_view_get_pixbuf (view, lm->marker_type);
+		if (pixbuf)
+		{
+			if (!composite)
+			{
+				composite = gdk_pixbuf_copy (pixbuf);
+				width = gdk_pixbuf_get_width (composite);
+				height = gdk_pixbuf_get_height (composite);
+			}
+			else
+			{
+				gint pixbuf_w;
+				gint pixbuf_h;
+
+				pixbuf_w = gdk_pixbuf_get_width (pixbuf);
+				pixbuf_h = gdk_pixbuf_get_height (pixbuf);
+				gdk_pixbuf_composite (pixbuf,
+						      composite,
+						      0, 0,
+						      width, height,
+						      0, 0,
+						      (double) pixbuf_w / width,
+						      (double) pixbuf_h / height,
+						      GDK_INTERP_BILINEAR,
+						      COMPOSITE_ALPHA);
+			}
+			g_object_unref (pixbuf);
+			
+		} else
+			g_warning ("Unknown marker '%s' used", lm->marker_type);
+
+		current_marker = g_slist_next (current_marker);
+	}
+	while (current_marker);
+	
+	/* render the result to the left window */
+	if (composite)
+	{
+		GdkWindow *window;
+
+		window = gtk_text_view_get_window (GTK_TEXT_VIEW (view),
+						   GTK_TEXT_WINDOW_LEFT);
+
+		gdk_pixbuf_render_to_drawable_alpha (composite,
+						     GDK_DRAWABLE (window),
+						     0, 0, x, y,
+						     width, height,
+						     GDK_PIXBUF_ALPHA_BILEVEL,
+						     127, GDK_RGB_DITHER_NORMAL, 0, 0);
+		g_object_unref (composite);
+	}
+
+	return current_marker;
+}
+
 static void
 gtk_source_view_paint_margin (GtkSourceView *view,
 			      GdkEventExpose *event)
@@ -791,12 +850,12 @@ gtk_source_view_paint_margin (GtkSourceView *view,
 	PangoLayout *layout;
 	GArray *numbers;
 	GArray *pixels;
-	gchar *str;
-	gint y1;
-	gint y2;
+	GSList *markers, *current_marker;
+	gchar str [8];  /* we don't expect more than ten million lines ;-) */
+	gint y1, y2;
 	gint count;
 	gint margin_width;
-	gint text_width;
+	gint text_width, x_pixmap;
 	gint i;
 
 	text_view = GTK_TEXT_VIEW (view);
@@ -854,11 +913,16 @@ gtk_source_view_paint_margin (GtkSourceView *view,
 		g_array_append_val (numbers, n);
 	}
 
+	DEBUG ({
+		g_message ("Painting line numbers %d - %d",
+			   g_array_index (numbers, gint, 0),
+			   g_array_index (numbers, gint, count - 1));
+	});
+	
 	/* set size. */
-	str = g_strdup_printf ("%d", MAX (99,
-					  gtk_text_buffer_get_line_count (text_view->buffer)));
+	g_snprintf (str, sizeof (str),
+		    "%d", MAX (99, gtk_text_buffer_get_line_count (text_view->buffer)));
 	layout = gtk_widget_create_pango_layout (GTK_WIDGET (view), str);
-	g_free (str);
 
 	pango_layout_get_pixel_size (layout, &text_width, NULL);
 	
@@ -866,22 +930,66 @@ gtk_source_view_paint_margin (GtkSourceView *view,
 	pango_layout_set_alignment (layout, PANGO_ALIGN_RIGHT);
 
 	/* determine the width of the left margin. */
-	if (view->priv->show_line_numbers && view->priv->show_line_pixmaps)
-		margin_width = text_width + 4 + GUTTER_PIXMAP;
-	else if (view->priv->show_line_numbers)
+	if (view->priv->show_line_numbers)
 		margin_width = text_width + 4;
-	else if (view->priv->show_line_pixmaps)
-		margin_width = GUTTER_PIXMAP;
 	else
 		margin_width = 0;
+
+	x_pixmap = margin_width;
+	
+	if (view->priv->show_line_pixmaps)
+		margin_width += GUTTER_PIXMAP;
 
 	g_return_if_fail (margin_width != 0);
 	
 	gtk_text_view_set_border_window_size (GTK_TEXT_VIEW (text_view),
 					      GTK_TEXT_WINDOW_LEFT,
 					      margin_width);
+
+	/* get markers for the exposed region */
+	markers = NULL;
+	if (view->priv->source_buffer && view->priv->show_line_pixmaps)
+	{
+		GSList *all_markers, *l;
+		GtkTextIter begin, end;
+
+		/* get markers in the exposed area */
+		gtk_text_buffer_get_iter_at_line (text_view->buffer,
+						  &begin,
+						  g_array_index (numbers, gint, 0));
+		gtk_text_buffer_get_iter_at_line (text_view->buffer,
+						  &end,
+						  g_array_index (numbers, gint, count - 1));
+		if (!gtk_text_iter_ends_line (&end))
+			gtk_text_iter_forward_to_line_end (&end);
+
+		all_markers = gtk_source_buffer_get_markers_in_region (
+			view->priv->source_buffer, &begin, &end);
+
+		DEBUG ({
+			g_message ("Painting markers for lines %d - %d",
+				   gtk_text_iter_get_line (&begin),
+				   gtk_text_iter_get_line (&end));
+		});
+	
+		/* create an ordered list with the markers */
+		for (l = all_markers; l; l = l->next)
+		{
+			GtkSourceMarker *marker = l->data;
+			LineMarker *lm;
+
+			lm = g_new0 (LineMarker, 1);
+			lm->line_number = gtk_source_marker_get_line (marker);
+			lm->marker_type = gtk_source_marker_get_marker_type (marker);
+
+			markers = g_slist_insert_sorted (markers, lm, line_marker_cmp);
+		}
+		
+		g_slist_free (all_markers);
+	}
 	
 	i = 0;
+	current_marker = markers;
 	while (i < count) 
 	{
 		gint pos;
@@ -893,9 +1001,10 @@ gtk_source_view_paint_margin (GtkSourceView *view,
 						       NULL,
 						       &pos);
 
-		if (view->priv->show_line_numbers ) 
+		if (view->priv->show_line_numbers) 
 		{
-			str = g_strdup_printf ("%d", g_array_index (numbers, gint, i) + 1);
+			g_snprintf (str, sizeof (str),
+				    "%d", g_array_index (numbers, gint, i) + 1);
 
 			pango_layout_set_text (layout, str, -1);
 
@@ -909,28 +1018,38 @@ gtk_source_view_paint_margin (GtkSourceView *view,
 					  text_width + 2, 
 					  pos,
 					  layout);
-
-			g_free (str);
 		}
 
-		if (view->priv->show_line_pixmaps) 
+		if (view->priv->show_line_pixmaps && current_marker) 
 		{
-			gint x;
-
-			if (view->priv->show_line_numbers)
-				x = text_width + 4;
-			else
-				x = 0;
+			LineMarker *lm = current_marker->data;
 			
-			gtk_source_view_draw_line_markers (view,
-							   g_array_index (numbers, gint, i) + 1,
-							   x,
-							   pos);
+			if (lm->line_number == g_array_index (numbers, gint, i))
+			{
+				/* draw markers for the line */
+				current_marker = draw_line_markers (view,
+								    current_marker,
+								    x_pixmap,
+								    pos);
+			}
 		}
 
 		++i;
 	}
 
+	/* we should have used all markers */
+	g_assert (current_marker == NULL);
+	
+	/* free the markers list (maybe we could free the list in
+	 * draw_line_markers?) */
+	while (markers)
+	{
+		LineMarker *lm = markers->data;
+		g_free (lm->marker_type);
+		g_free (lm);
+		markers = g_slist_delete_link (markers, markers);
+	}
+	
 	g_array_free (pixels, TRUE);
 	g_array_free (numbers, TRUE);
 
@@ -1308,35 +1427,25 @@ gtk_source_view_set_tabs_width (GtkSourceView *view,
 	}
 }
 
-/*
-gboolean
-gtk_source_view_add_pixbuf (GtkSourceView *view,
+void
+gtk_source_view_set_pixbuf (GtkSourceView *view,
 			    const gchar   *key,
-			    GdkPixbuf     *pixbuf,
-			    gboolean       overwrite)
+			    GdkPixbuf     *pixbuf)
 {
-	gpointer data = NULL;
-	gboolean replaced = FALSE;
-
-	g_return_val_if_fail (view != NULL, FALSE);
-	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
-
-	data = g_hash_table_lookup (view->pixmap_cache, key);
-	if (data && !overwrite)
-		return (FALSE);
-
-	if (data) {
-		g_hash_table_remove (view->pixmap_cache, key);
-		g_object_unref (G_OBJECT (data));
-		replaced = TRUE;
-	}
-	if (pixbuf && GDK_IS_PIXBUF (pixbuf)) {
+	g_return_if_fail (view != NULL);
+	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
+	g_return_if_fail (key != NULL);
+	g_return_if_fail (pixbuf == NULL || GDK_IS_PIXBUF (pixbuf));
+	
+	if (pixbuf)
+	{
 		gint width;
 		gint height;
 
 		width = gdk_pixbuf_get_width (pixbuf);
 		height = gdk_pixbuf_get_height (pixbuf);
-		if (width > GUTTER_PIXMAP || height > GUTTER_PIXMAP) {
+		if (width > GUTTER_PIXMAP || height > GUTTER_PIXMAP)
+		{
 			if (width > GUTTER_PIXMAP)
 				width = GUTTER_PIXMAP;
 			if (height > GUTTER_PIXMAP)
@@ -1344,22 +1453,39 @@ gtk_source_view_add_pixbuf (GtkSourceView *view,
 			pixbuf = gdk_pixbuf_scale_simple (pixbuf, width, height,
 							  GDK_INTERP_BILINEAR);
 		}
-		g_object_ref (G_OBJECT (pixbuf));
-		g_hash_table_insert (view->pixmap_cache,
-				     (gchar *) key,
-				     (gpointer) pixbuf);
+		else
+		{
+			/* we own a reference of the pixbuf */
+			g_object_ref (G_OBJECT (pixbuf));
+		}
+		
+		g_hash_table_insert (view->priv->pixmap_cache,
+				     g_strdup (key),
+				     pixbuf);
 	}
-
-	return replaced;
+	else
+	{
+		g_hash_table_remove (view->priv->pixmap_cache, key);
+	}
 }
 
-GdkPixbuf *
-gtk_source_view_get_pixbuf (GtkSourceView *view,
-			    const gchar   *key)
+GdkPixbuf * 
+gtk_source_view_get_pixbuf (const GtkSourceView *view,
+			    const gchar         *key)
 {
-	return g_hash_table_lookup (view->pixmap_cache, key);
+	GdkPixbuf *pixbuf;
+
+	g_return_val_if_fail (view != NULL, NULL);
+	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), NULL);
+	g_return_val_if_fail (key != NULL, NULL);
+	
+	pixbuf = g_hash_table_lookup (view->priv->pixmap_cache, key);
+
+	if (pixbuf)
+		g_object_ref (pixbuf);
+	
+	return pixbuf;
 }
-*/
 
 static gchar*
 compute_indentation (GtkSourceView *view, gint line)

@@ -21,7 +21,6 @@
 #define __GTK_SOURCE_REGEX_H__
 
 #include <regex.h>
-
 #include <glib/gtypes.h>
 
 G_BEGIN_DECLS
