@@ -19,9 +19,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <gtk/gtk.h>
-#include "gtksourceview.h"
-#include "gtksourcelanguage.h"
-#include "gtksourcelanguagesmanager.h"
+#include <gtksourceview.h>
+#include <gtksourcelanguage.h>
+#include <gtksourcelanguagesmanager.h>
 
 static GtkSourceLanguagesManager *lm;
 
@@ -433,7 +433,7 @@ test_source (GtkSourceBuffer *buffer)
 		g_print ("No language found.");	
 
 
-	gtk_source_buffer_load (buffer, "gtksourcebuffer.c", &err);	
+	gtk_source_buffer_load (buffer, "../src/gtksourcebuffer.c", &err);	
 	
 	
 	return GTK_TEXT_BUFFER (buffer);

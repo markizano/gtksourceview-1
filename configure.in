@@ -64,5 +64,6 @@ Makefile
 po/Makefile.in
 src/Makefile
 src/language-specs/Makefile
+tests/Makefile
 ])
 AC_OUTPUT

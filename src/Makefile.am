@@ -64,21 +64,6 @@ gtksourceview-marshal.c: gtksourceview-marshal.list $(GLIB_GENMARSHAL)
 	echo "#include \"gtksourceview-marshal.h\"" > $@ && \
 	$(GLIB_GENMARSHAL) $< --body --prefix=gtksourceview_marshal >> $@
 
-# testing executables
-noinst_PROGRAMS = test-widget testregion
-
-test_widget_SOURCES = test-widget.c
-
-test_widget_LDADD = 			\
-	libgtksourceview-1.0.la 		\
-	$(DEP_LIBS)
-
-testregion_SOURCES = testregion.c
-
-testregion_LDADD = 			\
-	libgtksourceview-1.0.la 		\
-	$(DEP_LIBS)
-
 EXTRA_DIST = 				\
 	gtksourceview-marshal.list
 
