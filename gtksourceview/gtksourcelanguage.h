@@ -53,16 +53,17 @@ struct _GtkSourceLanguageClass
 };
 
 
+/* Do we really need these functions ? */
 void			 gtk_source_set_language_specs_directories	(const GSList 		 *dirs);
+void			 gtk_source_set_gconf_base_dir			(const gchar		 *dir);
 
 const GSList 		*gtk_source_get_available_languages		(void);
 
 
 GType            	 gtk_source_language_get_type 			(void) G_GNUC_CONST;
 
-/*
 GtkSourceLanguage	*gtk_source_language_get_from_mime_type		(const gchar             *mime_type);
-*/
+
 const gchar	 	*gtk_source_language_get_name			(const GtkSourceLanguage *language);
 const gchar		*gtk_source_language_get_section		(const GtkSourceLanguage *language);
 
@@ -72,10 +73,10 @@ const GSList		*gtk_source_language_get_tags			(const GtkSourceLanguage *language
 
 const GSList		*gtk_source_language_get_mime_types		(const GtkSourceLanguage *language);
 
-/*
+
 void			 gtk_source_language_set_mime_types		(GtkSourceLanguage       *language,
 								 	 GSList			 *mime_types);
-
+/*
 const GtkSourceTagStyle	*gtk_source_language_get_tag_style		(const GtkSourceLanguage *language,
 									 const gchar		 *tag_name);
 void			*gtk_source_language_set_tag_style		(const GtkSourceLanguage *language,

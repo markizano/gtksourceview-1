@@ -24,7 +24,9 @@
 #include <string.h>
 
 #include <libxml/xmlreader.h>
-#include <libgnome/gnome-util.h> /* For g_pointer_extesions */
+#include <libgnome/gnome-util.h>
+#include <gconf/gconf.h>
+#include <gconf/gconf-client.h>
 
 #include "gtksourcelanguage.h"
 
@@ -38,18 +40,28 @@ struct _GtkSourceLanguagePrivate
 	GSList    *mime_types;
 };
 
-static void	 gtk_source_language_class_init 	(GtkSourceLanguageClass 	*klass);
-static void	 gtk_source_language_init		(GtkSourceLanguage 		*lang);
-static void	 gtk_source_language_finalize 		(GObject 			*object);
+static void		 gtk_source_language_class_init 	(GtkSourceLanguageClass 	*klass);
+static void		 gtk_source_language_init		(GtkSourceLanguage 		*lang);
+static void	 	 gtk_source_language_finalize 		(GObject 			*object);
 
-static GSList 	*build_file_listing 			(const gchar 			*directory, 
-					 		 GSList				*filenames);
-static GtkSourceLanguage *get_language_from_file 	(const gchar 			*filename);
+static GSList	 	*build_file_listing 			(const gchar 			*directory, 
+					 		 	 GSList				*filenames);
+static GtkSourceLanguage *get_language_from_file 		(const gchar 			*filename);
+static const gchar 	*get_gconf_base_dir 			(void);
 
 static GSList	*language_specs_directories 	= NULL;
 static GSList 	*available_languages 		= NULL;
 
+static gchar	*gconf_base_dir		 	= NULL;
+
+#define DEFAULT_GCONF_BASE_DIR		"/apps/gtksourceview"
+
+#define DEFAULT_LANGUAGE_DIR		DATADIR "/gtksourceview/language-specs"
+#define USER_LANGUAGE_DIR		"gtksourceview/language-specs"
+
+
 static GObjectClass 	*parent_class  = NULL;
+
 
 GType
 gtk_source_language_get_type (void)
@@ -95,13 +107,7 @@ gtk_source_language_init (GtkSourceLanguage *lang)
 static void
 slist_deep_free (GSList *list)
 {
-	while (list != NULL)
-	{
-		g_free (list->data);
-
-		list = g_slist_next (list);
-	}
-
+	g_slist_foreach (list, (GFunc) g_free, NULL);
 	g_slist_free (list);
 }
 
@@ -164,6 +170,11 @@ get_lang_files ()
 	GSList *filenames = NULL;
 	GSList *dirs;
 
+	if (language_specs_directories == NULL)
+	{
+		gtk_source_set_language_specs_directories (NULL);
+	}
+
 	dirs = language_specs_directories;
 
 	while (dirs != NULL)
@@ -223,6 +234,18 @@ gtk_source_set_language_specs_directories (const GSList *dirs)
 		language_specs_directories = NULL;
 	}
 
+	if (dirs == NULL)
+	{
+		language_specs_directories =
+			g_slist_prepend (language_specs_directories,
+					g_strdup (DEFAULT_LANGUAGE_DIR));
+		language_specs_directories = 
+			g_slist_prepend (language_specs_directories,
+					gnome_util_home_file (USER_LANGUAGE_DIR));
+
+		return;
+	}
+
 	while (dirs != NULL)
 	{
 		language_specs_directories = 
@@ -231,6 +254,48 @@ gtk_source_set_language_specs_directories (const GSList *dirs)
 
 		dirs = g_slist_next (dirs);
 	}
+}
+
+static GConfClient *
+get_gconf_client ()
+{
+	static GConfClient *gconf_client = NULL;
+
+	if (gconf_client == NULL)
+	{
+		gconf_client = gconf_client_get_default ();
+		
+		if (gconf_client == NULL)
+		{
+			g_warning ("Cannot connect to preferences manager.");
+			return NULL;
+		}
+	}
+
+	return gconf_client;
+}
+
+static gchar *
+get_gconf_key (const GtkSourceLanguage *lang, const gchar *k)
+{
+	gchar *temp;
+	gchar *key;
+	gchar *name;
+       
+	name = gconf_escape_key (gtk_source_language_get_name (lang), -1);
+	g_return_val_if_fail (name != NULL, NULL);
+
+	temp = gconf_concat_dir_and_key (get_gconf_base_dir (), name);
+	g_return_val_if_fail (gconf_valid_key (temp, NULL), NULL);
+
+	g_free (name);
+
+	key = gconf_concat_dir_and_key (temp, k);
+	g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
+
+	g_free (temp);
+	
+	return key;
 }
 
 static GtkSourceLanguage *
@@ -374,6 +439,33 @@ get_language_from_file (const gchar *filename)
 
     	}
 
+	if (lang != NULL)
+	{
+		GConfClient *gconf_client = get_gconf_client ();
+		
+		if (get_gconf_client != NULL)
+		{
+			GSList *mime_types = NULL;
+			gchar *key;
+
+			key = get_gconf_key (lang, "mime_types");
+			g_return_val_if_fail (key != NULL, lang);
+
+			mime_types = gconf_client_get_list (gconf_client,
+							    key,
+							    GCONF_VALUE_STRING, 
+							    NULL);
+
+			/* Get mime types from gconf if needed */
+
+			if (mime_types != NULL)
+			{
+				slist_deep_free (lang->priv->mime_types);
+				lang->priv->mime_types = mime_types;
+			}
+		}
+	}	
+	
 	return lang;
 }
 
@@ -399,6 +491,196 @@ gtk_source_language_get_mime_types (const GtkSourceLanguage *language)
 	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
 
 	return language->priv->mime_types;
+}
+
+GtkSourceLanguage *
+gtk_source_language_get_from_mime_type (const gchar *mime_type)
+{
+	const GSList *languages;
+	g_return_val_if_fail (mime_type != NULL, NULL);
+
+	languages = gtk_source_get_available_languages ();
+
+	while (languages != NULL)
+	{
+		const GSList *mime_types;
+
+		GtkSourceLanguage *lang = GTK_SOURCE_LANGUAGE (languages->data);
+		
+		mime_types = gtk_source_language_get_mime_types (lang);
+
+		while (mime_types != NULL)
+		{
+			/* FIXME: is this right ? - Paolo */
+			if (strcmp ((const gchar*)mime_types->data, mime_type) == 0)
+			{
+				g_object_ref (lang);
+				
+				return lang;
+			}
+
+			mime_types = g_slist_next (mime_types);
+		}
+
+		languages = g_slist_next (languages);
+	}
+
+	return NULL;
+}
+
+const gchar *
+get_gconf_base_dir ()
+{
+	if (gconf_base_dir == NULL)
+		gtk_source_set_gconf_base_dir (NULL);
+
+	g_return_val_if_fail (gconf_base_dir != NULL, NULL);
+
+	return gconf_base_dir;
+}
+
+void 
+gtk_source_set_gconf_base_dir (const gchar *dir)
+{
+	g_free (gconf_base_dir);
+
+	if (dir != NULL)
+		gconf_base_dir = g_strdup (dir);
+	else
+		gconf_base_dir = g_strdup (DEFAULT_GCONF_BASE_DIR);
+}
+
+static GSList *
+get_mime_types_from_file (const gchar *filename)
+{
+	xmlTextReaderPtr reader;
+	gint ret;
+	GSList *mime_types = NULL;
+	
+	reader = xmlNewTextReaderFilename (filename);
+
+	if (reader != NULL) 
+	{
+        	ret = xmlTextReaderRead (reader);
+		
+        	while (ret == 1) 
+		{
+			if (xmlTextReaderNodeType (reader) == 1)
+			{
+				xmlChar *name;
+
+				name = xmlTextReaderName (reader);
+
+				if (strcmp (name, "language") == 0)
+				{
+					gchar *mimetypes;
+					gchar** mtl;
+					gint i;
+
+					mimetypes = xmlTextReaderGetAttribute (reader, "mimetypes");
+					
+					if (mimetypes == NULL)
+					{
+						g_warning ("Impossible to get mimetypes from file '%s'",
+			   				   filename);
+
+						ret = 0;
+					}
+					else
+					{
+
+						mtl = g_strsplit (mimetypes, ";" , 0);
+
+						i = 0; 
+	
+						do
+						{
+							mime_types = g_slist_prepend (mime_types,
+										      g_strdup (mtl[i]));
+
+							++i;
+						} while (mtl[i] != NULL);
+
+						g_strfreev (mtl);
+						xmlFree (mimetypes);
+
+						ret = 0;
+					}
+				}
+
+				xmlFree (name);
+			}
+			
+			if (ret != 0)
+				ret = xmlTextReaderRead (reader);
+			
+		}
+	
+		xmlFreeTextReader (reader);
+        	
+		if (ret != 0) 
+		{
+	            g_warning("Failed to parse '%s'", filename);
+		    return NULL;
+		}
+        }
+	else 
+	{
+		g_warning("Unable to open '%s'", filename);
+
+    	}
+
+	return mime_types;
+}
+
+void 
+gtk_source_language_set_mime_types (GtkSourceLanguage	*language,
+				    GSList		*mime_types)
+{
+	GSList *l;
+	gchar *key;
+	GConfClient *gconf_client;
+	g_return_if_fail (GTK_IS_SOURCE_LANGUAGE (language));
+
+	key = get_gconf_key (language, "mime_types");
+	g_return_if_fail (key != NULL);
+	
+	slist_deep_free (language->priv->mime_types);
+	language->priv->mime_types = NULL;
+
+	/* Dup mime_types */
+	l = mime_types;
+	while (l != NULL)
+	{
+		language->priv->mime_types = g_slist_prepend (language->priv->mime_types,
+							      g_strdup ((const gchar*)l->data));
+		l = g_slist_next (l);
+	}
+	language->priv->mime_types = g_slist_reverse (language->priv->mime_types);
+
+	gconf_client = get_gconf_client ();
+	
+	if (mime_types != NULL)
+	{
+		if (gconf_client != NULL)
+			gconf_client_set_list (gconf_client,
+					       key,
+					       GCONF_VALUE_STRING,
+					       mime_types,
+					       NULL);
+	}
+	else
+	{
+		if (gconf_client != NULL)
+			gconf_client_unset (gconf_client,
+					    key,
+					    NULL);
+					    
+		/* Get mime types from XML file */
+		language->priv->mime_types = get_mime_types_from_file (
+						language->priv->lang_file_name);
+	}
+
 }
 
 

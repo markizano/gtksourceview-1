@@ -54,8 +54,9 @@
 #undef LAZIEST_MODE
 
 /* in milliseconds */
-#define WORKER_TIME_SLICE                   30
+#define WORKER_TIME_SLICE                   40
 #define INITIAL_WORKER_BATCH                40960
+#define MINIMUM_WORKER_BATCH                1024
 
 typedef struct _MarkerSubList        MarkerSubList;
 typedef struct _SyntaxDelimiter      SyntaxDelimiter;
@@ -752,6 +753,7 @@ iter_has_syntax_tag (GtkTextIter *iter)
 	return tag;
 }
 
+
 static GList *
 gtk_source_buffer_get_syntax_entries (const GtkSourceBuffer *buffer)
 {
@@ -1251,6 +1253,7 @@ get_syntax_start (GtkSourceBuffer      *source_buffer,
 	g_return_val_if_fail (length >= 0, NULL);
 	g_return_val_if_fail (match != NULL, NULL);
 	*/
+
 	if (length == 0)
 		return NULL;
 	
@@ -1281,9 +1284,9 @@ get_syntax_start (GtkSourceBuffer      *source_buffer,
 		
 		tag = list->data;
 		
-		l = re_match (&tag->reg_start.buf, text,
-			      match->endindex, match->startindex,
-			      &tag->reg_start.reg);
+		l = gtk_source_regex_match (&tag->reg_start, text,
+					    length, pos);
+
 		if (l >= 0)
 			return tag;
 
@@ -1525,13 +1528,16 @@ build_syntax_regions_table (GtkSourceBuffer *source_buffer,
 
 	/* update worker information */
 	source_buffer->priv->worker_last_offset =
-		gtk_text_iter_is_end (&end) ? -1 :
-		gtk_text_iter_get_offset (&end);
-	head_length = gtk_text_iter_get_offset (&end) -
-		gtk_text_iter_get_offset (&start);
+		gtk_text_iter_is_end (&end) ? -1 : gtk_text_iter_get_offset (&end);
+
+	head_length = gtk_text_iter_get_offset (&end) -	gtk_text_iter_get_offset (&start);
+	
 	if (head_length > 0) {
-		source_buffer->priv->worker_batch_size = head_length * WORKER_TIME_SLICE
-			/ (g_timer_elapsed (timer, NULL) * 1000);
+		source_buffer->priv->worker_batch_size =
+			MAX (head_length * WORKER_TIME_SLICE / 
+					(g_timer_elapsed (timer, NULL) * 1000),
+			     MINIMUM_WORKER_BATCH);
+
 		/* make sure the analyzed region gets highlighted */
 		refresh_range (source_buffer, &start, &end);
 	}
@@ -1779,10 +1785,8 @@ check_pattern (GtkSourceBuffer *source_buffer,
 							  offset +
 							  m.endpos);
 
-				gtk_text_buffer_apply_tag (GTK_TEXT_BUFFER
-							   (source_buffer),
-							   GTK_TEXT_TAG
-							   (tag),
+				gtk_text_buffer_apply_tag (GTK_TEXT_BUFFER (source_buffer),
+							   GTK_TEXT_TAG (tag),
 							   &start_iter,
 							   &end_iter);
 				offset += m.endpos;
@@ -1856,8 +1860,7 @@ highlight_region (GtkSourceBuffer *source_buffer,
 		/* do the highlighting for the selected region */
 		if (current_tag) {
 			/* apply syntax tag from b_iter to e_iter */
-			gtk_text_buffer_apply_tag (GTK_TEXT_BUFFER
-						   (source_buffer),
+			gtk_text_buffer_apply_tag (GTK_TEXT_BUFFER (source_buffer),
 						   GTK_TEXT_TAG (current_tag),
 						   &b_iter,
 						   &e_iter);
@@ -1945,7 +1948,8 @@ gtk_source_buffer_highlight_region (GtkSourceBuffer *source_buffer,
 				    GtkTextIter     *end)
 {
 	g_return_if_fail (source_buffer != NULL);
-	g_return_if_fail (start != NULL && end != NULL);
+	g_return_if_fail (start != NULL);
+       	g_return_if_fail (end != NULL);
 
 	if (!source_buffer->priv->highlight)
 		return;

@@ -1,5 +1,6 @@
 INCLUDES = \
 	$(WARN_CFLAGS) \
+	-DDATADIR=\""$(datadir)"\" \
 	-DG_LOG_DOMAIN=\"GtkSourceView\" \
 	-I$(top_srcdir) \
 	-I$(top_srcdir)/src \

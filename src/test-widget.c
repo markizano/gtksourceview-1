@@ -334,7 +334,7 @@ test_source (GtkSourceBuffer *buffer)
 	*/
 	g_slist_free (keywords);
 	
-	g_object_set (G_OBJECT (tag), "foreground", "blue", NULL);
+	g_object_set (G_OBJECT (tag), "foreground", "navy", /*"weight", PANGO_WEIGHT_BOLD,*/ NULL);
 	list = g_list_append (list, (gpointer) tag);
 
 	tag = gtk_pattern_tag_new ("gtk_functions", "\\b\\(gtk\\|gdk\\|g\\|gnome\\)_[a-zA-Z0-9_]+");
@@ -349,13 +349,6 @@ test_source (GtkSourceBuffer *buffer)
 	g_object_set (G_OBJECT (tag), "foreground", "red", NULL);
 	list = g_list_append (list, (gpointer) tag);
 */
-	tag = gtk_pattern_tag_new ("keywords",
-				   "\\b\\(do\\|while\\|for\\|if\\|else\\|switch\\|case\\|"
-				   "return\\|public\\|protected\\|private\\|false\\|"
-				   "true\\|break\\|extern\\|inline\\|this\\|dynamic_cast\\|"
-				   "static_cast\\|template\\|cin\\|cout\\)\\b");
-	g_object_set (G_OBJECT (tag), "foreground", "blue", "weight", PANGO_WEIGHT_BOLD, NULL);
-	list = g_list_append (list, (gpointer) tag);
 
 	tag = gtk_pattern_tag_new ("operators",
 				   "\\(\\*\\|\\*\\*\\|->\\|::\\|<<\\|>>\\|>\\|<\\|=\\|==\\|!=\\|<=\\|>=\\|++\\|--\\|%\\|+\\|-\\|||\\|&&\\|!\\|+=\\|-=\\|\\*=\\|/=\\|%=\\)");
@@ -379,15 +372,19 @@ test_source (GtkSourceBuffer *buffer)
 	keywords = g_slist_append (keywords, "undef");
 
 	tag = gtk_keyword_tag_new ("defs", keywords, TRUE, FALSE, TRUE, "^[ \t]*#[ \t]*", NULL);
-/*
-	tag = gtk_pattern_tag_new ("defs",
-				   "^#[ \t]*\\(include\\|if\\|ifdef\\|ifndef\\|else\\|elif\\|define\\|endif\\|pragma\\|undef\\)\\b");
-*/
-	g_slist_free (keywords);
-
 	g_object_set (G_OBJECT (tag), "foreground", "tomato3", NULL);
 	list = g_list_append (list, (gpointer) tag);
+	g_slist_free (keywords);
 
+	tag = gtk_pattern_tag_new ("keywords",
+				   "\\b\\(do\\|while\\|for\\|if\\|else\\|switch\\|case\\|"
+				   "return\\|public\\|protected\\|private\\|false\\|"
+				   "true\\|break\\|extern\\|inline\\|this\\|dynamic_cast\\|"
+				   "static_cast\\|template\\|cin\\|cout\\)\\b");
+	g_object_set (G_OBJECT (tag), "foreground", "blue", "weight", PANGO_WEIGHT_BOLD, NULL);
+	list = g_list_append (list, (gpointer) tag);
+
+	
 	tag = gtk_line_comment_tag_new ("comment", "//");
 	g_object_set (G_OBJECT (tag), "foreground", "gray", "style", PANGO_STYLE_ITALIC, NULL);
 	list = g_list_append (list, (gpointer) tag);
@@ -600,6 +597,8 @@ main (int argc, char *argv[])
 	{
 		GSList *dirs = NULL;
 		const GSList *langs;
+		GtkSourceLanguage *language;
+		GSList *types = NULL;
 		
 		dirs = g_slist_prepend (dirs, ".");
 				
@@ -625,11 +624,33 @@ main (int argc, char *argv[])
 				mime_types = g_slist_next (mime_types);
 			}
 
-			g_print ("\n");
+			g_print ("\n\n");
 
 			langs = g_slist_next (langs);
 		}
-					
+
+		types = g_slist_prepend (types, "text/test");
+		gtk_source_language_set_mime_types (
+				GTK_SOURCE_LANGUAGE (gtk_source_get_available_languages ()->data),
+				types);
+		g_slist_free (types);
+
+		g_print ("Get language from mime type: text/test\n\n");
+		
+		language = gtk_source_language_get_from_mime_type ("text/test");
+		
+		if (language != NULL)
+		{
+			g_print ("Name: %s\n", gtk_source_language_get_name (language));
+			g_object_unref (language);
+		}
+		else
+			g_print ("No language found.");	
+
+		gtk_source_language_set_mime_types (
+				GTK_SOURCE_LANGUAGE (gtk_source_get_available_languages ()->data),
+				NULL);
+		
 	}
 
 	gtk_widget_set_usize (window, 400, 500);
