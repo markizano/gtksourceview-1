@@ -25,10 +25,13 @@
 
 #include <libxml/xmlreader.h>
 
-#include "gtksourcelanguage-private.h"
 #include "gtksourceview-i18n.h"
-#include "gtksourcelanguage.h"
 #include "gtksourcetag.h"
+#include "gtksourcebuffer.h"
+#include "gtksourcelanguage.h"
+#include "gtksourcelanguagesmanager.h"
+#include "gtksourcelanguage-private.h"
+#include "gtksourcesimpleengine.h"
 
 #include "gtksourceview-marshal.h"
 
@@ -39,6 +42,10 @@ static void		  gtk_source_language_finalize 		(GObject 			*object);
 static GtkSourceLanguage *process_language_node 		(xmlTextReaderPtr 		 reader, 
 								 const gchar 			*filename);
 static GSList 		 *get_mime_types_from_file 		(GtkSourceLanguage 		*language);
+static void               tag_style_changed_cb                  (GtkSourceLanguage              *language,
+								 const gchar                    *id,
+								 GtkSourceTag                   *tag);
+
 
 /* Signals */
 enum {
@@ -335,7 +342,11 @@ process_language_node (xmlTextReaderPtr reader, const gchar *filename)
 	}
 	else
 	{
-		if (strcmp (version , "1.0") != 0)
+		if (strcmp (version , "1.0") == 0)
+		{
+			lang->priv->version = GTK_SOURCE_LANGUAGE_VERSION_1_0;
+		}
+		else
 		{
 			g_warning ("Usupported language spec version '%s' in file '%s'",
 				   version, filename);
@@ -430,6 +441,14 @@ gtk_source_language_get_section	(GtkSourceLanguage *language)
 	g_return_val_if_fail (language->priv->section != NULL, NULL);
 
 	return g_strdup (language->priv->section);
+}
+
+gint 	
+gtk_source_language_get_version (GtkSourceLanguage *language)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), 0);
+
+	return language->priv->version;
 }
 
 GSList *
@@ -605,12 +624,135 @@ strconvescape (gchar *source)
 	return source;
 }
 
-
-static GtkTextTag *
-parseLineComment (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
+static gchar *
+case_insesitive_keyword (const gchar *keyword)
 {
-	GtkTextTag *tag = NULL;
+	GString *str;
+	gint length;
 	
+	const gchar *cur;
+	const gchar *end;
+
+	g_return_val_if_fail (keyword != NULL, NULL);
+
+	length = strlen (keyword);
+
+	str = g_string_new ("");
+
+	cur = keyword;
+	end = keyword + length;
+	
+	while (cur != end) 
+	{
+		gunichar cur_char;
+		cur_char = g_utf8_get_char (cur);
+		
+		if (((cur_char >= 'A') && (cur_char <= 'Z')) ||
+		    ((cur_char >= 'a') && (cur_char <= 'z')))
+		{
+			gunichar cur_char_upper;
+		       	gunichar cur_char_lower;
+	
+			cur_char_upper = g_unichar_toupper (cur_char);
+			cur_char_lower = g_unichar_tolower (cur_char);
+		
+			g_string_append_c (str, '[');
+			g_string_append_unichar (str, cur_char_lower);
+			g_string_append_unichar (str, cur_char_upper);
+			g_string_append_c (str, ']');
+		}
+		else
+			g_string_append_unichar (str, cur_char);
+
+		cur = g_utf8_next_char (cur);
+	}
+			
+	return g_string_free (str, FALSE);
+}
+
+static gchar * 
+build_keyword_list (const gchar  *id,
+		    const GSList *keywords,
+		    gboolean      case_sensitive,
+		    gboolean      match_empty_string_at_beginning,
+		    gboolean      match_empty_string_at_end,
+		    const gchar  *beginning_regex,
+		    const gchar  *end_regex)
+{
+	GString *str;
+	gint keyword_count;
+	
+	g_return_val_if_fail (keywords != NULL, NULL);
+
+	str =  g_string_new ("");
+
+	if (keywords != NULL)
+	{
+		if (match_empty_string_at_beginning)
+			g_string_append (str, "\\b");
+
+		if (beginning_regex != NULL)
+			g_string_append (str, beginning_regex);
+
+		g_string_append (str, "(");
+	
+		keyword_count = 0;
+		/* Due to a bug in GNU libc regular expressions
+		 * implementation we can't have keyword lists of more
+		 * than 250 or so elements, so we truncate such a
+		 * list.  This is a temporary solution, as the correct
+		 * approach would be to generate multiple keyword
+		 * lists.  (See bug #110991) */
+
+#define KEYWORD_LIMIT 250
+
+		while (keywords != NULL && keyword_count < KEYWORD_LIMIT)
+		{
+			gchar *k;
+			
+			if (case_sensitive)
+				k = (gchar*)keywords->data;
+			else
+				k = case_insesitive_keyword ((gchar*)keywords->data);
+			
+			g_string_append (str, k);
+			
+			if (!case_sensitive)
+				g_free (k);
+			
+			keywords = g_slist_next (keywords);
+			
+			keyword_count++;
+			
+			if (keywords != NULL && keyword_count < KEYWORD_LIMIT)
+				g_string_append (str, "|");
+		}
+		g_string_append (str, ")");
+		
+		if (keyword_count >= KEYWORD_LIMIT)
+		{
+			g_warning ("Keyword list '%s' too long. Only the first %d "
+				   "elements will be highlighted. See bug #110991 for "
+				   "further details.", id, KEYWORD_LIMIT);
+		}
+
+		if (end_regex != NULL)
+			g_string_append (str, end_regex);
+		
+		if (match_empty_string_at_end)
+			g_string_append (str, "\\b");
+	}
+
+	return g_string_free (str, FALSE);
+}
+
+static void 
+parseLineComment (xmlDocPtr              doc,
+		  xmlNodePtr             cur,
+		  gchar                 *id,
+		  xmlChar               *style,
+		  GtkSourceSimpleEngine *se)
+{
 	xmlNodePtr child;
 
 	child = cur->xmlChildrenNode;
@@ -621,7 +763,9 @@ parseLineComment (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
 			
 		start_regex = xmlNodeListGetString (doc, child->xmlChildrenNode, 1);
 			
-		tag = gtk_line_comment_tag_new (id, name, strconvescape (start_regex));
+		gtk_source_simple_engine_add_syntax_pattern (se, id, style,
+							     strconvescape (start_regex), 
+							     "\n");
 
 		xmlFree (start_regex);
 	}
@@ -630,15 +774,15 @@ parseLineComment (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
 		g_warning ("Missing start-regex in tag 'line-comment' (%s, line %ld)", 
 			   doc->name, xmlGetLineNo (child));
 	}
-
-	return tag;
 }
 
-static GtkTextTag *
-parseBlockComment (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
+static void
+parseBlockComment (xmlDocPtr              doc,
+		   xmlNodePtr             cur,
+		   gchar                 *id,
+		   xmlChar               *style,
+		   GtkSourceSimpleEngine *se)
 {
-	GtkTextTag *tag = NULL;
-
 	xmlChar *start_regex = NULL;
 	xmlChar *end_regex = NULL;
 
@@ -666,7 +810,7 @@ parseBlockComment (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
 		g_warning ("Missing start-regex in tag 'block-comment' (%s, line %ld)", 
 			   doc->name, xmlGetLineNo (cur));
 
-		return NULL;
+		return;
 	}
 
 	if (end_regex == NULL)
@@ -676,25 +820,24 @@ parseBlockComment (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
 		g_warning ("Missing end-regex in tag 'block-comment' (%s, line %ld)", 
 			   doc->name, xmlGetLineNo (cur));
 
-		return NULL;
+		return;
 	}
 
-	tag = gtk_block_comment_tag_new (id,
-					 name, 
-					 strconvescape (start_regex), 
-					 strconvescape (end_regex));
-
+	gtk_source_simple_engine_add_syntax_pattern (se, id, style,
+						     strconvescape (start_regex), 
+						     strconvescape (end_regex));
+	
 	xmlFree (start_regex);
 	xmlFree (end_regex);
-
-	return tag;
 }
 
-static GtkTextTag *
-parseString (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
+static void
+parseString (xmlDocPtr              doc,
+	     xmlNodePtr             cur,
+	     gchar                 *id,
+	     xmlChar               *style,
+	     GtkSourceSimpleEngine *se)
 {
-	GtkTextTag *tag = NULL;
-
 	xmlChar *start_regex = NULL;
 	xmlChar *end_regex = NULL;
 
@@ -738,7 +881,7 @@ parseString (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
 		g_warning ("Missing start-regex in tag 'string' (%s, line %ld)", 
 			   doc->name, xmlGetLineNo (cur));
 
-		return NULL;
+		return;
 	}
 
 	if (end_regex == NULL)
@@ -748,26 +891,40 @@ parseString (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
 		g_warning ("Missing end-regex in tag 'string' (%s, line %ld)", 
 			   doc->name, xmlGetLineNo (cur));
 
-		return NULL;
+		return;
 	}
 
-	tag = gtk_string_tag_new (id,
-				  name, 
-				  strconvescape (start_regex), 
-				  strconvescape (end_regex), 
-				  end_at_line_end);
+	strconvescape (start_regex);
+	strconvescape (end_regex);
+	
+	if (!end_at_line_end)
+		gtk_source_simple_engine_add_syntax_pattern (se, id, style,
+							     start_regex,
+							     end_regex);
+	else
+	{
+		gchar *end;
+		
+		end = g_strdup_printf ("%s|\n", end_regex);
+
+		gtk_source_simple_engine_add_syntax_pattern (se, id, style,
+							     start_regex,
+							     end);
+		
+		g_free (end);
+	}
 
 	xmlFree (start_regex);
 	xmlFree (end_regex);
-
-	return tag;
 }
 
-static GtkTextTag *
-parseKeywordList (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
+static void
+parseKeywordList (xmlDocPtr              doc,
+		  xmlNodePtr             cur,
+		  gchar                 *id,
+		  xmlChar               *style,
+		  GtkSourceSimpleEngine *se)
 {
-	GtkTextTag *tag = NULL;
-
 	gboolean case_sensitive = TRUE;
 	gboolean match_empty_string_at_beginning = TRUE;
 	gboolean match_empty_string_at_end = TRUE;
@@ -775,7 +932,8 @@ parseKeywordList (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
 	gchar  *end_regex = NULL;
 
 	GSList *list = NULL;
-
+	gchar *regex;
+	
 	xmlChar *prop;
 
 	xmlNodePtr child;
@@ -860,17 +1018,16 @@ parseKeywordList (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
 		g_free (beginning_regex),
 		g_free (end_regex);
 		
-		return NULL;
+		return;
 	}
 
-	tag = gtk_keyword_list_tag_new (id,
-					name, 
-					list,
-					case_sensitive,
-					match_empty_string_at_beginning,
-					match_empty_string_at_end,
-					strconvescape (beginning_regex),
-					strconvescape (end_regex));
+	regex = build_keyword_list (id,
+				    list,
+				    case_sensitive,
+				    match_empty_string_at_beginning,
+				    match_empty_string_at_end,
+				    strconvescape (beginning_regex),
+				    strconvescape (end_regex));
 
 	g_free (beginning_regex),
 	g_free (end_regex);
@@ -878,14 +1035,18 @@ parseKeywordList (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
 	g_slist_foreach (list, (GFunc) xmlFree, NULL);
 	g_slist_free (list);
 
-	return tag;
+	gtk_source_simple_engine_add_simple_pattern (se, id, style, regex);
+
+	g_free (regex);
 }
 
-static GtkTextTag *
-parsePatternItem (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
+static void 
+parsePatternItem (xmlDocPtr              doc,
+		  xmlNodePtr             cur,
+		  gchar                 *id,
+		  xmlChar               *style,
+		  GtkSourceSimpleEngine *se)
 {
-	GtkTextTag *tag = NULL;
-	
 	xmlNodePtr child;
 
 	child = cur->xmlChildrenNode;
@@ -896,7 +1057,8 @@ parsePatternItem (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
 			
 		regex = xmlNodeListGetString (doc, child->xmlChildrenNode, 1);
 			
-		tag = gtk_pattern_tag_new (id, name, strconvescape (regex));
+		gtk_source_simple_engine_add_simple_pattern (se, id, style,
+							     strconvescape (regex));
 
 		xmlFree (regex);
 	}
@@ -905,15 +1067,15 @@ parsePatternItem (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
 		g_warning ("Missing regex in tag 'pattern-item' (%s, line %ld)", 
 			   doc->name, xmlGetLineNo (child));
 	}
-
-	return tag;
 }
 
-static GtkTextTag *
-parseSyntaxItem (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
+static void 
+parseSyntaxItem (xmlDocPtr              doc,
+		 xmlNodePtr             cur,
+		 const gchar           *id,
+		 xmlChar               *style,
+		 GtkSourceSimpleEngine *se)
 {
-	GtkTextTag *tag = NULL;
-
 	xmlChar *start_regex = NULL;
 	xmlChar *end_regex = NULL;
 
@@ -941,7 +1103,7 @@ parseSyntaxItem (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
 		g_warning ("Missing start-regex in tag 'syntax-item' (%s, line %ld)", 
 			   doc->name, xmlGetLineNo (cur));
 
-		return NULL;
+		return;
 	}
 
 	if (end_regex == NULL)
@@ -951,47 +1113,25 @@ parseSyntaxItem (xmlDocPtr doc, xmlNodePtr cur, gchar* id, xmlChar *name)
 		g_warning ("Missing end-regex in tag 'syntax-item' (%s, line %ld)", 
 			   doc->name, xmlGetLineNo (cur));
 
-		return NULL;
+		return;
 	}
 
-	tag = gtk_syntax_tag_new (id,
-				  name, 
-				  strconvescape (start_regex),
-				  strconvescape (end_regex));
+	gtk_source_simple_engine_add_syntax_pattern (se, id, style,
+						     strconvescape (start_regex),
+						     strconvescape (end_regex));
 
 	xmlFree (start_regex);
 	xmlFree (end_regex);
-
-	return tag;
 }
 
 static void 
-tag_style_changed_cb (GtkSourceLanguage *language,
-		      const gchar       *id,
-		      GtkSourceTag	*tag)
+parseTag (GtkSourceLanguage     *language,
+	  xmlDocPtr              doc,
+	  xmlNodePtr             cur,
+	  GSList               **tags,
+	  GtkSourceSimpleEngine *engine,
+	  gboolean               populate_styles_table)
 {
-	GtkSourceTagStyle *ts;
-
-	if (strcmp (gtk_source_tag_get_id (tag), id) != 0)
-		return;
-
-	ts = gtk_source_language_get_tag_style (language, id);
-
-	if (ts != NULL)
-	{
-		gtk_source_tag_set_style (GTK_SOURCE_TAG (tag), ts);
-		gtk_source_tag_style_free (ts);
-	}
-}
-
-static GSList *
-parseTag (GtkSourceLanguage *language, 
-	  xmlDocPtr          doc, 
-	  xmlNodePtr         cur, 
-	  GSList            *tag_list, 
-	  gboolean           populate_styles_table)
-{
-	GtkTextTag *tag = NULL;
 	xmlChar *name;
 	xmlChar *style;
 	xmlChar *id_temp;
@@ -1015,10 +1155,10 @@ parseTag (GtkSourceLanguage *language,
 
 	if (name == NULL)
 	{
-		return tag_list;	
+		return;
 	}
 
-	g_return_val_if_fail (id_temp != NULL, tag_list);
+	g_return_if_fail (id_temp != NULL);
 	id = escape_id (id_temp, -1);
 	xmlFree (id_temp);
 
@@ -1028,45 +1168,50 @@ parseTag (GtkSourceLanguage *language,
 		style = xmlStrdup ("Normal");
 	}
 	
-	if (!xmlStrcmp (cur->name, (const xmlChar *)"line-comment"))
+	if (engine)
 	{
-		tag = parseLineComment (doc, cur, id, name);		
+		if (!xmlStrcmp (cur->name, (const xmlChar *)"line-comment"))
+		{
+			parseLineComment (doc, cur, id, style, engine);
+		}
+		else if (!xmlStrcmp (cur->name, (const xmlChar *)"block-comment"))
+		{
+			parseBlockComment (doc, cur, id, style, engine);		
+		}
+		else if (!xmlStrcmp (cur->name, (const xmlChar *)"string"))
+		{
+			parseString (doc, cur, id, style, engine);
+		}
+		else if (!xmlStrcmp (cur->name, (const xmlChar *)"keyword-list"))
+		{
+			parseKeywordList (doc, cur, id, style, engine);
+		}
+		else if (!xmlStrcmp (cur->name, (const xmlChar *)"pattern-item"))
+		{
+			parsePatternItem (doc, cur, id, style, engine);
+		}
+		else if (!xmlStrcmp (cur->name, (const xmlChar *)"syntax-item"))
+		{
+			parseSyntaxItem (doc, cur, id, style, engine);
+		}
+		else
+		{
+			g_print ("Unknown tag: %s\n", cur->name);
+		}
 	}
-	else if (!xmlStrcmp (cur->name, (const xmlChar *)"block-comment"))
-	{
-		tag = parseBlockComment (doc, cur, id, name);		
-	}
-	else if (!xmlStrcmp (cur->name, (const xmlChar *)"string"))
-	{
-		tag = parseString (doc, cur, id, name);		
-	}
-	else if (!xmlStrcmp (cur->name, (const xmlChar *)"keyword-list"))
-	{
-		tag = parseKeywordList (doc, cur, id, name);		
-	}
-	else if (!xmlStrcmp (cur->name, (const xmlChar *)"pattern-item"))
-	{
-		tag = parsePatternItem (doc, cur, id, name);		
-	}
-	else if (!xmlStrcmp (cur->name, (const xmlChar *)"syntax-item"))
-	{
-		tag = parseSyntaxItem (doc, cur, id, name);		
-	}
-	else
-	{
-		g_print ("Unknown tag: %s\n", cur->name);
-	}
+	
+	if (populate_styles_table)
+		g_hash_table_insert (language->priv->tag_id_to_style_name, 
+				     g_strdup (id), 
+				     g_strdup (style));
 
-	if (tag != NULL)
+	if (tags)
 	{
+		GtkTextTag *tag;
 		GtkSourceTagStyle *ts;
-		
-		tag_list = g_slist_prepend (tag_list, tag);
 
-		if (populate_styles_table)
-			g_hash_table_insert (language->priv->tag_id_to_style_name, 
-					     g_strdup (id), 
-					     g_strdup (style));
+		tag = gtk_source_tag_new (id, name);
+		*tags = g_slist_prepend (*tags, tag);
 
 		ts = gtk_source_language_get_tag_style (language, id);
 
@@ -1086,16 +1231,14 @@ parseTag (GtkSourceLanguage *language,
 	xmlFree (name);
 	xmlFree (style);
 	g_free (id);
-
-	return tag_list;
 }
 
-static GSList *
-language_file_parse (GtkSourceLanguage *language,
-		     gboolean           get_tags,
-		     gboolean           populate_styles_table)
+static gboolean 
+language_file_parse (GtkSourceLanguage     *language,
+		     GSList               **tags,
+		     GtkSourceSimpleEngine *engine,
+		     gboolean               populate_styles_table)
 {
-	GSList *tag_list = NULL;
 	xmlDocPtr doc;
 	xmlNodePtr cur;
 
@@ -1106,7 +1249,7 @@ language_file_parse (GtkSourceLanguage *language,
 	{
 		g_warning ("Impossible to parse file '%s'",
 			   language->priv->lang_file_name);
-		return NULL;
+		return FALSE;
 	}
 
 	cur = xmlDocGetRootElement (doc);
@@ -1117,7 +1260,7 @@ language_file_parse (GtkSourceLanguage *language,
 			   language->priv->lang_file_name);
 
 		xmlFreeDoc (doc);
-		return NULL;
+		return FALSE;
 	}
 
 	if (xmlStrcmp (cur->name, (const xmlChar *) "language")) {
@@ -1125,7 +1268,7 @@ language_file_parse (GtkSourceLanguage *language,
 			   language->priv->lang_file_name);
 		
 		xmlFreeDoc (doc);
-		return NULL;
+		return FALSE;
 	}
 
 	/* FIXME: check that the language name, version, etc. are the 
@@ -1133,7 +1276,7 @@ language_file_parse (GtkSourceLanguage *language,
 
 	cur = xmlDocGetRootElement (doc);
 	cur = cur->xmlChildrenNode;
-	g_return_val_if_fail (cur != NULL, NULL);
+	g_return_val_if_fail (cur != NULL, FALSE);
 	
 	while (cur != NULL)
 	{
@@ -1152,28 +1295,60 @@ language_file_parse (GtkSourceLanguage *language,
 			}
 			xmlFree (escape);
 			language->priv->escape_char = esc_char;
+
+			if (engine)
+				gtk_source_simple_engine_set_escape_char (engine, esc_char);
 			
-			if (!get_tags)
+			if (!tags && !engine)
 				break;
 		}
-		else if (get_tags)
+		else if (tags || engine)
 		{
-			tag_list = parseTag (language,
-					     doc, 
-					     cur, 
-					     tag_list, 
-					     populate_styles_table);
+			parseTag (language,
+				  doc, 
+				  cur, 
+				  tags,
+				  engine,
+				  populate_styles_table);
 		}
 		
 		cur = cur->next;
 	}
 	language->priv->escape_char_valid = TRUE;
 
-	tag_list = g_slist_reverse (tag_list);
+	if (tags)
+		*tags = g_slist_reverse (*tags);
       
 	xmlFreeDoc (doc);
 
-	return tag_list;
+	return TRUE;
+}
+
+/* Tags managment ------------------------------------------------------ */
+
+static void 
+tag_style_changed_cb (GtkSourceLanguage *language,
+		      const gchar       *id,
+		      GtkSourceTag	*tag)
+{
+	GtkSourceTagStyle *ts;
+	gchar *tag_id;
+
+	g_object_get (G_OBJECT (tag), "name", &tag_id, NULL);
+	if (strcmp (tag_id, id) != 0)
+	{
+		g_free (tag_id);
+		return;
+	}
+	g_free (tag_id);
+
+	ts = gtk_source_language_get_tag_style (language, id);
+
+	if (ts != NULL)
+	{
+		gtk_source_tag_set_style (GTK_SOURCE_TAG (tag), ts);
+		gtk_source_tag_style_free (ts);
+	}
 }
 
 GSList *
@@ -1188,21 +1363,24 @@ gtk_source_language_get_tags (GtkSourceLanguage *language)
 	{
 		g_return_val_if_fail (language->priv->tag_id_to_style == NULL, NULL);
 
-		language->priv->tag_id_to_style_name = g_hash_table_new_full ((GHashFunc)g_str_hash,
-										(GEqualFunc)g_str_equal,
-										(GDestroyNotify)g_free,
-										(GDestroyNotify)g_free);
+		language->priv->tag_id_to_style_name =
+			g_hash_table_new_full ((GHashFunc)g_str_hash,
+					       (GEqualFunc)g_str_equal,
+					       (GDestroyNotify)g_free,
+					       (GDestroyNotify)g_free);
 
-		language->priv->tag_id_to_style = g_hash_table_new_full ((GHashFunc)g_str_hash,
-									   (GEqualFunc)g_str_equal,
-									   (GDestroyNotify)g_free,
-									   (GDestroyNotify)gtk_source_tag_style_free);
+		language->priv->tag_id_to_style =
+			g_hash_table_new_full ((GHashFunc)g_str_hash,
+					       (GEqualFunc)g_str_equal,
+					       (GDestroyNotify)g_free,
+					       (GDestroyNotify)gtk_source_tag_style_free);
 
 		populate_styles_table = TRUE;
 	}
 
-	tag_list = language_file_parse (language, TRUE, populate_styles_table);
-
+	if (language->priv->version == GTK_SOURCE_LANGUAGE_VERSION_1_0)
+		language_file_parse (language, &tag_list, NULL, populate_styles_table);
+	
 	return tag_list;
 }
 
@@ -1390,13 +1568,26 @@ gtk_source_language_set_style_scheme (GtkSourceLanguage    *language,
 			  G_CALLBACK (style_changed_cb), language);
 }
 
-gunichar 
-gtk_source_language_get_escape_char (GtkSourceLanguage *language)
-{
-	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), 0);
+/* Highlighting engine creation ------------------------------------------ */
 
-	if (!language->priv->escape_char_valid)
-		language_file_parse (language, FALSE, FALSE);
-		
-	return language->priv->escape_char;
+GtkSourceEngine *
+gtk_source_language_create_engine (GtkSourceLanguage *language)
+{
+	GtkSourceEngine *engine = NULL;
+
+	if (language->priv->version == GTK_SOURCE_LANGUAGE_VERSION_1_0)
+	{
+		engine = gtk_source_simple_engine_new ();
+		if (!language_file_parse (language,
+					  NULL,
+					  GTK_SOURCE_SIMPLE_ENGINE (engine),
+					  FALSE))
+		{
+			g_object_unref (engine);
+			engine = NULL;
+		}
+	}
+	
+	return engine;
 }
+

@@ -38,7 +38,7 @@
 #include "gtksourceview-marshal.h"
 
 #include "gtksourceiter.h"
-#include "gtksourcesimpleengine.h"
+#include "gtksourceengine.h"
 #include "gtksourcetag.h"
 
 /*
@@ -60,13 +60,15 @@ enum {
 	CAN_REDO,
 	HIGHLIGHT_UPDATED,
 	MARKER_UPDATED,
+	TEXT_INSERTED,
+	TEXT_DELETED,
+	UPDATE_HIGHLIGHT,
 	LAST_SIGNAL
 };
 
 /* Properties */
 enum {
 	PROP_0,
-	PROP_ESCAPE_CHAR,
 	PROP_CHECK_BRACKETS,
 	PROP_HIGHLIGHT,
 	PROP_MAX_UNDO_LEVELS,
@@ -82,8 +84,6 @@ struct _GtkSourceBufferPrivate
 	GtkTextMark           *bracket_mark;
 	guint                  bracket_found:1;
 
-	gunichar               escape_char;
-	
 	GArray                *markers;
 
 	GtkSourceLanguage     *language;
@@ -121,9 +121,9 @@ static void 	 gtk_source_buffer_can_redo_handler	(GtkSourceUndoManager    *um,
 							 gboolean                 can_redo,
 							 GtkSourceBuffer         *buffer);
 
-static void 	 gtk_source_buffer_move_cursor		(GtkTextBuffer           *buffer,
-							 GtkTextIter             *iter,
-							 GtkTextMark             *mark, 
+static void      gtk_source_buffer_move_cursor          (GtkTextBuffer           *buffer,
+							 const GtkTextIter       *iter,
+							 GtkTextMark             *mark,
 							 gpointer                 data);
 
 static void 	 gtk_source_buffer_real_insert_text 	(GtkTextBuffer           *buffer,
@@ -186,20 +186,14 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 	klass->can_redo 	 = NULL;
 	klass->highlight_updated = NULL;
 	klass->marker_updated    = NULL;
+	klass->text_inserted     = NULL;
+	klass->text_deleted      = NULL;
+	klass->update_highlight  = NULL;
 	
 	/* Do not set these signals handlers directly on the parent_class since
 	 * that will cause problems (a loop). */
 	tb_class->insert_text 	= gtk_source_buffer_real_insert_text;
 	tb_class->delete_range 	= gtk_source_buffer_real_delete_range;
-
-	g_object_class_install_property (object_class,
-					 PROP_ESCAPE_CHAR,
-					 g_param_spec_unichar ("escape_char",
-							       _("Escape Character"),
-							       _("Escaping character "
-								 "for syntax patterns"),
-							       0,
-							       G_PARAM_READWRITE));
 
 	g_object_class_install_property (object_class,
 					 PROP_CHECK_BRACKETS,
@@ -283,6 +277,43 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 			  G_TYPE_NONE, 
 			  1, 
 			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE);
+
+	buffer_signals[TEXT_INSERTED] =
+	    g_signal_new ("text_inserted",
+			  G_OBJECT_CLASS_TYPE (object_class),
+			  G_SIGNAL_RUN_LAST,
+			  G_STRUCT_OFFSET (GtkSourceBufferClass, text_inserted),
+			  NULL, NULL,
+			  gtksourceview_marshal_VOID__BOXED_BOXED,
+			  G_TYPE_NONE, 
+			  2, 
+			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE,
+			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE);
+
+	buffer_signals[TEXT_DELETED] =
+	    g_signal_new ("text_deleted",
+			  G_OBJECT_CLASS_TYPE (object_class),
+			  G_SIGNAL_RUN_LAST,
+			  G_STRUCT_OFFSET (GtkSourceBufferClass, text_deleted),
+			  NULL, NULL,
+			  gtksourceview_marshal_VOID__BOXED_STRING,
+			  G_TYPE_NONE, 
+			  2, 
+			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE,
+			  G_TYPE_STRING | G_SIGNAL_TYPE_STATIC_SCOPE);
+
+	buffer_signals[UPDATE_HIGHLIGHT] =
+	    g_signal_new ("update_highlight",
+			  G_OBJECT_CLASS_TYPE (object_class),
+			  G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
+			  G_STRUCT_OFFSET (GtkSourceBufferClass, update_highlight),
+			  NULL, NULL,
+			  gtksourceview_marshal_VOID__BOXED_BOXED_BOOLEAN,
+			  G_TYPE_NONE, 
+			  3, 
+			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE,
+			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE,
+			  G_TYPE_BOOLEAN);
 }
 
 static void
@@ -335,7 +366,7 @@ gtk_source_buffer_constructor (GType                  type,
 		if (!strcmp ("tag-table", construct_param [i].pspec->name) &&
 		    g_value_get_object (construct_param [i].value) == NULL)
 		{
-#if (GLIB_MINOR_VERSION <= 2)
+#if (GLIB_MAJOR_VERSION == 2 && GLIB_MINOR_VERSION <= 2)
 			g_value_set_object_take_ownership (construct_param [i].value,
 							   gtk_source_tag_table_new ());
 #else
@@ -446,11 +477,6 @@ gtk_source_buffer_set_property (GObject      *object,
     
 	switch (prop_id)
 	{
-		case PROP_ESCAPE_CHAR:
-			gtk_source_buffer_set_escape_char (source_buffer,
-							   g_value_get_uint (value));
-			break;
-			
 		case PROP_CHECK_BRACKETS:
 			gtk_source_buffer_set_check_brackets (source_buffer,
 							      g_value_get_boolean (value));
@@ -491,10 +517,6 @@ gtk_source_buffer_get_property (GObject    *object,
     
 	switch (prop_id)
 	{
-		case PROP_ESCAPE_CHAR:
-			g_value_set_uint (value, source_buffer->priv->escape_char);
-			break;
-			
 		case PROP_CHECK_BRACKETS:
 			g_value_set_boolean (value, source_buffer->priv->check_brackets);
 			break;
@@ -590,11 +612,11 @@ gtk_source_buffer_can_redo_handler (GtkSourceUndoManager  	*um,
 		       can_redo);
 }
 
-static void
-gtk_source_buffer_move_cursor (GtkTextBuffer *buffer,
-			       GtkTextIter   *iter, 
-			       GtkTextMark   *mark, 
-			       gpointer       data)
+static void 
+gtk_source_buffer_move_cursor (GtkTextBuffer     *buffer,
+			       const GtkTextIter *iter,
+			       GtkTextMark       *mark,
+			       gpointer           data)
 {
 	GtkTextIter iter1, iter2;
 
@@ -656,11 +678,16 @@ gtk_source_buffer_real_insert_text (GtkTextBuffer *buffer,
 				    const gchar   *text, 
 				    gint           len)
 {
+	gint insert_offset;
+	GtkTextIter insert_iter;
+	
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 	g_return_if_fail (iter != NULL);
 	g_return_if_fail (text != NULL);
 	g_return_if_fail (gtk_text_iter_get_buffer (iter) == buffer);
 
+	insert_offset = gtk_text_iter_get_offset (iter);
+	
 	/*
 	 * iter is invalidated when
 	 * insertion occurs (because the buffer contents change), but the
@@ -674,8 +701,8 @@ gtk_source_buffer_real_insert_text (GtkTextBuffer *buffer,
 				       gtk_text_buffer_get_insert (buffer),
 				       NULL);
 
-	if (!GTK_SOURCE_BUFFER (buffer)->priv->highlight)
-		return;
+	gtk_text_buffer_get_iter_at_offset (buffer, &insert_iter, insert_offset);
+	g_signal_emit (buffer, buffer_signals [TEXT_INSERTED], 0, &insert_iter, iter);
 }
 
 static void
@@ -687,13 +714,17 @@ gtk_source_buffer_real_delete_range (GtkTextBuffer *buffer,
 	GtkTextMark *mark;
 	GtkTextIter iter;
 	GSList *markers;
-		
+	gchar *text;
+	
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 	g_return_if_fail (start != NULL);
 	g_return_if_fail (end != NULL);
 	g_return_if_fail (gtk_text_iter_get_buffer (start) == buffer);
 	g_return_if_fail (gtk_text_iter_get_buffer (end) == buffer);
 
+	/* save slice of deleted text */
+	text = gtk_text_buffer_get_slice (buffer, start, end, TRUE);
+	
 	gtk_text_iter_order (start, end);
 	delta = gtk_text_iter_get_offset (start) - 
 			gtk_text_iter_get_offset (end);
@@ -739,15 +770,17 @@ gtk_source_buffer_real_delete_range (GtkTextBuffer *buffer,
 		g_slist_free (markers);
 	}
 
-	if (!GTK_SOURCE_BUFFER (buffer)->priv->highlight) 
-		return;
+	/* emit text deleted for engines */
+	g_signal_emit (buffer, buffer_signals [TEXT_DELETED], 0,
+		       start, text);
+	g_free (text);
 }
 
 /* FIXME: this can't be here, but it's now needed for bracket matching */
-static const GtkSyntaxTag *
+static const GtkSourceTag *
 iter_has_syntax_tag (const GtkTextIter *iter)
 {
-	const GtkSyntaxTag *tag;
+	const GtkSourceTag *tag;
 	GSList *list;
 
 	g_return_val_if_fail (iter != NULL, NULL);
@@ -756,8 +789,8 @@ iter_has_syntax_tag (const GtkTextIter *iter)
 	tag = NULL;
 
 	while ((list != NULL) && (tag == NULL)) {
-		if (GTK_IS_SYNTAX_TAG (list->data))
-			tag = GTK_SYNTAX_TAG (list->data);
+		if (GTK_IS_SOURCE_TAG (list->data))
+			tag = GTK_SOURCE_TAG (list->data);
 		list = g_slist_next (list);
 	}
 
@@ -781,7 +814,7 @@ gtk_source_buffer_find_bracket_match_real (GtkTextIter *orig, gint max_chars)
 	
 	gboolean found;
 
-	const GtkSyntaxTag *base_tag;
+	const GtkSourceTag *base_tag;
 
 	iter = *orig;
 
@@ -1190,9 +1223,6 @@ void
 gtk_source_buffer_set_highlight (GtkSourceBuffer *buffer,
 				 gboolean         highlight)
 {
-	GtkTextIter iter1;
-	GtkTextIter iter2;
-
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 
 	highlight = (highlight != FALSE);
@@ -1202,206 +1232,18 @@ gtk_source_buffer_set_highlight (GtkSourceBuffer *buffer,
 
 	buffer->priv->highlight = highlight;
 
-	if (highlight) {
-		buffer->priv->highlight_engine = gtk_source_simple_engine_new ();
-		gtk_source_engine_attach_buffer (buffer->priv->highlight_engine, buffer);
-	
-	} else {
-		gtk_source_engine_attach_buffer (buffer->priv->highlight_engine, NULL);
-		g_object_unref (buffer->priv->highlight_engine);
-		buffer->priv->highlight_engine = NULL;
-
-		/* FIXME: should the engine take care of removing the
-		 * source tags? */
-		gtk_text_buffer_get_bounds (GTK_TEXT_BUFFER (buffer),
-					    &iter1, 
-					    &iter2);
-		gtk_source_buffer_remove_all_source_tags (buffer,
-							  &iter1,
-							  &iter2);
-	}
 	g_object_notify (G_OBJECT (buffer), "highlight");
 }
 
-void 
-_gtk_source_buffer_highlight_region (GtkSourceBuffer   *source_buffer,
-				     const GtkTextIter *start,
-				     const GtkTextIter *end,
-				     gboolean           highlight_now)
-{
-	g_return_if_fail (source_buffer != NULL);
-	g_return_if_fail (start != NULL);
-       	g_return_if_fail (end != NULL);
 
-	if (!source_buffer->priv->highlight)
-		return;
-
-	gtk_source_engine_highlight_region (source_buffer->priv->highlight_engine,
-					    start, end, highlight_now);
-}
-
-/* This is a modified version of the gtk_text_buffer_remove_all_tags
- * function from gtk/gtktextbuffer.c
- *
- * Copyright (C) 2000 Red Hat, Inc.
- */
-
-static gint
-pointer_cmp (gconstpointer a, gconstpointer b)
-{
-	if (a < b)
-		return -1;
-	else if (a > b)
-		return 1;
-	else
-		return 0;
-}
-
-/**
- * gtk_source_buffer_remove_all_source_tags:
- * @buffer: a #GtkSourceBuffer
- * @start: one bound of range to be untagged
- * @end: other bound of range to be untagged
- * 
- * Removes all tags in the range between @start and @end.  Be careful
- * with this function; it could remove tags added in code unrelated to
- * the code you're currently writing. That is, using this function is
- * probably a bad idea if you have two or more unrelated code sections
- * that add tags.
- **/
-void
-gtk_source_buffer_remove_all_source_tags (GtkSourceBuffer   *buffer,
-					  const GtkTextIter *start,
-					  const GtkTextIter *end)
-{
-	GtkTextIter first, second, tmp;
-	GSList *tags;
-	GSList *tmp_list;
-	GSList *tmp_list2;
-	GSList *prev;
-	GtkTextTag *tag;
-  
-	/*
-	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
-	g_return_if_fail (start != NULL);
-	g_return_if_fail (end != NULL);
-	g_return_if_fail (gtk_text_iter_get_buffer (start) == GTK_TEXT_BUFFER (buffer));
-	g_return_if_fail (gtk_text_iter_get_buffer (end) == GTK_TEXT_BUFFER (buffer));
-	*/
-	
-	first = *start;
-	second = *end;
-
-	gtk_text_iter_order (&first, &second);
-
-	/* Get all tags turned on at the start */
-	tags = NULL;
-	tmp_list = gtk_text_iter_get_tags (&first);
-	tmp_list2 = tmp_list;
-	
-	while (tmp_list2 != NULL)
-	{
-		if (GTK_IS_SOURCE_TAG (tmp_list2->data))
-		{
-			tags = g_slist_prepend (tags, tmp_list2->data);
-		}
-
-		tmp_list2 = g_slist_next (tmp_list2);
-	}
-	
-	g_slist_free (tmp_list);
-	
-	/* Find any that are toggled on within the range */
-	tmp = first;
-	while (gtk_text_iter_forward_to_tag_toggle (&tmp, NULL))
-	{
-		GSList *toggled;
-		
-		if (gtk_text_iter_compare (&tmp, &second) >= 0)
-			break; /* past the end of the range */
-      
-		toggled = gtk_text_iter_get_toggled_tags (&tmp, TRUE);
-
-		/* We could end up with a really big-ass list here.
-		 * Fix it someday.
-		 */
-		tmp_list2 = toggled;
-		while (tmp_list2 != NULL)
-		{
-			if (GTK_IS_SOURCE_TAG (tmp_list2->data))
-			{
-				tags = g_slist_prepend (tags, tmp_list2->data);
-			}
-
-			tmp_list2 = g_slist_next (tmp_list2);
-		}
-
-		g_slist_free (toggled);
-	}
-  
-	/* Sort the list */
-	tags = g_slist_sort (tags, pointer_cmp);
-
-	/* Strip duplicates */
-	tag = NULL;
-	prev = NULL;
-	tmp_list = tags;
-
-	while (tmp_list != NULL)
-	{
-		if (tag == tmp_list->data)
-		{
-			/* duplicate */
-			if (prev)
-				prev->next = tmp_list->next;
-
-			tmp_list->next = NULL;
-
-			g_slist_free (tmp_list);
-
-			tmp_list = prev->next;
-			/* prev is unchanged */
-		}
-		else
-		{
-			/* not a duplicate */
-			tag = GTK_TEXT_TAG (tmp_list->data);
-			prev = tmp_list;
-			tmp_list = tmp_list->next;
-		}
-	}
-
-	g_slist_foreach (tags, (GFunc) g_object_ref, NULL);
-  
-	tmp_list = tags;
-	while (tmp_list != NULL)
-	{
-		tag = GTK_TEXT_TAG (tmp_list->data);
-
-		gtk_text_buffer_remove_tag (GTK_TEXT_BUFFER (buffer), 
-					    tag,
-					    &first,
-					    &second);
-      
-		tmp_list = tmp_list->next;
-	}
-
-	g_slist_foreach (tags, (GFunc) g_object_unref, NULL);
-  
-	g_slist_free (tags);
-}
 
 /**
  * gtk_source_buffer_set_language:
  * @buffer: a #GtkSourceBuffer.
  * @language: a #GtkSourceLanguage to set, or NULL.
  * 
- * Sets the #GtkSourceLanguage the source buffer will use, adding
- * #GtkSourceTag tags with the language's patterns and setting the
- * escape character with gtk_source_buffer_set_escape_char().  Note
- * that this will remove any #GtkSourceTag tags currently in the
- * buffer's tag table.  The buffer holds a reference to the @language
- * set.
+ * Sets the #GtkSourceLanguage the source buffer will use.  The buffer
+ * holds a reference to the @language set.
  **/
 void
 gtk_source_buffer_set_language (GtkSourceBuffer   *buffer, 
@@ -1414,30 +1256,46 @@ gtk_source_buffer_set_language (GtkSourceBuffer   *buffer,
 	if (buffer->priv->language == language)
 		return;
 
-	if (language != NULL)
-		g_object_ref (language);
+	table = GTK_SOURCE_TAG_TABLE (gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (buffer)));
 
 	if (buffer->priv->language != NULL)
+	{
+		/* remove previous tags */
+		/* FIXME: should use tag grouping when it's
+		 * implemented in GtkSourceTagTable */
+		gtk_source_tag_table_remove_source_tags (table);
+
 		g_object_unref (buffer->priv->language);
+	}
 
+	if (buffer->priv->highlight_engine)
+	{
+		/* disconnect the old engine */
+		gtk_source_engine_attach_buffer (buffer->priv->highlight_engine, NULL);
+		g_object_unref (buffer->priv->highlight_engine);
+		buffer->priv->highlight_engine = NULL;
+	}
+	
 	buffer->priv->language = language;
-
-	/* remove previous tags */
-	table = GTK_SOURCE_TAG_TABLE (gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (buffer)));
-	gtk_source_tag_table_remove_source_tags (table);
 
 	if (language != NULL)
 	{
 		GSList *list = NULL;
 		
+		g_object_ref (language);
+
+		/* get the style tags */
+		/* FIXME: keep the tag group when that's implemented in GtkSourceTagTable */
 		list = gtk_source_language_get_tags (language);		
  		gtk_source_tag_table_add_tags (table, list);
 
-		g_slist_foreach (list, (GFunc)g_object_unref, NULL);
+		g_slist_foreach (list, (GFunc) g_object_unref, NULL);
 		g_slist_free (list);
 
-		gtk_source_buffer_set_escape_char (
-			buffer, gtk_source_language_get_escape_char (language));
+		/* get a new engine */
+		buffer->priv->highlight_engine = gtk_source_language_create_engine (language);
+		if (buffer->priv->highlight_engine)
+			gtk_source_engine_attach_buffer (buffer->priv->highlight_engine, buffer);
 	}
 
 	g_object_notify (G_OBJECT (buffer), "language");
@@ -1459,52 +1317,6 @@ gtk_source_buffer_get_language (GtkSourceBuffer *buffer)
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
 
 	return buffer->priv->language;
-}
-
-/**
- * gtk_source_buffer_get_escape_char:
- * @buffer: a #GtkSourceBuffer.
- * 
- * Determines the escaping character used by the source buffer
- * highlighting engine.
- * 
- * Return value: the UTF-8 character for the escape character the
- * buffer is using.
- **/
-gunichar 
-gtk_source_buffer_get_escape_char (GtkSourceBuffer *buffer)
-{
-	g_return_val_if_fail (buffer != NULL && GTK_IS_SOURCE_BUFFER (buffer), 0);
-
-	return buffer->priv->escape_char;
-}
-
-/**
- * gtk_source_buffer_set_escape_char:
- * @buffer: a #GtkSourceBuffer.
- * @escape_char: the escape character the buffer should use.
- * 
- * Sets the escape character to be used by the highlighting engine.
- *
- * When performing the initial analysis, the engine will discard a
- * matching syntax pattern if it's prefixed with an odd number of
- * escape characters.  This allows for example to correctly highlight
- * strings with escaped quotes embedded.
- *
- * This setting affects only syntax patterns (i.e. those defined in
- * #GtkSyntaxTag tags).
- **/
-void 
-gtk_source_buffer_set_escape_char (GtkSourceBuffer *buffer,
-				   gunichar         escape_char)
-{
-	g_return_if_fail (buffer != NULL && GTK_IS_SOURCE_BUFFER (buffer));
-
-	if (escape_char != buffer->priv->escape_char)
-	{
-		buffer->priv->escape_char = escape_char;
-		g_object_notify (G_OBJECT (buffer), "escape_char");
-	}
 }
 
 /* Markers functionality */

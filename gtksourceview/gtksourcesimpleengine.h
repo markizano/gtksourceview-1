@@ -52,6 +52,24 @@ GType           	 gtk_source_simple_engine_get_type 		(void) G_GNUC_CONST;
 
 GtkSourceEngine         *gtk_source_simple_engine_new                   (void);
 
+gboolean                 gtk_source_simple_engine_add_simple_pattern    (GtkSourceSimpleEngine *se,
+									 const gchar           *id,
+									 const gchar           *style,
+									 const gchar           *pattern);
+
+gboolean                 gtk_source_simple_engine_add_syntax_pattern    (GtkSourceSimpleEngine *se,
+									 const gchar           *id,
+									 const gchar           *style,
+									 const gchar           *pattern_start,
+									 const gchar           *pattern_end);
+
+void                     gtk_source_simple_engine_remove_pattern        (GtkSourceSimpleEngine *se,
+									 const gchar           *id);
+
+gunichar                 gtk_source_simple_engine_get_escape_char       (GtkSourceSimpleEngine *se);
+void                     gtk_source_simple_engine_set_escape_char       (GtkSourceSimpleEngine *se,
+									 gunichar               escape_char);
+
 G_END_DECLS
 
 #endif /* __GTK_SOURCE_SIMPLE_ENGINE_H__ */

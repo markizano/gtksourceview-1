@@ -1,3 +1,84 @@
+2004-02-01  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
+
+	* gtksourceview/gtksourcetag.h:
+	* gtksourceview/gtksourcetag.c:
+	* gtksourceview/gtksourcetag-private.h: Remove GtkSourceTag's id,
+	replace by translated name.  The id is now the tag's name, to be
+	able to lookup up a tag id in the tag table.  Removed GtkSyntaxTag
+	and GtkPatternTag classes.
+
+	* gtksourceview/gtksourcesimpleengine.c: Maintain simple and
+	syntax patterns in the engine, instead of GtkSyntaxTag and
+	GtkPatternTag tags.  Also, select which GtkSourceTag tags to use
+	according to the style declared for each pattern.
+	(buffer_notify_cb): Monitor highlight property of the buffer.
+	Syntax analysis is done irregardless of this setting, but actual
+	highlighting is controlled by it.
+	(gtk_source_simple_engine_attach_buffer): Use the new buffer
+	signals "text_inserted", "text_deleted" and "update_highlight".
+	(idle_worker): Only highlight when the highlight property of the
+	buffer is set to TRUE.
+	(unhighlight_region): Remove tags used by this engine from the
+	buffer at the given region.
+	(invalidate_highlight): Unhighlight the whole buffer.
+	(gtk_source_simple_engine_add_simple_pattern)
+	(gtk_source_simple_engine_add_syntax_pattern): New functions.
+	Adds simple and syntax pattern (i.e. similar to GtkPatternTag and
+	GtkSyntaxTag).  Both functions work without a buffer.  Tag
+	assignment for each pattern is done on buffer attachment.
+	(gtk_source_simple_engine_remove_pattern): Remove a pattern from
+	the engine.
+	(gtk_source_simple_engine_set_escape_char) 
+	(gtk_source_simple_engine_get_escape_char): Functions to set and
+	retrieve the engine's escape character.
+
+	* gtksourceview/gtksourcesimpleengine.h: Declare new patterns API.
+	
+	* gtksourceview/gtksourceprintjob.c (get_text_with_style): Use the
+	"update_highlight" buffer signal instead of
+	_gtk_source_buffer_highlight_region().
+	* gtksourceview/gtksourceview.c (gtk_source_view_expose): Idem.
+
+	* gtksourceview/gtksourcelanguage-private.h: Added version field
+	to the language.
+
+	* gtksourceview/gtksourcelanguage.h:
+	* gtksourceview/gtksourcelanguage.c:
+	(gtk_source_language_get_version): New function.
+	(language_file_parse, parseTag): Create simple GtkSourceTags
+	instead of GtkSyntaxTag and GtkPatternTag.  Setup the highlighting
+	engine if it was provided.
+	(gtk_source_language_create_engine): New function to create and
+	setup a highlighting engine with the language specifications.
+
+	* gtksourceview/gtksourceengine.h:
+	* gtksourceview/gtksourceengine.c: Removed
+	gtk_source_engine_highlight_region() function and vtable entry. 
+
+	* gtksourceview/gtksourcebuffer.h: 
+	* gtksourceview/gtksourcebuffer.c: Added "text_inserted",
+	"text_deleted" and "update_highlight" signals for engine
+	consumption. Removed escape character property and accesor
+	functions.
+	(gtk_source_buffer_move_cursor): take a const GtkTextIter.
+	(gtk_source_buffer_real_insert_text): emit "text_inserted".
+	(gtk_source_buffer_real_delete_range): emit "text_deleted". 
+	(iter_has_syntax_tag): s/GtkSyntaxTag/GtkSourceTag/g.
+	(gtk_source_buffer_set_highlight): let engine and tags alone,
+	since now engines should keep track of the highlight property
+	themselves.
+	(_gtk_source_buffer_highlight_region): Removed in favor or
+	"update_highlight" signal.
+	(gtk_source_buffer_remove_all_source_tags): Removed; engines are
+	responsible for removing their tags.
+	(gtk_source_buffer_set_language): Get the highlighting engine from
+	the language and attach it to the buffer.
+
+	* gtksourceview/gtksourceview-marshal.list: Added marshals for the
+	new signals.
+
+	* gtksourceview/Makefile.am: Install gtksourceengine.h.
+
 2004-01-29  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
 
 	Splitted the highlighting code off GtkSourceBuffer into an object

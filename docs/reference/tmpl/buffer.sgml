@@ -95,11 +95,6 @@ one for the old location and one for the new.
 
 </para>
 
-<!-- ##### ARG GtkSourceBuffer:escape-char ##### -->
-<para>
-
-</para>
-
 <!-- ##### ARG GtkSourceBuffer:highlight ##### -->
 <para>
 
@@ -212,24 +207,6 @@ one for the old location and one for the new.
 
 @buffer: 
 @language: 
-
-
-<!-- ##### FUNCTION gtk_source_buffer_get_escape_char ##### -->
-<para>
-
-</para>
-
-@buffer: 
-@Returns: 
-
-
-<!-- ##### FUNCTION gtk_source_buffer_set_escape_char ##### -->
-<para>
-
-</para>
-
-@buffer: 
-@escape_char: 
 
 
 <!-- ##### FUNCTION gtk_source_buffer_can_undo ##### -->

@@ -26,19 +26,18 @@
 #include <gtk/gtk.h>
 
 #include "gtksourceview-i18n.h"
-#include "gtksourcesimpleengine.h"
+#include "gtksourcetag.h"
 #include "gtksourcebuffer.h"
+#include "gtksourcesimpleengine.h"
 #include "gtksourceregex.h"
 #include "gtktextregion.h"
-#include "gtksourcetag.h"
-#include "gtksourcetag-private.h"
 
+/*
 #define ENABLE_DEBUG
 #define ENABLE_PROFILE
-/*
+*/
 #undef ENABLE_DEBUG
 #undef ENABLE_PROFILE
-*/
 
 #ifdef ENABLE_DEBUG
 #define DEBUG(x) (x)
@@ -51,6 +50,37 @@
 #else
 #define PROFILE(x)
 #endif
+
+/* struct for holding patterns */
+
+typedef struct _Pattern       Pattern;
+typedef struct _SimplePattern SimplePattern;
+typedef struct _SyntaxPattern SyntaxPattern;
+
+struct _Pattern
+{
+	gchar          *id;
+	gchar          *style;
+	GtkSourceTag   *tag;
+};
+
+struct _SimplePattern
+{
+	Pattern         p;
+	
+	gchar          *pattern;
+	GtkSourceRegex *reg_pattern;
+};
+
+struct _SyntaxPattern
+{
+	Pattern         p;
+	
+	gchar          *start_pattern;
+	gchar          *end_pattern;
+	GtkSourceRegex *reg_start;
+	GtkSourceRegex *reg_end;
+};
 
 /* define this to always highlight in an idle handler, and not
  * possibly in the expose method of the view */
@@ -66,14 +96,14 @@ typedef struct _PatternMatch         PatternMatch;
 
 struct _SyntaxDelimiter 
 {
-	gint                offset;
-	gint                depth;
-	GtkSyntaxTag       *tag;
+	gint                 offset;
+	gint                 depth;
+	const SyntaxPattern *pattern;
 };
 
 struct _PatternMatch
 {
-	GtkPatternTag        *tag;
+	const SimplePattern  *pattern;
 	GtkSourceBufferMatch  match;
 };
 
@@ -81,14 +111,9 @@ struct _GtkSourceSimpleEnginePrivate
 {
 	GtkSourceBuffer       *buffer;
 
-	/* signal handlers */
-	gulong                 tag_table_changed_handler;
-	gulong                 insert_text_handler;
-	gulong                 delete_range_handler;
-	gulong                 delete_range_handler_after;
-	gint                   offsets_deleted;
-	gulong                 escape_char_notify_handler;
-
+	/* whether or not to actually highlight the buffer */
+	gboolean               highlight;
+	
 	/* highlighting "input" */
 	GList                 *syntax_items;
 	GList                 *pattern_items;
@@ -117,11 +142,16 @@ static void   gtk_source_simple_engine_class_init          (GtkSourceSimpleEngin
 static void   gtk_source_simple_engine_init 	           (GtkSourceSimpleEngine      *engine);
 static void   gtk_source_simple_engine_finalize            (GObject                    *object);
 
+static void   simple_pattern_destroy                       (SimplePattern              *pat);
+static void   syntax_pattern_destroy                       (SyntaxPattern              *pat);
+
 static void   gtk_source_simple_engine_attach_buffer       (GtkSourceEngine            *engine,
 							    GtkSourceBuffer            *buffer);
 
 static GList *gtk_source_simple_engine_get_syntax_entries  (GtkSourceSimpleEngine      *se);
 static GList *gtk_source_simple_engine_get_pattern_entries (GtkSourceSimpleEngine      *se);
+
+static void   install_idle_worker                          (GtkSourceSimpleEngine      *se);
 
 static void   build_syntax_regions_table                   (GtkSourceSimpleEngine      *se,
 							    const GtkTextIter          *needed_end);
@@ -138,13 +168,15 @@ static void   highlight_region                             (GtkSourceSimpleEngin
 static void   refresh_range                                (GtkSourceSimpleEngine      *se,
 							    GtkTextIter                *start,
 							    GtkTextIter                *end);
+static void   invalidate_highlight                         (GtkSourceSimpleEngine      *se,
+							    gboolean                    highlight);
 static void   ensure_highlighted                           (GtkSourceSimpleEngine      *se,
 							    const GtkTextIter          *start,
 							    const GtkTextIter          *end);
-static void   gtk_source_simple_engine_highlight_region    (GtkSourceEngine            *engine,
+static void   highlight_queue                              (GtkSourceSimpleEngine      *se,
 							    const GtkTextIter          *start,
-							    const GtkTextIter          *end,
-							    gboolean                    synchronous);
+							    const GtkTextIter          *end);
+
 
 GType
 gtk_source_simple_engine_get_type (void)
@@ -189,7 +221,6 @@ gtk_source_simple_engine_class_init (GtkSourceSimpleEngineClass *klass)
 	object_class->finalize	       = gtk_source_simple_engine_finalize;
 
 	engine_class->attach_buffer    = gtk_source_simple_engine_attach_buffer;
-	engine_class->highlight_region = gtk_source_simple_engine_highlight_region;
 }
 
 static void
@@ -218,6 +249,11 @@ gtk_source_simple_engine_finalize (GObject *object)
 	/* disconnect buffer (if there is one), which destroys almost eveything */
 	gtk_source_simple_engine_attach_buffer (GTK_SOURCE_ENGINE (engine), NULL);
 	
+	/* destroy patterns */
+	g_list_foreach (engine->priv->pattern_items, (GFunc) simple_pattern_destroy, NULL);
+	g_list_foreach (engine->priv->syntax_items, (GFunc) syntax_pattern_destroy, NULL);
+	gtk_source_regex_destroy (engine->priv->reg_syntax_all);
+	
 	g_free (engine->priv);
 	engine->priv = NULL;
 	
@@ -225,204 +261,278 @@ gtk_source_simple_engine_finalize (GObject *object)
 }
 
 
+/* Pattern structures handling ------------------------------------------------------ */
+
+static SimplePattern *
+simple_pattern_new (const gchar *id,
+		    const gchar *style,
+		    const gchar *pattern)
+{
+	SimplePattern *pat;
+	GtkSourceRegex *regex;
+	
+	/* try to compile pattern */
+	regex = gtk_source_regex_compile (pattern);
+	if (regex)
+	{
+		pat = g_new0 (SimplePattern, 1);
+
+		pat->p.id = g_strdup (id);
+		pat->p.style = g_strdup (style);
+		pat->pattern = g_strdup (pattern);
+		pat->reg_pattern = regex;
+	}
+	else
+		pat = NULL;
+
+	return pat;
+}
+
+static void
+simple_pattern_destroy (SimplePattern *pat)
+{
+	if (pat)
+	{
+		g_free (pat->p.id);
+		g_free (pat->p.style);
+		if (pat->p.tag)
+			g_object_unref (pat->p.tag);
+		g_free (pat->pattern);
+		gtk_source_regex_destroy (pat->reg_pattern);
+
+		g_free (pat);
+	}
+}
+
+static SyntaxPattern *
+syntax_pattern_new (const gchar *id,
+		    const gchar *style,
+		    const gchar *start_pattern,
+		    const gchar *end_pattern)
+{
+	SyntaxPattern *sp;
+	GtkSourceRegex *rs, *re;
+	
+	/* try to compile pattern */
+	rs = gtk_source_regex_compile (start_pattern);
+	re = gtk_source_regex_compile (end_pattern);
+	if (rs != NULL && re != NULL)
+	{
+		sp = g_new0 (SyntaxPattern, 1);
+
+		sp->p.id = g_strdup (id);
+		sp->p.style = g_strdup (style);
+		sp->start_pattern = g_strdup (start_pattern);
+		sp->end_pattern = g_strdup (end_pattern);
+		sp->reg_start = rs;
+		sp->reg_end = re;
+	}
+	else
+	{
+		gtk_source_regex_destroy (rs);
+		gtk_source_regex_destroy (re);
+		sp = NULL;
+	}
+	
+	return sp;
+}
+
+static void
+syntax_pattern_destroy (SyntaxPattern *sp)
+{
+	if (sp)
+	{
+		g_free (sp->p.id);
+		g_free (sp->p.style);
+		if (sp->p.tag)
+			g_object_unref (sp->p.tag);
+		g_free (sp->start_pattern);
+		g_free (sp->end_pattern);
+		gtk_source_regex_destroy (sp->reg_start);
+		gtk_source_regex_destroy (sp->reg_end);
+
+		g_free (sp);
+	}
+}
+
+static GList *
+find_pattern (GList *patterns, const gchar *id)
+{
+	GList *r;
+	for (r = patterns; r; r = r->next)
+	{
+		Pattern *pat = r->data;
+		if (!strcmp (pat->id, id))
+			break;
+	}
+	return r;
+}
+
 /* Buffer attachment and change tracking functions ------------------------------ */
 
 static void 
-insert_text_cb (GtkTextBuffer *buffer,
-		GtkTextIter   *iter,
-		const gchar   *text,
-		gint           len,
-		gpointer       data)
+text_inserted_cb (GtkSourceBuffer   *buffer,
+		  const GtkTextIter *start,
+		  const GtkTextIter *end,
+		  gpointer           data)
 {
 	gint start_offset, text_length;
 	GtkSourceSimpleEngine *se = data;
-	GtkTextIter start_iter;
 
-	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
-	g_return_if_fail (iter != NULL);
-	g_return_if_fail (text != NULL);
-	g_return_if_fail (gtk_text_iter_get_buffer (iter) == buffer);
+	g_return_if_fail (start != NULL);
+	g_return_if_fail (end != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_SIMPLE_ENGINE (se));
-	g_return_if_fail (se->priv->buffer == GTK_SOURCE_BUFFER (buffer));
+	g_return_if_fail (se->priv->buffer == buffer);
 
 	/* we get the iter at the end of the inserted text */
-	text_length = g_utf8_strlen (text, len);
-	start_iter = *iter;
-	gtk_text_iter_backward_chars (iter, text_length);
-	start_offset = gtk_text_iter_get_offset (&start_iter);
+	start_offset = gtk_text_iter_get_offset (start);
+	text_length = gtk_text_iter_get_offset (end) - start_offset;
 	
 	update_syntax_regions (se, start_offset, text_length);
 }
 
-static void
-delete_range_cb (GtkTextBuffer *buffer,
-		 GtkTextIter   *start,
-		 GtkTextIter   *end,
-		 gpointer       data)
+static void 
+text_deleted_cb (GtkSourceBuffer   *buffer,
+		 const GtkTextIter *iter,
+		 const gchar       *text,
+		 gpointer           data)
 {
 	GtkSourceSimpleEngine *se = data;
 	
-	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
-	g_return_if_fail (start != NULL);
-	g_return_if_fail (end != NULL);
-	g_return_if_fail (gtk_text_iter_get_buffer (start) == buffer);
-	g_return_if_fail (gtk_text_iter_get_buffer (end) == buffer);
+	g_return_if_fail (iter != NULL);
+	g_return_if_fail (gtk_text_iter_get_buffer (iter) == GTK_TEXT_BUFFER (buffer));
 	g_return_if_fail (GTK_IS_SOURCE_SIMPLE_ENGINE (se));
-	g_return_if_fail (se->priv->buffer == GTK_SOURCE_BUFFER (buffer));
+	g_return_if_fail (se->priv->buffer == buffer);
 
-	gtk_text_iter_order (start, end);
-	/* keep deleted offsets in the engine struct so the "after"
-	 * handler can use it to invalidate regions */
-	se->priv->offsets_deleted = gtk_text_iter_get_offset (start) - 
-		gtk_text_iter_get_offset (end);
+	/* we use the stored deleted offsets in the engine to
+	 * invalidate regions */
+	update_syntax_regions (se, gtk_text_iter_get_offset (iter),
+			       g_utf8_strlen (text, -1));
 }
 
-static void
-delete_range_after_cb (GtkTextBuffer *buffer,
-		       GtkTextIter   *start,
-		       GtkTextIter   *end,
-		       gpointer       data)
+static void 
+update_highlight_cb (GtkSourceBuffer   *buffer,
+		     const GtkTextIter *start,
+		     const GtkTextIter *end,
+		     gboolean           synchronous,
+		     gpointer           data)
 {
 	GtkSourceSimpleEngine *se = data;
 	
-	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
-	g_return_if_fail (start != NULL);
-	g_return_if_fail (end != NULL);
-	g_return_if_fail (gtk_text_iter_get_buffer (start) == buffer);
-	g_return_if_fail (gtk_text_iter_get_buffer (end) == buffer);
 	g_return_if_fail (GTK_IS_SOURCE_SIMPLE_ENGINE (se));
-	g_return_if_fail (se->priv->buffer == GTK_SOURCE_BUFFER (buffer));
+	g_return_if_fail (start != NULL);
+       	g_return_if_fail (end != NULL);
 
-	if (se->priv->offsets_deleted > 0)
-	{
-		/* we use the stored deleted offsets in the engine to
-		 * invalidate regions */
-		update_syntax_regions (se, gtk_text_iter_get_offset (start),
-				       se->priv->offsets_deleted);
-		se->priv->offsets_deleted = 0;
-	}
-}
-
-static void
-get_tags_func (GtkTextTag *tag, gpointer data)
-{
-        GSList **list = NULL;
-
-	g_return_if_fail (data != NULL);
-
-	list = (GSList **) data;
-
-	if (GTK_IS_SOURCE_TAG (tag))
-	{
-		*list = g_slist_prepend (*list, tag);
-	}
-}
-
-static GSList *
-get_source_tags_from_buffer (const GtkSourceBuffer *buffer)
-{
-	GSList *list = NULL;
-	GtkTextTagTable *table;
-
-	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
-
-	table = gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (buffer));
-	gtk_text_tag_table_foreach (table, get_tags_func, &list);
-	list = g_slist_reverse (list);	
-	
-	return list;
-}
-
-static void
-sync_syntax_regex (GtkSourceSimpleEngine *se)
-{
-	GString *str;
-	GList *cur;
-	GtkSyntaxTag *tag;
-
-	str = g_string_new ("");
-	cur = se->priv->syntax_items;
-
-	if (se->priv->reg_syntax_all)
-	{
-		gtk_source_regex_destroy (se->priv->reg_syntax_all);
-		se->priv->reg_syntax_all = NULL;
-	}
-	if (cur == NULL)
+	if (!se->priv->highlight)
 		return;
+	
+	if (se->priv->worker_last_offset < 0 ||
+	    se->priv->worker_last_offset >= gtk_text_iter_get_offset (end))
+	{
+		ensure_highlighted (se, start, end);
+	}
+	else
+	{
+		if (synchronous)
+		{
+			build_syntax_regions_table (se, end);
+			ensure_highlighted (se, start, end);
+		}
+		else
+		{
+			highlight_queue (se, start, end);
+			install_idle_worker (se);
+		}
+	}
+}
 
-	while (cur != NULL) {
-		g_return_if_fail (GTK_IS_SYNTAX_TAG (cur->data));
+static void
+forget_pattern_tag (GtkSourceSimpleEngine *se, Pattern *pattern)
+{
+	GtkTextIter start, end;
 
-		tag = GTK_SYNTAX_TAG (cur->data);
-		g_string_append (str, tag->start);
-		
-		cur = g_list_next (cur);
-		
-		if (cur != NULL)
-			g_string_append (str, "|");
+	g_return_if_fail (se->priv->buffer);
+
+	if (!pattern->tag) return;
+	
+	/* remove tag from buffer */
+	gtk_text_buffer_get_bounds (GTK_TEXT_BUFFER (se->priv->buffer), &start, &end);
+	gtk_text_buffer_remove_tag (GTK_TEXT_BUFFER (se->priv->buffer),
+				    GTK_TEXT_TAG (pattern->tag),
+				    &start, &end);
+
+	g_object_unref (pattern->tag);
+	pattern->tag = NULL;
+}
+
+static gboolean
+retrieve_pattern_tag (GtkSourceSimpleEngine *se, Pattern *pattern)
+{
+	GtkTextTagTable *table;
+	GtkTextTag *tag;
+	GtkSourceTag *stag;
+	gboolean rval = FALSE;
+
+	g_return_val_if_fail (se->priv->buffer, FALSE);
+
+	/* tries to get a text tag to apply to the given pattern */
+	table = gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (se->priv->buffer));
+	g_return_val_if_fail (table, FALSE);
+
+	/* lookup specific id first */
+	tag = gtk_text_tag_table_lookup (table, pattern->id);
+	tag = GTK_IS_SOURCE_TAG (tag) ? tag : NULL;
+	if (!tag)
+	{
+		/* lookup style next */
+		tag = gtk_text_tag_table_lookup (table, pattern->style);
+		tag = GTK_IS_SOURCE_TAG (tag) ? tag : NULL;
 	}
 
-	se->priv->reg_syntax_all = gtk_source_regex_compile (str->str);
+	/* cast the tag */
+	stag = tag ? GTK_SOURCE_TAG (tag) : NULL;
 
-	g_string_free (str, TRUE);
+	/* check for changes */
+	if (stag != pattern->tag)
+	{
+		if (pattern->tag)
+			forget_pattern_tag (se, pattern);
+		pattern->tag = stag;
+		if (stag)
+			g_object_ref (stag);
+		rval = TRUE;
+	}
+	
+	return rval;
 }
 
 static void
 sync_with_tag_table (GtkSourceSimpleEngine *se)
 {
-	GtkTextTagTable *tag_table;
-	GtkSourceBuffer *buffer;
-	GSList *entries;
-	GSList *list;
-
+	gboolean invalidate = FALSE;
+	GList *list, *next_list;
+	
+	/* check for changes in used tags in the buffer's tag table */
+	
 	g_return_if_fail (GTK_IS_SOURCE_SIMPLE_ENGINE (se));
-	g_return_if_fail (se->priv->buffer != NULL);
-	buffer = se->priv->buffer;
-	
-	if (se->priv->syntax_items)
+	g_return_if_fail (se->priv->buffer);
+
+	list = se->priv->pattern_items;
+	next_list = se->priv->syntax_items;
+	while (list)
 	{
-		g_list_free (se->priv->syntax_items);
-		se->priv->syntax_items = NULL;
-	}
-
-	if (se->priv->pattern_items)
-	{
-		g_list_free (se->priv->pattern_items);
-		se->priv->pattern_items = NULL;
-	}
-
-	tag_table = gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (buffer));
-	g_return_if_fail (tag_table != NULL);
-
-	list = entries = get_source_tags_from_buffer (buffer);
-	
-	while (entries != NULL) 
-	{	
-		if (GTK_IS_SYNTAX_TAG (entries->data)) 
+		invalidate = retrieve_pattern_tag (se, list->data) || invalidate;
+		
+		list = list->next;
+		if (!list)
 		{
-			se->priv->syntax_items =
-				g_list_prepend (se->priv->syntax_items, entries->data);
-			
-		} 
-		else if (GTK_IS_PATTERN_TAG (entries->data)) 
-		{
-			se->priv->pattern_items =
-				g_list_prepend (se->priv->pattern_items, entries->data);
-			
+			list = next_list;
+			next_list = NULL;
 		}
-
-		entries = g_slist_next (entries);
 	}
-
-	g_slist_free (list);
-
-	se->priv->syntax_items = g_list_reverse (se->priv->syntax_items);
-	se->priv->pattern_items = g_list_reverse (se->priv->pattern_items);
 	
-	sync_syntax_regex (se);
-
-	invalidate_syntax_regions (se, NULL, 0);
+	if (invalidate)
+		invalidate_highlight (se, FALSE);
 }
 
 static void 
@@ -439,24 +549,26 @@ tag_table_changed_cb (GtkSourceTagTable     *table,
 	sync_with_tag_table (se);
 }
 
-static void 
-notify_cb (GtkSourceBuffer *buffer,
-	   GParamSpec      *pspec,
-	   gpointer         user_data)
+static void
+buffer_notify_cb (GObject    *object,
+		  GParamSpec *pspec,
+		  gpointer    user_data)
 {
-	GtkSourceSimpleEngine *se = user_data;
-	gunichar new_escape_char;
+	GtkSourceBuffer *buffer;
+	GtkSourceSimpleEngine *se;
+	gboolean highlight;
 	
-	g_return_if_fail (GTK_IS_SOURCE_SIMPLE_ENGINE (se));
-	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
-	g_return_if_fail (se->priv->buffer == buffer);
+	g_return_if_fail (GTK_IS_SOURCE_BUFFER (object));
+	g_return_if_fail (GTK_IS_SOURCE_SIMPLE_ENGINE (user_data));
 
-	new_escape_char = gtk_source_buffer_get_escape_char (buffer);
-	if (new_escape_char != se->priv->escape_char)
+	buffer = GTK_SOURCE_BUFFER (object);
+	se = GTK_SOURCE_SIMPLE_ENGINE (user_data);
+
+	highlight = gtk_source_buffer_get_highlight (buffer);
+	if (highlight != se->priv->highlight)
 	{
-		se->priv->escape_char = new_escape_char;
-		/* regenerate syntax tables */
-		invalidate_syntax_regions (se, NULL, 0);
+		se->priv->highlight = highlight;
+		invalidate_highlight (se, highlight);
 	}
 }
 
@@ -474,6 +586,25 @@ gtk_source_simple_engine_attach_buffer (GtkSourceEngine *engine,
 	/* detach previous buffer if there is one */
 	if (se->priv->buffer)
 	{
+		GList *list, *next_list;
+		
+		invalidate_highlight (se, FALSE);
+
+		/* forget all cached tags */
+		list = se->priv->pattern_items;
+		next_list = se->priv->syntax_items;
+		while (list)
+		{
+			forget_pattern_tag (se, list->data);
+			
+			list = list->next;
+			if (!list)
+			{
+				list = next_list;
+				next_list = NULL;
+			}
+		}
+
 		if (se->priv->worker_handler)
 		{
 			g_source_remove (se->priv->worker_handler);
@@ -494,37 +625,25 @@ gtk_source_simple_engine_attach_buffer (GtkSourceEngine *engine,
 			se->priv->old_syntax_regions = NULL;
 		}
 
-		g_list_free (se->priv->syntax_items);
-		g_list_free (se->priv->pattern_items);
-		se->priv->syntax_items = NULL;
-		se->priv->pattern_items = NULL;
-
-		if (se->priv->reg_syntax_all)
-		{
-			gtk_source_regex_destroy (se->priv->reg_syntax_all);
-			se->priv->reg_syntax_all = NULL;
-		}
-
-		/* disconnect tag table signals */
-		if (se->priv->tag_table_changed_handler)
-		{
-			table = gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (se->priv->buffer));
-			g_signal_handler_disconnect (table, se->priv->tag_table_changed_handler);
-			se->priv->tag_table_changed_handler = 0;
-		}
-		
-		g_signal_handler_disconnect (se->priv->buffer, se->priv->insert_text_handler);
-		g_signal_handler_disconnect (se->priv->buffer, se->priv->delete_range_handler);
-		g_signal_handler_disconnect (se->priv->buffer, se->priv->delete_range_handler_after);
-		g_signal_handler_disconnect (se->priv->buffer, se->priv->escape_char_notify_handler);
-		
-		se->priv->buffer = NULL;
+		/* disconnect signals */
+		table = gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (se->priv->buffer));
+		g_signal_handlers_disconnect_matched (table,
+						      G_SIGNAL_MATCH_DATA,
+						      0, 0, NULL, NULL, se);
+		g_signal_handlers_disconnect_matched (se->priv->buffer,
+						      G_SIGNAL_MATCH_DATA,
+						      0, 0, NULL, NULL, se);
 	}
+
+	se->priv->buffer = buffer;
 
 	if (buffer)
 	{
-		se->priv->buffer = buffer;
+		se->priv->highlight = gtk_source_buffer_get_highlight (buffer);
 		
+		/* retrieve references to all text tags */
+		sync_with_tag_table (se);
+	
 		/* highlight data */
 		se->priv->refresh_region = gtk_text_region_new (GTK_TEXT_BUFFER (buffer));
 		se->priv->syntax_regions = g_array_new (FALSE, FALSE,
@@ -535,21 +654,19 @@ gtk_source_simple_engine_attach_buffer (GtkSourceEngine *engine,
 		se->priv->worker_last_offset = -1;
 		se->priv->worker_batch_size = INITIAL_WORKER_BATCH;
 
-		se->priv->insert_text_handler = g_signal_connect_after (
-			buffer, "insert_text", G_CALLBACK (insert_text_cb), se);
-		se->priv->delete_range_handler = g_signal_connect (
-			buffer, "delete_range", G_CALLBACK (delete_range_cb), se);
-		se->priv->delete_range_handler_after = g_signal_connect_after (
-			buffer, "delete_range", G_CALLBACK (delete_range_after_cb), se);
-		se->priv->escape_char_notify_handler = g_signal_connect (
-			buffer, "notify::escape_char", G_CALLBACK (notify_cb), se);
-
+		g_signal_connect (buffer, "text_inserted",
+				  G_CALLBACK (text_inserted_cb), se);
+		g_signal_connect (buffer, "text_deleted",
+				  G_CALLBACK (text_deleted_cb), se);
+		g_signal_connect (buffer, "update_highlight",
+				  G_CALLBACK (update_highlight_cb), se);
+		g_signal_connect (buffer, "notify::highlight",
+				  G_CALLBACK (buffer_notify_cb), se);
+		
 		table = gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (buffer));
 		if (GTK_IS_SOURCE_TAG_TABLE (table))
 		{
-			se->priv->tag_table_changed_handler =
-				g_signal_connect (table, "changed",
-						  G_CALLBACK (tag_table_changed_cb), engine);
+			g_signal_connect (table, "changed", G_CALLBACK (tag_table_changed_cb), se);
 		}
 		else
 		{
@@ -557,7 +674,7 @@ gtk_source_simple_engine_attach_buffer (GtkSourceEngine *engine,
 		}
 
 		/* this function starts the syntax table building process */
-		sync_with_tag_table (se);
+		invalidate_syntax_regions (se, NULL, 0);
 	}
 }
 
@@ -595,34 +712,37 @@ idle_worker (GtkSourceSimpleEngine *se)
 		build_syntax_regions_table (se, NULL);
 	}
 
-	/* Now we highlight subregions requested by the views */
-	gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (source_buffer), &last_end_iter, 0);
-	for (i = 0; i < gtk_text_region_subregions (se->priv->highlight_requests); i++) {
-		gtk_text_region_nth_subregion (se->priv->highlight_requests,
-					       i, &start_iter, &end_iter);
+	if (se->priv->highlight)
+	{
+		/* Now we highlight subregions requested by the views */
+		gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (source_buffer), &last_end_iter, 0);
+		for (i = 0; i < gtk_text_region_subregions (se->priv->highlight_requests); i++) {
+			gtk_text_region_nth_subregion (se->priv->highlight_requests,
+						       i, &start_iter, &end_iter);
 
-		if (se->priv->worker_last_offset < 0 ||
-		    se->priv->worker_last_offset >= gtk_text_iter_get_offset (&end_iter)) {
-			ensure_highlighted (se, 
-					    &start_iter, 
-					    &end_iter);
-			last_end_iter = end_iter;
-		} else {
-			/* since the subregions are ordered, we are
-			 * guaranteed here that all subsequent
-			 * subregions will be beyond the already
-			 * analyzed text */
-			break;
+			if (se->priv->worker_last_offset < 0 ||
+			    se->priv->worker_last_offset >= gtk_text_iter_get_offset (&end_iter)) {
+				ensure_highlighted (se, 
+						    &start_iter, 
+						    &end_iter);
+				last_end_iter = end_iter;
+			} else {
+				/* since the subregions are ordered, we are
+				 * guaranteed here that all subsequent
+				 * subregions will be beyond the already
+				 * analyzed text */
+				break;
+			}
 		}
-	}
-	gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (se->priv->buffer), &start_iter, 0);
+		gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (se->priv->buffer), &start_iter, 0);
 
-	if (!gtk_text_iter_equal (&start_iter, &last_end_iter)) {
-		/* remove already highlighted subregions from requests */
-		gtk_text_region_substract (se->priv->highlight_requests,
-					   &start_iter, &last_end_iter);
-		gtk_text_region_clear_zero_length_subregions (
-			se->priv->highlight_requests);
+		if (!gtk_text_iter_equal (&start_iter, &last_end_iter)) {
+			/* remove already highlighted subregions from requests */
+			gtk_text_region_substract (se->priv->highlight_requests,
+						   &start_iter, &last_end_iter);
+			gtk_text_region_clear_zero_length_subregions (
+				se->priv->highlight_requests);
+		}
 	}
 	
 	if (se->priv->worker_last_offset < 0) {
@@ -652,6 +772,40 @@ install_idle_worker (GtkSourceSimpleEngine *se)
 
 /* Syntax analysis code ---------------------------------------------------- */
 
+static void
+sync_reg_syntax_all (GtkSourceSimpleEngine *se)
+{
+	GString *str;
+	GList *cur;
+	SyntaxPattern *sp;
+	
+	str = g_string_new ("");
+	cur = se->priv->syntax_items;
+
+	if (se->priv->reg_syntax_all)
+	{
+		gtk_source_regex_destroy (se->priv->reg_syntax_all);
+		se->priv->reg_syntax_all = NULL;
+	}
+	if (cur == NULL)
+		return;
+
+	while (cur != NULL) {
+		sp = cur->data;
+
+		g_string_append (str, sp->start_pattern);
+		
+		cur = g_list_next (cur);
+		
+		if (cur != NULL)
+			g_string_append (str, "|");
+	}
+
+	se->priv->reg_syntax_all = gtk_source_regex_compile (str->str);
+
+	g_string_free (str, TRUE);
+}
+
 static gboolean
 is_escaped (GtkSourceSimpleEngine *se, const gchar *text, gint index)
 {
@@ -670,14 +824,14 @@ is_escaped (GtkSourceSimpleEngine *se, const gchar *text, gint index)
 	return retval;
 }
 
-static const GtkSyntaxTag * 
+static const SyntaxPattern * 
 get_syntax_start (GtkSourceSimpleEngine *se,
 		  const gchar           *text,
 		  gint                   length,
 		  GtkSourceBufferMatch  *match)
 {
 	GList *list;
-	GtkSyntaxTag *tag;
+	SyntaxPattern *sp;
 	gint pos;
 	
 	if (length == 0)
@@ -706,11 +860,11 @@ get_syntax_start (GtkSourceSimpleEngine *se,
 		return NULL;
 
 	while (list != NULL) {
-		tag = list->data;
+		sp = list->data;
 		
-		if (gtk_source_regex_match (tag->reg_start, text,
+		if (gtk_source_regex_match (sp->reg_start, text,
 					    pos, match->endindex))
-			return tag;
+			return sp;
 
 		list = g_list_next (list);
 	}
@@ -722,7 +876,7 @@ static gboolean
 get_syntax_end (GtkSourceSimpleEngine *se,
 		const gchar           *text,
 		gint                   length,
-		GtkSyntaxTag          *tag,
+		const SyntaxPattern   *sp,
 		GtkSourceBufferMatch  *match)
 {
 	GtkSourceBufferMatch tmp;
@@ -730,14 +884,14 @@ get_syntax_end (GtkSourceSimpleEngine *se,
 
 	g_return_val_if_fail (text != NULL, FALSE);
 	g_return_val_if_fail (length >= 0, FALSE);
-	g_return_val_if_fail (tag != NULL, FALSE);
+	g_return_val_if_fail (sp != NULL, FALSE);
 
 	if (!match)
 		match = &tmp;
 	
 	pos = 0;
 	do {
-		pos = gtk_source_regex_search (tag->reg_end, text, pos,
+		pos = gtk_source_regex_search (sp->reg_end, text, pos,
 					       length, match);
 		if (pos < 0 || !is_escaped (se, text, match->startindex))
 			break;
@@ -791,7 +945,7 @@ adjust_table_offsets (GArray *table, gint start, gint delta)
 		start++;
 	}
 }
-	
+
 static void 
 invalidate_syntax_regions (GtkSourceSimpleEngine *se,
 			   GtkTextIter           *from,
@@ -846,7 +1000,7 @@ invalidate_syntax_regions (GtkSourceSimpleEngine *se,
 		delim = &g_array_index (table,
 					SyntaxDelimiter,
 					region - 1);
-		if (delim->tag &&
+		if (delim->pattern &&
 		    delim->offset == offset) {
 			/* take previous region if we are just at the
 			   start of a syntax region (i.e. we're
@@ -913,7 +1067,7 @@ delimiter_is_equal (SyntaxDelimiter *d1, SyntaxDelimiter *d2)
 {
 	return (d1->offset == d2->offset &&
 		d1->depth == d2->depth &&
-		d1->tag == d2->tag);
+		d1->pattern == d2->pattern);
 }
 
 /**
@@ -941,31 +1095,31 @@ next_syntax_region (GtkSourceSimpleEngine *se,
 		    gint                   head_offset,
 		    GtkSourceBufferMatch  *match)
 {
-	GtkSyntaxTag *tag;
+	const SyntaxPattern *pat;
 	gboolean found;
 	
-	if (!state->tag) {
+	if (!state->pattern) {
 		/* we come from a non-syntax colored region, so seek
 		 * for an opening pattern */
-		tag = (GtkSyntaxTag *) get_syntax_start (se, head, head_length, match);
+		pat = get_syntax_start (se, head, head_length, match);
 
-		if (!tag)
+		if (!pat)
 			return FALSE;
 		
-		state->tag = tag;
+		state->pattern = pat;
 		state->offset = match->startpos + head_offset;
 		state->depth = 1;
 
 	} else {
 		/* seek the closing pattern for the current syntax
 		 * region */
-		found = get_syntax_end (se, head, head_length, state->tag, match);
+		found = get_syntax_end (se, head, head_length, state->pattern, match);
 		
 		if (!found)
 			return FALSE;
 		
 		state->offset = match->endpos + head_offset;
-		state->tag = NULL;
+		state->pattern = NULL;
 		state->depth = 0;
 		
 	}
@@ -992,6 +1146,10 @@ build_syntax_regions_table (GtkSourceSimpleEngine *se,
 
 	/* we shouldn't have been called if the buffer has no syntax entries */
 	g_assert (gtk_source_simple_engine_get_syntax_entries (se) != NULL);
+	
+	/* make sure the all syntax regexp is sync'ed */
+	if (se->priv->reg_syntax_all == NULL)
+		sync_reg_syntax_all (se);
 	
 	/* check if we still have text to analyze */
 	if (se->priv->worker_last_offset < 0)
@@ -1029,7 +1187,7 @@ build_syntax_regions_table (GtkSourceSimpleEngine *se,
 	/* setup analyzer */
 	if (table->len == 0) {
 		delim.offset = offset;
-		delim.tag = NULL;
+		delim.pattern = NULL;
 		delim.depth = 0;
 
 	} else {
@@ -1200,7 +1358,7 @@ update_syntax_regions (GtkSourceSimpleEngine *se,
 	first_region = bsearch_offset (table, head_offset);
 
 	/* initialize analyzing context */
-	delim.tag = NULL;
+	delim.pattern = NULL;
 	delim.offset = 0;
 	delim.depth = 0;
 	/* first expected match */
@@ -1212,7 +1370,7 @@ update_syntax_regions (GtkSourceSimpleEngine *se,
 		gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (se->priv->buffer),
 						    &start_iter,
 						    head_offset);
-		if (g_array_index (table, SyntaxDelimiter, first_region - 1).tag) {
+		if (g_array_index (table, SyntaxDelimiter, first_region - 1).pattern) {
 			/* we are inside a syntax colored region, so
 			 * we expect to see the opening delimiter
 			 * first */
@@ -1261,7 +1419,7 @@ update_syntax_regions (GtkSourceSimpleEngine *se,
 						    end_offset);
 
 		/* calculate expected_end_index */
-		if (g_array_index (table, SyntaxDelimiter, region).tag)
+		if (g_array_index (table, SyntaxDelimiter, region).pattern)
 			expected_end_index = region;
 		else
 			expected_end_index = MIN (region + 1, table->len);
@@ -1388,18 +1546,18 @@ search_patterns (GList       *matches,
 	
 	new_pattern = patterns;
 	while (new_pattern || matches) {
-		GtkPatternTag *tag;
+		const SimplePattern *pat;
 		gint i;
 		
 		if (new_pattern) {
 			/* process new patterns first */
-			tag = new_pattern->data;
+			pat = new_pattern->data;
 			new_pattern = new_pattern->next;
 			pmatch = NULL;
 		} else {
 			/* process patterns already in @matches */
 			pmatch = matches->data;
-			tag = pmatch->tag;
+			pat = pmatch->pattern;
 			if (pmatch->match.startpos >= offset) {
 				/* pattern is ahead of offset, so our
 				 * work is done */
@@ -1411,7 +1569,7 @@ search_patterns (GList       *matches,
 		}
 		
 		/* do the regex search on @text */
-		i = gtk_source_regex_search (tag->reg_pattern,
+		i = gtk_source_regex_search (pat->reg_pattern,
 					     text,
 					     0,
 					     length,
@@ -1423,7 +1581,7 @@ search_patterns (GList       *matches,
 			/* create the match structure */
 			if (!pmatch) {
 				pmatch = g_new0 (PatternMatch, 1);
-				pmatch->tag = tag;
+				pmatch->pattern = pat;
 			}
 			/* adjust offsets (indexes remain relative to
 			 * the current pointer in the text) */
@@ -1450,12 +1608,9 @@ search_patterns (GList       *matches,
 			 * PatternMatch structure if we were analyzing
 			 * a pattern from @matches */
 			if (i >= 0 && i == match.endpos) {
-				gchar *name;
-				g_object_get (G_OBJECT (tag), "name", &name, NULL);
-				g_warning ("The regex for pattern tag `%s' matched "
+				g_warning ("The regex for pattern `%s' matched "
 					   "a zero length string.  That's probably "
-					   "due to a buggy regular expression.", name);
-				g_free (name);
+					   "due to a buggy regular expression.", pat->p.id);
 			}
 			g_free (pmatch);
 		}
@@ -1513,10 +1668,11 @@ check_pattern (GtkSourceSimpleEngine *se,
 					  pmatch->match.endpos);
 
 		/* ... and apply it */
-		gtk_text_buffer_apply_tag (GTK_TEXT_BUFFER (se->priv->buffer),
-					   GTK_TEXT_TAG (pmatch->tag),
-					   &start_iter,
-					   &end_iter);
+		if (pmatch->pattern->p.tag)
+			gtk_text_buffer_apply_tag (GTK_TEXT_BUFFER (se->priv->buffer),
+						   GTK_TEXT_TAG (pmatch->pattern->p.tag),
+						   &start_iter,
+						   &end_iter);
 
 		/* now skip it completely */
 		offset = pmatch->match.endpos;
@@ -1543,6 +1699,34 @@ check_pattern (GtkSourceSimpleEngine *se,
 	});
 }
 
+static void
+unhighlight_region (GtkSourceSimpleEngine *se,
+		    const GtkTextIter     *start,
+		    const GtkTextIter     *end)
+{
+	GList *l, *next_list;
+	
+	g_return_if_fail (GTK_IS_SOURCE_SIMPLE_ENGINE (se));
+
+	l = se->priv->pattern_items;
+	next_list = se->priv->syntax_items;
+	while (l)
+	{
+		Pattern *pat = l->data;
+
+		if (pat->tag)
+			gtk_text_buffer_remove_tag (GTK_TEXT_BUFFER (se->priv->buffer),
+						    GTK_TEXT_TAG (pat->tag), start, end);
+
+		l = l->next;
+		if (l == NULL && next_list)
+		{
+			l = next_list;
+			next_list = NULL;
+		}
+	}
+}
+
 static void 
 highlight_region (GtkSourceSimpleEngine *se,
 		  GtkTextIter           *start,
@@ -1550,7 +1734,7 @@ highlight_region (GtkSourceSimpleEngine *se,
 {
 	GtkTextIter b_iter, e_iter;
 	gint b_off, e_off, end_offset;
-	GtkSyntaxTag *current_tag;
+	const SyntaxPattern *current_sp;
 	SyntaxDelimiter *delim;
 	GArray *table;
 	gint region;
@@ -1571,7 +1755,7 @@ highlight_region (GtkSourceSimpleEngine *se,
 	/* remove_all_tags is not efficient: for different positions
 	   in the buffer it takes different times to complete, taking
 	   longer if the slice is at the beginning */
-	gtk_source_buffer_remove_all_source_tags (se->priv->buffer, start, end);
+	unhighlight_region (se, start, end);
 
 	slice_ptr = slice = gtk_text_iter_get_slice (start, end);
 	end_offset = gtk_text_iter_get_offset (end);
@@ -1590,7 +1774,7 @@ highlight_region (GtkSourceSimpleEngine *se,
 		/* select region to work on */
 		b_iter = e_iter;
 		b_off = e_off;
-		current_tag = delim ? delim->tag : NULL;
+		current_sp = delim ? delim->pattern : NULL;
 		region++;
 		delim = region <= table->len ?
 			&g_array_index (table, SyntaxDelimiter, region - 1) :
@@ -1603,12 +1787,13 @@ highlight_region (GtkSourceSimpleEngine *se,
 		gtk_text_iter_forward_chars (&e_iter, (e_off - b_off));
 
 		/* do the highlighting for the selected region */
-		if (current_tag) {
+		if (current_sp) {
 			/* apply syntax tag from b_iter to e_iter */
-			gtk_text_buffer_apply_tag (GTK_TEXT_BUFFER (se->priv->buffer),
-						   GTK_TEXT_TAG (current_tag),
-						   &b_iter,
-						   &e_iter);
+			if (current_sp->p.tag)
+				gtk_text_buffer_apply_tag (GTK_TEXT_BUFFER (se->priv->buffer),
+							   GTK_TEXT_TAG (current_sp->p.tag),
+							   &b_iter,
+							   &e_iter);
 
 			slice_ptr = g_utf8_offset_to_pointer (slice_ptr,
 							      e_off - b_off);
@@ -1652,6 +1837,19 @@ refresh_range (GtkSourceSimpleEngine *se,
 	g_signal_emit_by_name (se->priv->buffer, "highlight_updated", start, end);
 }
 
+static void
+invalidate_highlight (GtkSourceSimpleEngine *se,
+		      gboolean               highlight)
+{
+	GtkTextIter start, end;
+
+	gtk_text_buffer_get_bounds (GTK_TEXT_BUFFER (se->priv->buffer), &start, &end);
+	if (highlight)
+		refresh_range (se, &start, &end);
+	else
+		unhighlight_region (se, &start, &end);
+}
+
 static void 
 ensure_highlighted (GtkSourceSimpleEngine *se,
 		    const GtkTextIter     *start,
@@ -1693,41 +1891,6 @@ highlight_queue (GtkSourceSimpleEngine *se,
 			  gtk_text_iter_get_offset (end)));
 }
 
-static void
-gtk_source_simple_engine_highlight_region (GtkSourceEngine   *engine,
-					   const GtkTextIter *start,
-					   const GtkTextIter *end,
-					   gboolean           synchronous)
-{
-	GtkSourceSimpleEngine *se;
-	
-	g_return_if_fail (engine != NULL);
-	g_return_if_fail (GTK_IS_SOURCE_SIMPLE_ENGINE (engine));
-	g_return_if_fail (start != NULL);
-       	g_return_if_fail (end != NULL);
-
-	se = GTK_SOURCE_SIMPLE_ENGINE (engine);
-
-	if (se->priv->worker_last_offset < 0 ||
-	    se->priv->worker_last_offset >= gtk_text_iter_get_offset (end))
-	{
-		ensure_highlighted (se, start, end);
-	}
-	else
-	{
-		if (synchronous)
-		{
-			build_syntax_regions_table (se, end);
-			ensure_highlighted (se, start, end);
-		}
-		else
-		{
-			highlight_queue (se, start, end);
-			install_idle_worker (se);
-		}
-	}
-}
-
 /* Public API ------------------------------------------------------------ */
 
 /**
@@ -1744,5 +1907,157 @@ gtk_source_simple_engine_new ()
 						  NULL));
 	
 	return engine;
+}
+
+gboolean 
+gtk_source_simple_engine_add_simple_pattern (GtkSourceSimpleEngine *se,
+					     const gchar           *id,
+					     const gchar           *style,
+					     const gchar           *pattern)
+{
+	SimplePattern *pat;
+	gboolean rval = FALSE;
+	
+	g_return_val_if_fail (GTK_IS_SOURCE_SIMPLE_ENGINE (se), FALSE);
+	g_return_val_if_fail (id != NULL, FALSE);
+	g_return_val_if_fail (style != NULL, FALSE);
+	g_return_val_if_fail (pattern != NULL, FALSE);
+
+	if (!find_pattern (se->priv->pattern_items, id))
+	{
+		pat = simple_pattern_new (id, style, pattern);
+		if (pat)
+		{
+			if (se->priv->buffer)
+			{
+				/* lookup the text tag for the pattern
+				   and if we're highlighting queue up
+				   a refresh */
+				if (retrieve_pattern_tag (se, &(pat->p))
+				    && se->priv->highlight)
+					invalidate_highlight (se, TRUE);
+			}
+			se->priv->pattern_items = g_list_prepend (se->priv->pattern_items, pat);
+			rval = TRUE;
+		}
+	}
+	return rval;
+}
+
+gboolean 
+gtk_source_simple_engine_add_syntax_pattern (GtkSourceSimpleEngine *se,
+					     const gchar           *id,
+					     const gchar           *style,
+					     const gchar           *pattern_start,
+					     const gchar           *pattern_end)
+{
+	SyntaxPattern *pat;
+	gboolean rval = FALSE;
+
+	g_return_val_if_fail (GTK_IS_SOURCE_SIMPLE_ENGINE (se), FALSE);
+	g_return_val_if_fail (id != NULL, FALSE);
+	g_return_val_if_fail (style != NULL, FALSE);
+	g_return_val_if_fail (pattern_start != NULL, FALSE);
+	g_return_val_if_fail (pattern_end != NULL, FALSE);
+
+	if (!find_pattern (se->priv->syntax_items, id))
+	{
+		pat = syntax_pattern_new (id, style, pattern_start, pattern_end);
+		if (pat)
+		{
+			if (se->priv->buffer)
+				/* cache the text tag for the syntax pattern */
+				retrieve_pattern_tag (se, &(pat->p));
+
+			se->priv->syntax_items = g_list_prepend (se->priv->syntax_items, pat);
+
+			/* destroy the all syntax patterns regex so
+			 * it's recreated when needed */
+			gtk_source_regex_destroy (se->priv->reg_syntax_all);
+			se->priv->reg_syntax_all = NULL;
+			
+			/* invalidate syntax */
+			if (se->priv->buffer)
+				invalidate_syntax_regions (se, NULL, 0);
+
+			rval = TRUE;
+		}
+	}
+	return rval;
+}
+
+void 
+gtk_source_simple_engine_remove_pattern (GtkSourceSimpleEngine *se,
+					 const gchar           *id)
+{
+	GList *l;
+	
+	g_return_if_fail (GTK_IS_SOURCE_SIMPLE_ENGINE (se));
+	g_return_if_fail (id != NULL);
+
+	/* try simple patterns first */
+	l = find_pattern (se->priv->pattern_items, id);
+	if (l != NULL)
+	{
+		SimplePattern *pat = l->data;
+
+		if (pat->p.tag)
+		{
+			/* we *do* have a buffer... */
+			forget_pattern_tag (se, &(pat->p));
+			if (se->priv->highlight)
+				invalidate_highlight (se, TRUE);
+		}
+		
+		simple_pattern_destroy (pat);
+		se->priv->pattern_items = g_list_remove (se->priv->pattern_items, l);
+	}
+	else
+	{
+		l = find_pattern (se->priv->syntax_items, id);
+		if (l != NULL)
+		{
+			SyntaxPattern *sp = l->data;
+
+			if (sp->p.tag)
+				forget_pattern_tag (se, &(sp->p));
+				
+			se->priv->syntax_items = g_list_remove_link (se->priv->syntax_items, l);
+			syntax_pattern_destroy (sp);
+
+			/* destroy the all syntax patterns regex so
+			 * it's recreated when needed */
+			gtk_source_regex_destroy (se->priv->reg_syntax_all);
+			se->priv->reg_syntax_all = NULL;
+			
+			/* invalidate syntax */
+			if (se->priv->buffer)
+				invalidate_syntax_regions (se, NULL, 0);
+		}
+	}
+}
+
+gunichar 
+gtk_source_simple_engine_get_escape_char (GtkSourceSimpleEngine *se)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_SIMPLE_ENGINE (se), 0);
+
+	return se->priv->escape_char;
+}
+
+void 
+gtk_source_simple_engine_set_escape_char (GtkSourceSimpleEngine *se,
+					  gunichar               escape_char)
+{
+	g_return_if_fail (GTK_IS_SOURCE_SIMPLE_ENGINE (se));
+
+	if (escape_char != se->priv->escape_char)
+	{
+		se->priv->escape_char = escape_char;
+		
+		if (se->priv->buffer)
+			/* regenerate syntax tables */
+			invalidate_syntax_regions (se, NULL, 0);
+	}
 }
 

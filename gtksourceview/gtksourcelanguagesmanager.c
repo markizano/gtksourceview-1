@@ -25,13 +25,13 @@
 
 #include <libxml/xmlreader.h>
 
+#include "gtksourcetag.h"
+#include "gtksourcebuffer.h"
+#include "gtksourcelanguage.h"
 #include "gtksourcelanguagesmanager.h"
 
 #include "gtksourcelanguage-private.h"
 #include "gtksourceview-i18n.h"
-
-#include "gtksourcelanguage.h"
-#include "gtksourcetag.h"
 
 #define DEFAULT_GCONF_BASE_DIR		"/apps/gtksourceview"
 

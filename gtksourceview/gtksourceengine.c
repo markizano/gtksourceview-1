@@ -23,6 +23,7 @@
 #include <config.h>
 #endif
 
+#include "gtksourcebuffer.h"
 #include "gtksourceengine.h"
 
 static void gtk_source_engine_class_init (GtkSourceEngineClass *klass);
@@ -66,7 +67,6 @@ gtk_source_engine_class_init (GtkSourceEngineClass *klass)
 	parent_class = g_type_class_peek_parent (klass);
 
 	klass->attach_buffer = NULL;
-	klass->highlight_region = NULL;
 }
 
 static void
@@ -83,21 +83,5 @@ gtk_source_engine_attach_buffer (GtkSourceEngine *engine,
 	g_return_if_fail (GTK_SOURCE_ENGINE_GET_CLASS (engine)->attach_buffer);
 
 	GTK_SOURCE_ENGINE_GET_CLASS (engine)->attach_buffer (engine, buffer);
-}
-
-void 
-gtk_source_engine_highlight_region (GtkSourceEngine   *engine,
-				    const GtkTextIter *start,
-				    const GtkTextIter *end,
-				    gboolean           synchronous)
-{
-	g_return_if_fail (engine != NULL);
-	g_return_if_fail (GTK_IS_SOURCE_ENGINE (engine));
-	g_return_if_fail (start != NULL && end != NULL);
-	g_return_if_fail (GTK_SOURCE_ENGINE_GET_CLASS (engine)->highlight_region);
-
-	GTK_SOURCE_ENGINE_GET_CLASS (engine)->highlight_region (engine,
-								start, end,
-								synchronous);
 }
 

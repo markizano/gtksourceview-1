@@ -20,7 +20,7 @@
 #ifndef __GTK_SOURCE_LANGUAGE_PRIVATE_H__
 #define __GTK_SOURCE_LANGUAGE_PRIVATE_H__
 
-#include "gtksourcelanguagesmanager.h"
+#include <glib.h>
 
 G_BEGIN_DECLS
 
@@ -34,6 +34,8 @@ struct _GtkSourceLanguagePrivate
 	gchar			*name;
 	gchar			*section;
 
+	gint                     version;
+	
 	GSList			*mime_types;
 
 	GHashTable		*tag_id_to_style_name;

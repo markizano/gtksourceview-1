@@ -80,6 +80,12 @@
 </para>
 
 
+<!-- ##### ARG GtkSourceBuffer:escape-char ##### -->
+<para>
+
+</para>
+
+
 <!-- ##### FUNCTION gtk_pattern_tag_get_type ##### -->
 <para>
 
@@ -94,6 +100,22 @@
 
 @iter: 
 @Returns: 
+
+<!-- ##### FUNCTION gtk_source_buffer_get_escape_char ##### -->
+<para>
+
+</para>
+
+@buffer: 
+@Returns: 
+
+<!-- ##### FUNCTION gtk_source_buffer_set_escape_char ##### -->
+<para>
+
+</para>
+
+@buffer: 
+@escape_char: 
 
 <!-- ##### FUNCTION gtk_syntax_tag_get_type ##### -->
 <para>

@@ -958,7 +958,7 @@ get_text_with_style (GtkSourcePrintJob *job,
 	GtkTextIter limit, iter;
 	
 	/* make sure the region to print is highlighted */
-	_gtk_source_buffer_highlight_region (job->priv->buffer, start, end, TRUE);
+	g_signal_emit_by_name (job->priv->buffer, "update_highlight", start, end, TRUE);
 
 	/* FIXME: handle invisible text properly.  This also assumes
 	 * the text has no embedded images and stuff */

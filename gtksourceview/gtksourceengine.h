@@ -23,7 +23,6 @@
 #define __GTK_SOURCE_ENGINE_H__
 
 #include <glib-object.h>
-#include <gtksourceview/gtksourcebuffer.h>
 
 G_BEGIN_DECLS
 
@@ -48,21 +47,12 @@ struct _GtkSourceEngineClass
 
 	void     (* attach_buffer)    (GtkSourceEngine   *engine,
 				       GtkSourceBuffer   *buffer);
-	void     (* highlight_region) (GtkSourceEngine   *engine,
-				       const GtkTextIter *start,
-				       const GtkTextIter *end,
-				       gboolean           synchronous);
 };
 
 GType       gtk_source_engine_get_type 	       (void) G_GNUC_CONST;
 
 void        gtk_source_engine_attach_buffer    (GtkSourceEngine   *engine,
 						GtkSourceBuffer   *buffer);
-
-void        gtk_source_engine_highlight_region (GtkSourceEngine   *engine,
-						const GtkTextIter *start,
-						const GtkTextIter *end,
-						gboolean           synchronous);
 
 
 G_END_DECLS

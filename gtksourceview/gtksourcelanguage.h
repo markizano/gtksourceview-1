@@ -26,6 +26,8 @@
 
 #include <gtksourceview/gtksourcetagstyle.h>
 #include <gtksourceview/gtksourcestylescheme.h>
+#include <gtksourceview/gtksourceengine.h>
+
 
 G_BEGIN_DECLS
 
@@ -62,6 +64,8 @@ struct _GtkSourceLanguageClass
 	void (*_gtk_source_reserved3) (void);
 };
 
+#define GTK_SOURCE_LANGUAGE_VERSION_1_0  100
+
 
 GType            	 gtk_source_language_get_type 			(void) G_GNUC_CONST;
 
@@ -69,11 +73,12 @@ gchar	 		*gtk_source_language_get_id			(GtkSourceLanguage       *language);
 
 gchar	 		*gtk_source_language_get_name			(GtkSourceLanguage       *language);
 gchar			*gtk_source_language_get_section		(GtkSourceLanguage       *language);
+gint			 gtk_source_language_get_version		(GtkSourceLanguage       *language);
+
+GtkSourceEngine         *gtk_source_language_create_engine              (GtkSourceLanguage       *language);
 
 /* The list must be freed and the tags unref'ed */
 GSList			*gtk_source_language_get_tags			(GtkSourceLanguage       *language);
-
-gunichar                 gtk_source_language_get_escape_char            (GtkSourceLanguage       *language);
 
 /* Should free the list (and free each string in it also). */
 GSList			*gtk_source_language_get_mime_types		(GtkSourceLanguage       *language);
