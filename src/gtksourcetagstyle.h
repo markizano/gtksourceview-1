@@ -27,18 +27,28 @@ G_BEGIN_DECLS
 
 typedef struct _GtkSourceTagStyle GtkSourceTagStyle;
 
-struct _GtkSourceTagStyle {
-	GdkColor foreground;
-	GdkColor background;
-	gboolean italic;
-	gboolean bold;
+typedef enum {
+	GTK_SOURCE_TAG_STYLE_USE_BACKGROUND = 1 << 0,
+	GTK_SOURCE_TAG_STYLE_USE_FOREGROUND = 1 << 1
+} GtkSourceTagStyleMask; 
 
-	/* use_background must be TRUE is background contain
-	 * a valid value */
-	gboolean use_background;
+struct _GtkSourceTagStyle {
 
 	/* readonly */
 	gboolean is_default;
+
+	guint mask;
+	
+	GdkColor foreground;
+	GdkColor background;
+	
+	gboolean italic;
+	gboolean bold;
+	gboolean underline;
+	gboolean strikethrough;
+
+	/* Reserved for future expansion */
+	guint8 reserved[16];	
 };
 
 G_END_DECLS

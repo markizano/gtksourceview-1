@@ -56,6 +56,7 @@
 #define DEFAULT_MARGIN			80
 #define MAX_MARGIN			200
 
+/* Signals */
 enum {
 	UNDO,
 	REDO,
@@ -120,6 +121,7 @@ static void 	set_source_buffer 			(GtkSourceView      *view,
 
 static void	gtk_source_view_populate_popup 		(GtkTextView        *view,
 					    		 GtkMenu            *menu);
+
 static void 	menu_item_activate_cb 			(GtkWidget          *menu_item,
 				  			 GtkTextView        *text_view);
 
@@ -245,7 +247,6 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 							    MAX_MARGIN,
 							    DEFAULT_MARGIN,
 							    G_PARAM_READWRITE));
-
 
 	signals [UNDO] =
 		g_signal_new ("undo",
@@ -601,7 +602,6 @@ gtk_source_view_undo (GtkSourceView *view)
 {
 	GtkSourceBuffer *buffer;
 	
-	g_return_if_fail (view != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
 
 	buffer = GTK_SOURCE_BUFFER (
@@ -619,7 +619,6 @@ gtk_source_view_redo (GtkSourceView *view)
 {
 	GtkSourceBuffer *buffer;
 
-	g_return_if_fail (view != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
 
 	buffer = GTK_SOURCE_BUFFER (
@@ -1236,7 +1235,7 @@ gtk_source_view_get_type (void)
 }
 
 gboolean
-gtk_source_view_get_show_line_numbers (const GtkSourceView *view)
+gtk_source_view_get_show_line_numbers (GtkSourceView *view)
 {
 	g_return_val_if_fail (view != NULL, FALSE);
 	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
@@ -1287,7 +1286,7 @@ gtk_source_view_set_show_line_numbers (GtkSourceView *view,
 }
 
 gboolean
-gtk_source_view_get_show_line_markers (const GtkSourceView *view)
+gtk_source_view_get_show_line_markers (GtkSourceView *view)
 {
 	g_return_val_if_fail (view != NULL, FALSE);
 	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
@@ -1338,7 +1337,7 @@ gtk_source_view_set_show_line_markers (GtkSourceView *view,
 }
 
 guint
-gtk_source_view_get_tabs_width (const GtkSourceView *view)
+gtk_source_view_get_tabs_width (GtkSourceView *view)
 {
 	g_return_val_if_fail (view != NULL, FALSE);
 	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
@@ -1588,7 +1587,7 @@ gtk_source_view_set_auto_indent (GtkSourceView *view, gboolean enable)
 }
 
 gboolean
-gtk_source_view_get_insert_spaces_instead_of_tabs (const GtkSourceView *view)
+gtk_source_view_get_insert_spaces_instead_of_tabs (GtkSourceView *view)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
 
@@ -1693,7 +1692,7 @@ gtk_source_view_set_show_margin (GtkSourceView *view, gboolean show)
 }
 
 gboolean 
-gtk_source_view_get_show_margin (const GtkSourceView *view)
+gtk_source_view_get_show_margin (GtkSourceView *view)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
 
@@ -1718,7 +1717,7 @@ gtk_source_view_set_margin (GtkSourceView *view, guint margin)
 }
 		
 guint
-gtk_source_view_get_margin  (const GtkSourceView *view)
+gtk_source_view_get_margin  (GtkSourceView *view)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), DEFAULT_MARGIN);
 

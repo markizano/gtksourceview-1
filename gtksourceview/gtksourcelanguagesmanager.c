@@ -42,7 +42,6 @@
 
 enum {
 	PROP_0,
-	PROP_GCONF_BASE_DIR,
 	PROP_LANG_SPECS_DIRS
 };
 
@@ -51,7 +50,6 @@ struct _GtkSourceLanguagesManagerPrivate {
 	GSList 		*available_languages;
 
 	GSList		*language_specs_directories;
-	gchar		*gconf_base_dir;
 };
 
 
@@ -77,11 +75,6 @@ static void	 gtk_source_languages_manager_get_property 	(GObject 		   *object,
 					   			 GParamSpec		   *pspec);
 static void	 gtk_source_languages_manager_set_specs_dirs	(GtkSourceLanguagesManager *lm,
 								 const GSList 		   *dirs);
-const GSList	*gtk_source_languages_manager_get_specs_dirs	(GtkSourceLanguagesManager *lm);
-
-static void	 gtk_source_languages_manager_set_gconf_base_dir(GtkSourceLanguagesManager *lm,
-								 const gchar		   *dir);
-
 
 static void
 gtk_source_languages_manager_class_init (GtkSourceLanguagesManagerClass *klass)
@@ -93,20 +86,10 @@ gtk_source_languages_manager_class_init (GtkSourceLanguagesManagerClass *klass)
 
 	object_class->set_property = gtk_source_languages_manager_set_property;
 	object_class->get_property = gtk_source_languages_manager_get_property;
-
-	g_object_class_install_property (object_class,
-					 PROP_GCONF_BASE_DIR,
-					 g_param_spec_string ("gconf_base_dir",
-                                                              _("GConf base dir"),
-                                                              _("GConf base dir used to store "
-							        "user preferences"),
-							      DEFAULT_GCONF_BASE_DIR,
-							      (G_PARAM_READWRITE | 
-							       G_PARAM_CONSTRUCT_ONLY)));
-
+	
 	g_object_class_install_property (object_class,
 					 PROP_LANG_SPECS_DIRS,
-					 g_param_spec_pointer ("lang_specs_dir",
+					 g_param_spec_pointer ("lang_files_dirs",
 						 	       _("Language spefications directories"),
 							       _("List of directories where the "
 								 "language spefication files (.lang) "
@@ -127,13 +110,7 @@ gtk_source_languages_manager_set_property (GObject 	*object,
 
 	lm = GTK_SOURCE_LANGUAGES_MANAGER (object);
     
-	switch (prop_id) {
-	    case PROP_GCONF_BASE_DIR:
-		gtk_source_languages_manager_set_gconf_base_dir (
-				lm, 
-				g_value_get_string (value));
-		break;
-	
+	switch (prop_id) {	
 	    case PROP_LANG_SPECS_DIRS:
 		gtk_source_languages_manager_set_specs_dirs (
 				lm, 
@@ -158,11 +135,7 @@ gtk_source_languages_manager_get_property (GObject 	*object,
 
 	lm = GTK_SOURCE_LANGUAGES_MANAGER (object);
     
-	switch (prop_id) {
-	    case PROP_GCONF_BASE_DIR:
-		    g_value_set_string (value, lm->priv->gconf_base_dir);
-		    break;
-	
+	switch (prop_id) {	
 	    case PROP_LANG_SPECS_DIRS:
 		    g_value_set_pointer (value, lm->priv->language_specs_directories);
 		    break;
@@ -193,8 +166,6 @@ gtk_source_languages_manager_finalize (GObject *object)
 	GtkSourceLanguagesManager *lm;
        
 	lm = GTK_SOURCE_LANGUAGES_MANAGER (object);
-	
-	g_free (lm->priv->gconf_base_dir);
 	
 	if (lm->priv->available_languages != NULL)
 	{
@@ -241,24 +212,11 @@ gtk_source_languages_manager_set_specs_dirs (GtkSourceLanguagesManager	*lm,
 }
 
 const GSList *
-gtk_source_languages_manager_get_specs_dirs (GtkSourceLanguagesManager *lm)
+gtk_source_languages_manager_get_lang_files_dirs (GtkSourceLanguagesManager *lm)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGES_MANAGER (lm), NULL);
 
 	return lm->priv->language_specs_directories;
-}
-
-static void
-gtk_source_languages_manager_set_gconf_base_dir (GtkSourceLanguagesManager 	*lm,
-						 const gchar			*dir)
-{
-	g_return_if_fail (GTK_IS_SOURCE_LANGUAGES_MANAGER (lm));
-	g_return_if_fail (lm->priv->gconf_base_dir == NULL);
-
-	if (dir != NULL)
-		lm->priv->gconf_base_dir = g_strdup (dir);
-	else
-		lm->priv->gconf_base_dir = g_strdup (DEFAULT_GCONF_BASE_DIR);
 }
 
 const GSList *
@@ -315,7 +273,7 @@ gtk_source_languages_manager_get_language_from_mime_type (GtkSourceLanguagesMana
 
 	while (languages != NULL)
 	{
-		const GSList *mime_types;
+		GSList *mime_types;
 
 		GtkSourceLanguage *lang = GTK_SOURCE_LANGUAGE (languages->data);
 		
@@ -323,16 +281,15 @@ gtk_source_languages_manager_get_language_from_mime_type (GtkSourceLanguagesMana
 
 		while (mime_types != NULL)
 		{
-			/* FIXME: is this right ? - Paolo */
 			if (strcmp ((const gchar*)mime_types->data, mime_type) == 0)
 			{		
-				g_object_ref (lang);
-		
 				return lang;
 			}
 
 			mime_types = g_slist_next (mime_types);
 		}
+
+		slist_deep_free (mime_types);
 
 		languages = g_slist_next (languages);
 	}

@@ -446,15 +446,24 @@ gtk_source_buffer_constructor (GType                  type,
 							       n_construct_properties,
 							       construct_param);
 	
-	if (g_object) {
+	if (g_object) 
+	{
+		GtkSourceTagStyle tag_style;
+		
 		GtkSourceBuffer *source_buffer = GTK_SOURCE_BUFFER (g_object);
 		
+		gdk_color_parse ("white", &tag_style.foreground);
+		gdk_color_parse ("gray", &tag_style.background);
+		tag_style.mask |= (GTK_SOURCE_TAG_STYLE_USE_BACKGROUND |
+				   GTK_SOURCE_TAG_STYLE_USE_FOREGROUND);
+
+		tag_style.italic = FALSE;
+		tag_style.bold = TRUE;
+		tag_style.underline = FALSE;
+		tag_style.strikethrough = FALSE;
+
 		/* Set default bracket match style */
-		gtk_source_buffer_set_bracket_match_style (source_buffer,
-							   "foreground", "white",
-							   "background", "red",
-							   "weight", PANGO_WEIGHT_BOLD,
-							   NULL);
+		gtk_source_buffer_set_bracket_match_style (source_buffer, &tag_style);
 
 		if (GTK_IS_SOURCE_TAG_TABLE (GTK_TEXT_BUFFER (source_buffer)->tag_table))
 		{
@@ -1088,7 +1097,7 @@ gtk_source_buffer_find_bracket_match (GtkTextIter *orig)
 }
 	
 gboolean
-gtk_source_buffer_can_undo (const GtkSourceBuffer *buffer)
+gtk_source_buffer_can_undo (GtkSourceBuffer *buffer)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), FALSE);
 
@@ -1096,7 +1105,7 @@ gtk_source_buffer_can_undo (const GtkSourceBuffer *buffer)
 }
 
 gboolean
-gtk_source_buffer_can_redo (const GtkSourceBuffer *buffer)
+gtk_source_buffer_can_redo (GtkSourceBuffer *buffer)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), FALSE);
 
@@ -1122,7 +1131,7 @@ gtk_source_buffer_redo (GtkSourceBuffer *buffer)
 }
 
 gint
-gtk_source_buffer_get_max_undo_levels (const GtkSourceBuffer *buffer)
+gtk_source_buffer_get_max_undo_levels (GtkSourceBuffer *buffer)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), 0);
 
@@ -1184,17 +1193,16 @@ gtk_source_buffer_set_check_brackets (GtkSourceBuffer *buffer,
 }
 
 void 
-gtk_source_buffer_set_bracket_match_style (GtkSourceBuffer *source_buffer,
-					   const gchar     *first_property_name,
-					   ...)
+gtk_source_buffer_set_bracket_match_style (GtkSourceBuffer         *source_buffer,
+					   const GtkSourceTagStyle *style)
 {
-	va_list list;
+	GtkTextTag *tag;
 	
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (source_buffer));
-	g_return_if_fail (first_property_name != NULL);
+	g_return_if_fail (style != NULL);
 
 	/* create the tag if not already done so */
-	if (!source_buffer->priv->bracket_match_tag)
+	if (source_buffer->priv->bracket_match_tag == NULL)
 	{
 		source_buffer->priv->bracket_match_tag = gtk_text_tag_new (NULL);
 		gtk_text_tag_table_add (gtk_text_buffer_get_tag_table (
@@ -1203,18 +1211,39 @@ gtk_source_buffer_set_bracket_match_style (GtkSourceBuffer *source_buffer,
 		g_object_unref (source_buffer->priv->bracket_match_tag);
 	}
 	
-	/* set style */
-	if (first_property_name)
+	g_return_if_fail (source_buffer->priv->bracket_match_tag != NULL);
+	tag = source_buffer->priv->bracket_match_tag;
+	
+	/* Foreground color */
+	if ((style->mask & GTK_SOURCE_TAG_STYLE_USE_FOREGROUND) != 0)
 	{
-		va_start (list, first_property_name);
-		g_object_set_valist (G_OBJECT (source_buffer->priv->bracket_match_tag),
-				     first_property_name, list);
-		va_end (list);
+		GValue foreground = { 0, };
+		
+		g_value_init (&foreground, GDK_TYPE_COLOR);
+		g_value_set_boxed (&foreground, &style->foreground);
+		g_object_set_property (G_OBJECT (tag), "foreground_gdk", &foreground);
 	}
+
+	/* Background color */
+	if ((style->mask & GTK_SOURCE_TAG_STYLE_USE_BACKGROUND) != 0)
+	{
+		GValue background = { 0, };
+
+		g_value_init (&background, GDK_TYPE_COLOR);
+		g_value_set_boxed (&background, &style->background);
+		g_object_set_property (G_OBJECT (tag), "background_gdk", &background);
+	}
+	
+	g_object_set (G_OBJECT (tag), 
+		      "style", style->italic ? PANGO_STYLE_ITALIC : PANGO_STYLE_NORMAL,
+		      "weight", style->bold ? PANGO_WEIGHT_BOLD : PANGO_WEIGHT_NORMAL,
+		      "strikethrough", style->strikethrough,
+		      "underline", style->underline ? PANGO_UNDERLINE_SINGLE : PANGO_UNDERLINE_NONE,
+		      NULL);	
 }
 
 gboolean
-gtk_source_buffer_get_highlight (const GtkSourceBuffer *buffer)
+gtk_source_buffer_get_highlight (GtkSourceBuffer *buffer)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), FALSE);
 
@@ -2584,14 +2613,14 @@ gtk_source_buffer_set_language (GtkSourceBuffer   *buffer,
 
 	/* remove previous tags */
 	table = GTK_SOURCE_TAG_TABLE (gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (buffer)));
-	gtk_source_tag_table_remove_all_source_tags (table);
+	gtk_source_tag_table_remove_source_tags (table);
 
 	if (language != NULL)
 	{
 		GSList *list = NULL;
 			
 		list = gtk_source_language_get_tags (language);		
- 		gtk_source_tag_table_add_all (table, list);
+ 		gtk_source_tag_table_add_tags (table, list);
 
 		g_slist_foreach (list, (GFunc)g_object_unref, NULL);
 		g_slist_free (list);

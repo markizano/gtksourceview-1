@@ -1,9 +1,9 @@
-TODO (last update: 12 April 2003)
+TODO (last update: 15 April 2003)
 =================================
 
 Before next release:
 
-[ ] Reviewing the APIs
+[X] Reviewing the APIs
 [X] Support for multiple views (Gustavo)
 [X] Removing the style themes stuff (Paolo)
 [X] Finishing the .lang file stuff (Paolo)
@@ -36,7 +36,6 @@ Future releases:
     our format) (Gustavo)
 [ ] Implementing smart indentation (Paolo)
 [ ] Writing documentation
-[ ] Monitor gconf values in GtkSourceLanguage (Paolo)
 [ ] Properties in GtkSourceLanguage (?) (Paolo)
 [X] Moving some of the code of gedit-view in gtksourceview (Paolo)
 [ ] Moving the gedit printing code to gtksourceview (Paolo)

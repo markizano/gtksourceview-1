@@ -54,6 +54,11 @@ struct _GtkSourceLanguageClass
 
 	void			  (*tag_style_changed) (GtkSourceLanguage *language,
 							const gchar       *name);
+
+	/* Padding for future expansion */
+	void (*_gtk_source_reserved1) (void);
+	void (*_gtk_source_reserved2) (void);
+	void (*_gtk_source_reserved3) (void);
 };
 
 
@@ -62,17 +67,17 @@ GType            	 gtk_source_language_get_type 			(void) G_GNUC_CONST;
 gchar	 		*gtk_source_language_get_name			(GtkSourceLanguage       *language);
 gchar			*gtk_source_language_get_section		(GtkSourceLanguage       *language);
 
-/* The list must be freed and the tags unrefed */
+/* The list must be freed and the tags unref'ed */
 GSList			*gtk_source_language_get_tags			(GtkSourceLanguage       *language);
 
 gunichar                 gtk_source_language_get_escape_char            (GtkSourceLanguage       *language);
 
-const GSList		*gtk_source_language_get_mime_types		(GtkSourceLanguage       *language);
+/* Should free the list (and free each string in it also). */
+GSList			*gtk_source_language_get_mime_types		(GtkSourceLanguage       *language);
 void			 gtk_source_language_set_mime_types		(GtkSourceLanguage       *language,
 								 	 const GSList		 *mime_types);
 
-const GtkSourceStyleScheme 
-			*gtk_source_language_get_style_scheme		(GtkSourceLanguage       *language);
+GtkSourceStyleScheme	*gtk_source_language_get_style_scheme		(GtkSourceLanguage       *language);
 void			 gtk_source_language_set_style_scheme		(GtkSourceLanguage       *language,
 									 GtkSourceStyleScheme    *scheme);
 

@@ -50,8 +50,8 @@ struct _GtkSourceTagTableClass
 	void (* changed) (GtkSourceTagTable *table);
 	
   	/* Padding for future expansion */
-  	void (*_gtk_reserved1) (void);
-  	void (*_gtk_reserved2) (void);
+  	void (*_gtk_source_reserved1) (void);
+  	void (*_gtk_source_reserved2) (void);
 };
 
 
@@ -59,10 +59,10 @@ GType			 gtk_source_tag_table_get_type	 		(void) G_GNUC_CONST;
 
 GtkSourceTagTable 	*gtk_source_tag_table_new	 		(void);
 
-void			 gtk_source_tag_table_add_all	 		(GtkSourceTagTable *table, 
+void			 gtk_source_tag_table_add_tags	 		(GtkSourceTagTable *table, 
 							  		 const GSList 	   *tags);
 
-void			 gtk_source_tag_table_remove_all_source_tags 	(GtkSourceTagTable *table);
+void			 gtk_source_tag_table_remove_source_tags 	(GtkSourceTagTable *table);
 
 G_END_DECLS
 

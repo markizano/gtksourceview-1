@@ -57,14 +57,12 @@ libgtksourceview_1_0_include_HEADERS = 	\
 	gtksourcebuffer.h 		\
 	gtksourcetag.h 			\
 	gtksourceview.h 		\
-	gtksourceregex.h 		\
 	gtksourcelanguage.h 		\
 	gtksourcelanguagesmanager.h 	\
 	gtksourcetagstyle.h 		\
 	gtksourcetagtable.h		\
 	gtksourcestylescheme.h		\
-	gtksourcemarker.h		\
-	gtktextregion.h
+	gtksourcemarker.h
 
 gtksourceview-marshal.h: gtksourceview-marshal.list $(GLIB_GENMARSHAL)
 	$(GLIB_GENMARSHAL) $< --header --prefix=gtksourceview_marshal > $@

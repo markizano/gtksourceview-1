@@ -37,6 +37,7 @@ static GtkSourceTagClass 	*parent_pattern_class = NULL;
 
 static void		 gtk_source_tag_init 		(GtkSourceTag       *text_tag);
 static void		 gtk_source_tag_class_init 	(GtkSourceTagClass  *text_tag);
+static void		 gtk_source_tag_finalize	(GObject            *object);
 
 static void		 gtk_syntax_tag_init 		(GtkSyntaxTag       *text_tag);
 static void		 gtk_syntax_tag_class_init 	(GtkSyntaxTagClass  *text_tag);
@@ -77,71 +78,81 @@ gtk_source_tag_get_type (void)
 static void
 gtk_source_tag_class_init (GtkSourceTagClass *klass)
 {
+	GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
 	parent_class = g_type_class_peek_parent (klass);
+	object_class->finalize	= gtk_source_tag_finalize;
 }
 
 static void
 gtk_source_tag_init (GtkSourceTag *text_tag)
 {
+	text_tag->style = NULL;
+}
+
+static void
+gtk_source_tag_finalize (GObject *object)
+{
+	GtkSourceTag *tag;
+
+	tag = GTK_SOURCE_TAG (object);
+	
+	g_free (tag->style);
+	
+	G_OBJECT_CLASS (parent_class)->finalize (object);
 }
 
 GtkSourceTagStyle *
 gtk_source_tag_get_style (GtkSourceTag *tag)
 {
 	GtkSourceTagStyle *style;
-	gint text_style, text_weight;
-	
-	g_return_val_if_fail (tag != NULL && GTK_IS_SOURCE_TAG (tag), NULL);
+		
+	g_return_val_if_fail (GTK_IS_SOURCE_TAG (tag), NULL);
 
 	style = g_new0 (GtkSourceTagStyle, 1);
 
-	g_object_get (G_OBJECT (tag),
-		      "foreground_gdk", &style->foreground,
-		      "background_gdk", &style->background,
-		      "style", &text_style,
-		      "weight", &text_weight,
-		      NULL);
-
-	style->use_background = TRUE;
-	style->italic = ((text_style & PANGO_STYLE_ITALIC) != 0);
-	style->bold = ((text_weight & PANGO_WEIGHT_BOLD) != 0);
-		      
+	*style = *tag->style;
+	
 	return style;
 }
 
 void 
 gtk_source_tag_set_style (GtkSourceTag *tag, const GtkSourceTagStyle *style)
 {
-	GValue italic = { 0, };
-	GValue bold = { 0, };
 	GValue foreground = { 0, };
 	GValue background = { 0, };
 
-	g_return_if_fail (tag != NULL && style != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_TAG (tag));
-	
-	/* Foreground color. */
-	g_value_init (&foreground, GDK_TYPE_COLOR);
-	g_value_set_boxed (&foreground, &style->foreground);
-	g_object_set_property (G_OBJECT (tag), "foreground_gdk", &foreground);
+	g_return_if_fail (style != NULL);
 
-	/* Background color. */
-	if (style->use_background)
+	/* Foreground color */
+	if ((style->mask & GTK_SOURCE_TAG_STYLE_USE_FOREGROUND) != 0)
+	{
+		g_value_init (&foreground, GDK_TYPE_COLOR);
+		g_value_set_boxed (&foreground, &style->foreground);
+		g_object_set_property (G_OBJECT (tag), "foreground_gdk", &foreground);
+	}
+
+	/* Background color */
+	if ((style->mask & GTK_SOURCE_TAG_STYLE_USE_BACKGROUND) != 0)
 	{
 		g_value_init (&background, GDK_TYPE_COLOR);
 		g_value_set_boxed (&background, &style->background);
 		g_object_set_property (G_OBJECT (tag), "background_gdk", &background);
 	}
+	
+	g_object_set (G_OBJECT (tag), 
+		      "style", style->italic ? PANGO_STYLE_ITALIC : PANGO_STYLE_NORMAL,
+		      "weight", style->bold ? PANGO_WEIGHT_BOLD : PANGO_WEIGHT_NORMAL,
+		      "strikethrough", style->strikethrough,
+		      "underline", style->underline ? PANGO_UNDERLINE_SINGLE : PANGO_UNDERLINE_NONE,
+		      NULL);
 
-	/* Bold setting. */
-	g_value_init (&italic, PANGO_TYPE_STYLE);
-	g_value_set_enum (&italic, style->italic ? PANGO_STYLE_ITALIC : PANGO_STYLE_NORMAL);
-	g_object_set_property (G_OBJECT (tag), "style", &italic);
+	g_free (tag->style);
 
-	/* Italic setting. */
-	g_value_init (&bold, G_TYPE_INT);
-	g_value_set_int (&bold, style->bold ? PANGO_WEIGHT_BOLD : PANGO_WEIGHT_NORMAL);
-	g_object_set_property (G_OBJECT (tag), "weight", &bold);
+	tag->style = g_new0 (GtkSourceTagStyle, 1);
+
+	*tag->style = *style;
 }
 
 
@@ -445,6 +456,3 @@ gtk_string_tag_new (const gchar    *name,
 		return tag;
 	}
 }
-
-
-

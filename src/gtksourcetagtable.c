@@ -151,7 +151,7 @@ unblock_signals (GtkSourceTagTable *tt)
 
 
 /**
- * gtk_source_tag_table_add_all:
+ * gtk_source_tag_table_add_tags:
  * @table: a #GtkSourceTagTable
  * @tag: a #GSList containing #GtkTextTag objects 
  *
@@ -162,7 +162,7 @@ unblock_signals (GtkSourceTagTable *tt)
  * then it is not added to the table.
  **/
 void 
-gtk_source_tag_table_add_all (GtkSourceTagTable *table, const GSList *tags)
+gtk_source_tag_table_add_tags (GtkSourceTagTable *table, const GSList *tags)
 {
 	gint old_size;
 	
@@ -198,7 +198,7 @@ foreach_remove_tag (GtkTextTag *tag, gpointer data)
 
 
 /**
- * gtk_source_tag_table_remove_all_source_tags:
+ * gtk_source_tag_table_remove_source_tags:
  * @table: a #GtkSourceTagTable
  * 
  * Remove all the source tags from the table. This will remove the table's
@@ -206,7 +206,7 @@ foreach_remove_tag (GtkTextTag *tag, gpointer data)
  * up destroyed if you don't have a reference to them.
  **/
 void 
-gtk_source_tag_table_remove_all_source_tags (GtkSourceTagTable *table)
+gtk_source_tag_table_remove_source_tags (GtkSourceTagTable *table)
 {
 	GSList *tags = NULL;
 	gint old_size;

@@ -36,9 +36,7 @@ struct _GtkSourceLanguagePrivate
 	GSList			*mime_types;
 
 	GHashTable		*tag_name_to_style_name;
-
-	GConfClient		*gconf_client;
-	gchar			*gconf_base_dir;
+	GHashTable		*tag_name_to_style;
 
 	GtkSourceStyleScheme 	*style_scheme;
 

@@ -24,7 +24,6 @@
 #include <string.h>
 
 #include <libxml/xmlreader.h>
-#include <gconf/gconf.h>
 
 #include "gtksourcelanguage-private.h"
 #include "gtksourceview-i18n.h"
@@ -35,12 +34,11 @@
 
 static void	 	  gtk_source_language_class_init 	(GtkSourceLanguageClass 	*klass);
 static void		  gtk_source_language_init		(GtkSourceLanguage 		*lang);
-static void	 	  gtk_source_language_finalize 		(GObject 			*object);
+static void		  gtk_source_language_finalize 		(GObject 			*object);
 
 static GtkSourceLanguage *process_language_node 		(xmlTextReaderPtr 		 reader, 
 								 const gchar 			*filename);
-static gchar 		 *get_gconf_key 			(const GtkSourceLanguage 	*lang, 
-								 const gchar 			*k);
+static GSList 		 *get_mime_types_from_file 		(GtkSourceLanguage 		*language);
 
 /* Signals */
 enum {
@@ -114,41 +112,6 @@ _gtk_source_language_new_from_file (const gchar			*filename,
 		g_warning("Unable to open '%s'", filename);
 
     	}
-
-	if (lang != NULL)
-	{
-		lang->priv->gconf_client = gconf_client_get_default ();
-
-		g_object_get (lm, "gconf_base_dir", &lang->priv->gconf_base_dir, NULL);
-		g_return_val_if_fail (lang->priv->gconf_base_dir != NULL, lang);
-
-
-		if (lang->priv->gconf_client != NULL)
-		{
-			GSList *mime_types = NULL;
-			gchar *key;
-
-			key = get_gconf_key (lang, "mime_types");
-			g_return_val_if_fail (key != NULL, lang);
-
-			mime_types = gconf_client_get_list (lang->priv->gconf_client,
-							    key,
-							    GCONF_VALUE_STRING, 
-							    NULL);
-
-			g_free (key);
-			
-			/* Get mime types from gconf if needed */
-
-			if (mime_types != NULL)
-			{
-				slist_deep_free (lang->priv->mime_types);
-				lang->priv->mime_types = mime_types;
-			}
-		}
-		else
-			g_warning ("Error connecting to GConf.");
-	}	
 	
 	return lang;
 }
@@ -221,9 +184,6 @@ gtk_source_language_finalize (GObject *object)
 
 		g_free (lang->priv->lang_file_name);
 
-		if (lang->priv->gconf_client != NULL)
-			g_object_unref (lang->priv->gconf_client);
-
 		xmlFree (lang->priv->name);
 		xmlFree (lang->priv->section);
 
@@ -231,8 +191,9 @@ gtk_source_language_finalize (GObject *object)
 
 		if (lang->priv->tag_name_to_style_name != NULL)
 			g_hash_table_destroy (lang->priv->tag_name_to_style_name);
-		
-		g_free (lang->priv->gconf_base_dir);
+
+		if (lang->priv->tag_name_to_style != NULL)
+			g_hash_table_destroy (lang->priv->tag_name_to_style);
 
 		g_object_unref (lang->priv->style_scheme);
 
@@ -240,37 +201,6 @@ gtk_source_language_finalize (GObject *object)
 	}
 	
 	G_OBJECT_CLASS (parent_class)->finalize (object);
-}
-
-
-static gchar *
-get_gconf_key (const GtkSourceLanguage *lang, const gchar *k)
-{
-	gchar *temp;
-	gchar *key;
-	gchar *name;
-
-	g_return_val_if_fail (lang->priv->gconf_base_dir != NULL, NULL);
-
-	name = gconf_escape_key (lang->priv->name, -1);
-	g_return_val_if_fail (name != NULL, NULL);
-	
-	key = gconf_concat_dir_and_key (lang->priv->gconf_base_dir, "languages");
-
-	g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
-	
-	temp = gconf_concat_dir_and_key (key, name);
-	g_return_val_if_fail (gconf_valid_key (temp, NULL), NULL);
-
-	g_free (key);
-	g_free (name);
-
-	key = gconf_concat_dir_and_key (temp, k);
-	g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
-
-	g_free (temp);
-
-	return key;
 }
 
 static GtkSourceLanguage *
@@ -379,22 +309,41 @@ gtk_source_language_get_section	(GtkSourceLanguage *language)
 	return g_strdup (language->priv->section);
 }
 
-const GSList *
+GSList *
 gtk_source_language_get_mime_types (GtkSourceLanguage *language)
 {
-	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
+	const GSList *l;
+	GSList *mime_types = NULL;
 
-	return language->priv->mime_types;
+	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
+	g_return_val_if_fail (language->priv->mime_types != NULL, NULL);
+
+	/* Dup mime_types */
+	
+	l = language->priv->mime_types;
+	
+	while (l != NULL)
+	{
+		mime_types = g_slist_prepend (mime_types, g_strdup ((const gchar*)l->data));
+		l = g_slist_next (l);
+	}
+	
+	mime_types = g_slist_reverse (mime_types);
+
+	return mime_types;
 }
 
 static GSList *
-get_mime_types_from_file (const gchar *filename)
+get_mime_types_from_file (GtkSourceLanguage *language)
 {
 	xmlTextReaderPtr reader;
 	gint ret;
 	GSList *mime_types = NULL;
-	
-	reader = xmlNewTextReaderFilename (filename);
+
+	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
+	g_return_val_if_fail (language->priv->lang_file_name != NULL, NULL);
+		
+	reader = xmlNewTextReaderFilename (language->priv->lang_file_name);
 
 	if (reader != NULL) 
 	{
@@ -419,7 +368,7 @@ get_mime_types_from_file (const gchar *filename)
 					if (mimetypes == NULL)
 					{
 						g_warning ("Impossible to get mimetypes from file '%s'",
-			   				   filename);
+			   				   language->priv->lang_file_name);
 
 						ret = 0;
 					}
@@ -457,13 +406,13 @@ get_mime_types_from_file (const gchar *filename)
         	
 		if (ret != 0) 
 		{
-	            g_warning("Failed to parse '%s'", filename);
+	            g_warning("Failed to parse '%s'", language->priv->lang_file_name);
 		    return NULL;
 		}
         }
 	else 
 	{
-		g_warning("Unable to open '%s'", filename);
+		g_warning("Unable to open '%s'", language->priv->lang_file_name);
 
     	}
 
@@ -474,53 +423,29 @@ void
 gtk_source_language_set_mime_types (GtkSourceLanguage	*language,
 				    const GSList	*mime_types)
 {
-	const GSList *l;
-	gchar *key;
-	
 	g_return_if_fail (GTK_IS_SOURCE_LANGUAGE (language));
-	g_return_if_fail (language->priv->gconf_base_dir != NULL);
+	g_return_if_fail (language->priv->mime_types != NULL);
 		
 	slist_deep_free (language->priv->mime_types);
 	language->priv->mime_types = NULL;
 
-	/* Dup mime_types */
-	l = mime_types;
-	while (l != NULL)
+	if (mime_types != NULL)
 	{
-		language->priv->mime_types = g_slist_prepend (language->priv->mime_types,
+		const GSList *l;
+
+		/* Dup mime_types */
+		l = mime_types;
+		while (l != NULL)
+		{
+			language->priv->mime_types = g_slist_prepend (language->priv->mime_types,
 							      g_strdup ((const gchar*)l->data));
-		l = g_slist_next (l);
-	}
-	language->priv->mime_types = g_slist_reverse (language->priv->mime_types);
-
-	if (language->priv->gconf_client == NULL)
-		return;
-
-	key = get_gconf_key (language, "mime_types");
-	g_return_if_fail (key != NULL);
+			l = g_slist_next (l);
+		}
 	
-	if (language->priv->mime_types != NULL)
-	{
-		if (gconf_client_key_is_writable (language->priv->gconf_client, key, NULL))
-			gconf_client_set_list (language->priv->gconf_client,
-					       key,
-					       GCONF_VALUE_STRING,
-					       language->priv->mime_types,
-					       NULL);
+		language->priv->mime_types = g_slist_reverse (language->priv->mime_types);
 	}
 	else
-	{
-		if (gconf_client_key_is_writable (language->priv->gconf_client, key, NULL))
-			gconf_client_unset (language->priv->gconf_client,
-					    key,
-					    NULL);
-					    
-		/* Get mime types from XML file */
-		language->priv->mime_types = get_mime_types_from_file (
-						language->priv->lang_file_name);
-	}
-
-	g_free (key);
+		language->priv->mime_types = get_mime_types_from_file (language);
 }
 
 /* FIXME: is this function UTF-8 aware? - Paolo */
@@ -933,10 +858,10 @@ tag_style_changed_cb (GtkSourceLanguage *language,
 
 static GSList *
 parseTag (GtkSourceLanguage *language, 
-	  xmlDocPtr doc, 
-	  xmlNodePtr cur, 
-	  GSList *tag_list, 
-	  GHashTable *ht)
+	  xmlDocPtr          doc, 
+	  xmlNodePtr         cur, 
+	  GSList            *tag_list, 
+	  gboolean           populate_styles_table)
 {
 	GtkTextTag *tag = NULL;
 	xmlChar *name;
@@ -990,22 +915,23 @@ parseTag (GtkSourceLanguage *language,
 		
 		tag_list = g_slist_prepend (tag_list, tag);
 
-		if (ht != NULL)
-			g_hash_table_insert (ht, g_strdup (name), g_strdup (style));
+		if (populate_styles_table)
+			g_hash_table_insert (language->priv->tag_name_to_style_name, 
+					     g_strdup (name), 
+					     g_strdup (style));
 
 		ts = gtk_source_language_get_tag_style (language, name);
 
 		if (ts != NULL)
 			gtk_source_tag_set_style (GTK_SOURCE_TAG (tag), ts);
 
+		g_free (ts);
+		
 		g_signal_connect_object (language, 
 					 "tag_style_changed",
 					 G_CALLBACK (tag_style_changed_cb),
 					 tag,
 					 0);
-
-		g_free (ts);
-
 	}
 		
 	xmlFree (name);
@@ -1078,8 +1004,7 @@ language_file_parse (GtkSourceLanguage *language,
 					     doc, 
 					     cur, 
 					     tag_list, 
-					     populate_styles_table ?
-					     language->priv->tag_name_to_style_name : NULL);
+					     populate_styles_table);
 		}
 		
 		cur = cur->next;
@@ -1103,10 +1028,17 @@ gtk_source_language_get_tags (GtkSourceLanguage *language)
 	
 	if (language->priv->tag_name_to_style_name == NULL)
 	{
+		g_return_val_if_fail (language->priv->tag_name_to_style == NULL, NULL);
+
 		language->priv->tag_name_to_style_name = g_hash_table_new_full ((GHashFunc)g_str_hash,
 										(GEqualFunc)g_str_equal,
 										(GDestroyNotify)g_free,
 										(GDestroyNotify)g_free);
+
+		language->priv->tag_name_to_style = g_hash_table_new_full ((GHashFunc)g_str_hash,
+									   (GEqualFunc)g_str_equal,
+									   (GDestroyNotify)g_free,
+									   (GDestroyNotify)g_free);
 
 		populate_styles_table = TRUE;
 	}
@@ -1116,24 +1048,69 @@ gtk_source_language_get_tags (GtkSourceLanguage *language)
 	return tag_list;
 }
 
-GtkSourceTagStyle *
-gtk_source_language_get_tag_default_style (GtkSourceLanguage 		*language, 
-					   const gchar 			*tag_name)
+static gboolean
+gtk_source_language_lazy_init_hash_tables (GtkSourceLanguage *language)
 {
-	const gchar *style_name;
-	
 	if (language->priv->tag_name_to_style_name == NULL)
 	{
-		/* FIXME: this is not very efficient - Paolo */
 		GSList *list;
+
+		g_return_val_if_fail (language->priv->tag_name_to_style == NULL, FALSE);
 
 		list = gtk_source_language_get_tags (language);
 
 		g_slist_foreach (list, (GFunc)g_object_unref, NULL);
 		g_slist_free (list);
 	
-		g_return_val_if_fail (language->priv->tag_name_to_style_name != NULL, NULL);
+		g_return_val_if_fail (language->priv->tag_name_to_style_name != NULL, FALSE);
+		g_return_val_if_fail (language->priv->tag_name_to_style != NULL, FALSE);
 	}
+
+	return TRUE;
+}
+
+GtkSourceTagStyle *
+gtk_source_language_get_tag_style (GtkSourceLanguage *language, 
+				   const gchar       *tag_name)
+{
+	const GtkSourceTagStyle *style;
+
+	g_return_val_if_fail (GTK_SOURCE_LANGUAGE (language), NULL);
+	g_return_val_if_fail (tag_name != NULL, NULL);
+
+	if (!gtk_source_language_lazy_init_hash_tables (language))
+		return NULL;
+
+	style = (const GtkSourceTagStyle*)g_hash_table_lookup (language->priv->tag_name_to_style,
+							       tag_name);
+
+	if (style == NULL)
+	{
+		return gtk_source_language_get_tag_default_style (language, tag_name);
+	}
+	else
+	{
+		GtkSourceTagStyle *ts;
+
+		ts = g_new0 (GtkSourceTagStyle, 1);
+
+		memcpy (ts, style, sizeof (GtkSourceTagStyle));
+
+		return ts;
+	}
+}
+
+GtkSourceTagStyle*
+gtk_source_language_get_tag_default_style (GtkSourceLanguage *language,
+					   const gchar       *tag_name)
+{
+	const gchar *style_name;
+	
+	g_return_val_if_fail (GTK_SOURCE_LANGUAGE (language), NULL);
+	g_return_val_if_fail (tag_name != NULL, NULL);
+
+	if (!gtk_source_language_lazy_init_hash_tables (language))
+			return NULL;
 
 	style_name = (const gchar*)g_hash_table_lookup (language->priv->tag_name_to_style_name,
 							tag_name);
@@ -1143,14 +1120,14 @@ gtk_source_language_get_tag_default_style (GtkSourceLanguage 		*language,
 		GtkSourceTagStyle *ts;
 		const GtkSourceTagStyle *tmp;
 
-		tmp = gtk_source_style_scheme_get_tag_style (language->priv->style_scheme,
-				                             style_name);
+		g_return_val_if_fail (language->priv->style_scheme != NULL, NULL);
 
 		ts = g_new0 (GtkSourceTagStyle, 1);
 
-		memcpy (ts, tmp, sizeof (GtkSourceTagStyle));
+		tmp = gtk_source_style_scheme_get_tag_style (language->priv->style_scheme,
+							     style_name);
 
-		ts->is_default = TRUE;
+		memcpy (ts, tmp, sizeof (GtkSourceTagStyle));
 
 		return ts;
 	}
@@ -1158,308 +1135,25 @@ gtk_source_language_get_tag_default_style (GtkSourceLanguage 		*language,
 		return NULL;
 }
 
-static gchar *
-get_gconf_base_key_for_tag (const GtkSourceLanguage *language,
-			    const gchar             *tag_name)
-{
-	gchar *base_key;
-	gchar *key;
-	gchar *name;
-	
-	name = gconf_escape_key (tag_name, -1);
-	g_return_val_if_fail (name != NULL, NULL);
-
-	base_key = get_gconf_key (language, "styles");
-	g_return_val_if_fail (base_key != NULL, NULL);
-
-	key = gconf_concat_dir_and_key (base_key, name);
-	g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
-
-	g_free (base_key);
-	g_free (name);
-
-	return key;
-}
-
-static gchar* 
-gdk_color_to_string (GdkColor color)
-{
-	return g_strdup_printf ("#%04x%04x%04x",
-				color.red, 
-				color.green,
-				color.blue);
-}
-
-
-static GdkColor
-gconf_client_get_color (GConfClient *client, const gchar *key,
-                        gboolean *valid , GError **err)
-{
-	gchar *str_color = NULL;
-	GdkColor color;
-	
-      	g_return_val_if_fail (client != NULL, color);
-      	g_return_val_if_fail (GCONF_IS_CLIENT (client), color);  
-	g_return_val_if_fail (key != NULL, color);
-
-	str_color = gconf_client_get_string (client, key, NULL);
-
-	if (str_color != NULL)
-	{
-		if (valid != NULL)
-			*valid = TRUE;
-	}
-	else
-	{
-		if (valid != NULL)
-			*valid = FALSE;
-	
-		return color;
-	}
-		
-	gdk_color_parse (str_color, &color);
-	g_free (str_color);
-	
-	return color;
-}
-
-
-static void
-gconf_change_set_set_color (GConfChangeSet *cs, 
-			    const gchar    *key,
-			    GdkColor        val)
-{
-	gchar *str_color = NULL;
-	
-	g_return_if_fail (cs != NULL);
-	g_return_if_fail (key != NULL);
-
-	str_color = gdk_color_to_string (val);
-	g_return_if_fail (str_color != NULL);
-
-	gconf_change_set_set_string (cs,
-				     key,
-				     str_color);
-	
-	g_free (str_color);
-}
-
-
-/* FIXME: cache the results? - Paolo */
-GtkSourceTagStyle*
-gtk_source_language_get_tag_style (GtkSourceLanguage *language,
-				   const gchar       *tag_name)
-{
-	gchar *base_key;
-
-	g_return_val_if_fail (GTK_SOURCE_LANGUAGE (language), NULL);
-	g_return_val_if_fail (tag_name != NULL, NULL);
-
-	base_key = get_gconf_base_key_for_tag (language, tag_name);
-
-	if ((language->priv->gconf_client != NULL) && 
-	    gconf_client_dir_exists (language->priv->gconf_client, base_key, NULL))
-	{
-		gchar *key;
-		gboolean valid = FALSE;
-		GdkColor color;
-		GtkSourceTagStyle *ts;
-
-		ts = g_new0 (GtkSourceTagStyle, 1);
-
-		key = gconf_concat_dir_and_key (base_key, "background");
-		g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
-
-		color = gconf_client_get_color (language->priv->gconf_client, 
-						key,
-						&valid,
-						NULL);
-		
-		g_free (key);
-		
-		if (valid)
-		{
-			ts->use_background = TRUE;
-			ts->background = color;
-		}
-		else
-			ts->use_background = FALSE;
-
-		key = gconf_concat_dir_and_key (base_key, "foreground");
-		g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
-
-		color = gconf_client_get_color (language->priv->gconf_client, 
-						key,
-						NULL,
-						NULL);
-		
-		g_free (key);
-
-		ts->foreground = color;
-
-		key = gconf_concat_dir_and_key (base_key, "italic");
-		g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
-
-		ts->italic = gconf_client_get_bool (language->priv->gconf_client, 
-						    key,
-						    NULL);
-
-		g_free (key);
-
-		key = gconf_concat_dir_and_key (base_key, "bold");
-		g_return_val_if_fail (gconf_valid_key (key, NULL), NULL);
-
-		ts->bold = gconf_client_get_bool (language->priv->gconf_client, 
-						  key,
-						  NULL);
-
-		g_free (key);
-
-		ts->is_default = FALSE;
-
-		g_free (base_key);
-			
-		return ts;
-		
-	}
-	else
-	{
-		g_free (base_key);
-		
-		return gtk_source_language_get_tag_default_style (language, tag_name);
-	}
-}
-
 void 
 gtk_source_language_set_tag_style (GtkSourceLanguage       *language,
 				   const gchar             *tag_name,
 				   const GtkSourceTagStyle *style)
 {
-	gchar *base_key;
-	gchar *key;
-	GConfChangeSet* change_set;
-	gboolean ret;
+	GtkSourceTagStyle *ts;
 
 	g_return_if_fail (GTK_SOURCE_LANGUAGE (language));
 	g_return_if_fail (tag_name != NULL);
 
-	g_print ("gtk_source_language_set_tag_style (%s)\n", tag_name);
-
-	if (language->priv->gconf_client == NULL)
-	{
-		g_warning ("Impossible to set tag style for tag '%s' of language '%s'.",
-				tag_name, language->priv->name);
-
-		return;
-	}
-
-	base_key = get_gconf_base_key_for_tag (language, tag_name);
-
-	g_print ("base key: %s\n", base_key);
-
-	if (style == NULL && 
-	    gconf_client_dir_exists (language->priv->gconf_client, base_key, NULL))
-	{
-		change_set = gconf_change_set_new ();
-
-		key = gconf_concat_dir_and_key (base_key, "background");
-		g_return_if_fail (gconf_valid_key (key, NULL));
-
-		gconf_change_set_unset (change_set, key);
-		g_free (key);
-
-		key = gconf_concat_dir_and_key (base_key, "foreground");
-		g_return_if_fail (gconf_valid_key (key, NULL));
-
-		gconf_change_set_unset (change_set, key);
-		g_free (key);
-
-		key = gconf_concat_dir_and_key (base_key, "italic");
-		g_return_if_fail (gconf_valid_key (key, NULL));
-
-		gconf_change_set_unset (change_set, key);
-		g_free (key);
-
-		key = gconf_concat_dir_and_key (base_key, "bold");
-		g_return_if_fail (gconf_valid_key (key, NULL));
-
-		gconf_change_set_unset (change_set, key);
-		g_free (key);
-
-		g_free (base_key);
-
-		ret = gconf_client_commit_change_set (language->priv->gconf_client,
-						      change_set,
-						      TRUE,
-						      NULL);
-
-		if (!ret)
-			g_warning ("GConf error setting tag style for tag '%s' of language '%s'.",
-				   tag_name, 
-				   language->priv->name);
-
-		gconf_change_set_unref (change_set);
-
-		g_signal_emit (G_OBJECT (language),
-		       signals[TAG_STYLE_CHANGED], 
-		       0, 
-		       tag_name);
-
-
-		return;		
-	}
-
-	change_set = gconf_change_set_new ();
-
-	key = gconf_concat_dir_and_key (base_key, "background");
-	g_return_if_fail (gconf_valid_key (key, NULL));
-
-	if (style->use_background)
-		gconf_change_set_set_color (change_set,
-					    key,
-					    style->background);
-	else
-		gconf_change_set_unset (change_set,
-					key);
-	g_free (key);
+	if (!gtk_source_language_lazy_init_hash_tables (language))
+			return;	
 	
-	key = gconf_concat_dir_and_key (base_key, "foreground");
-	g_return_if_fail (gconf_valid_key (key, NULL));
+	ts = g_new0 (GtkSourceTagStyle, 1);
+	memcpy (ts, style, sizeof (GtkSourceTagStyle));
 
-	gconf_change_set_set_color (change_set,
-				    key,
-				    style->foreground);
-	g_free (key);
-
-	key = gconf_concat_dir_and_key (base_key, "italic");
-	g_return_if_fail (gconf_valid_key (key, NULL));
-
-	gconf_change_set_set_bool (change_set,
-				   key,
-				   style->italic);
-	g_free (key);
-
-	key = gconf_concat_dir_and_key (base_key, "bold");
-	g_return_if_fail (gconf_valid_key (key, NULL));
-
-	gconf_change_set_set_bool (change_set,
-				   key,
-				   style->bold);
-	g_free (key);
-
-	g_free (base_key);
-	
-	ret = gconf_client_commit_change_set (language->priv->gconf_client,
-					      change_set,
-					      TRUE,
-					      NULL);
-
-	if (!ret)
-		g_warning ("GConf error setting tag style for tag '%s' of language '%s'.",
-			   tag_name, 
-			   language->priv->name);
-
-	gconf_change_set_unref (change_set);
+	g_hash_table_insert (language->priv->tag_name_to_style,
+			     g_strdup (tag_name),
+			     ts);
 
 	g_signal_emit (G_OBJECT (language),
 		       signals[TAG_STYLE_CHANGED], 
@@ -1469,7 +1163,7 @@ gtk_source_language_set_tag_style (GtkSourceLanguage       *language,
 	return;
 }
 
-const GtkSourceStyleScheme *
+GtkSourceStyleScheme *
 gtk_source_language_get_style_scheme (GtkSourceLanguage *language)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
@@ -1509,12 +1203,12 @@ gtk_source_language_set_style_scheme (GtkSourceLanguage    *language,
 	language->priv->style_scheme = scheme;
 	g_object_ref (language->priv->style_scheme);
 
-	if (language->priv->tag_name_to_style_name != NULL)
-	{
-		g_hash_table_foreach (language->priv->tag_name_to_style_name,
-				      (GHFunc) emit_tag_style_changed_signal,
-				      (gpointer) language);
-	}
+	if (!gtk_source_language_lazy_init_hash_tables (language))
+		return;
+
+	g_hash_table_foreach (language->priv->tag_name_to_style_name,
+			      (GHFunc) emit_tag_style_changed_signal,
+			      (gpointer) language);
 }
 
 gunichar 

@@ -349,8 +349,6 @@ open_file (GtkSourceBuffer *buffer, const gchar *filename)
 			g_object_set (G_OBJECT (buffer), "highlight", TRUE, NULL);
 
 			gtk_source_buffer_set_language (buffer, language);
-
-			g_object_unref (language);
 		}
 			
 		g_free (mime_type);

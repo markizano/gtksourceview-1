@@ -49,17 +49,23 @@ struct _GtkSourceStyleSchemeClass
 	GTypeInterface	base_iface;
 
 	/* vtable */
-	const gchar		* (* get_name)		(const GtkSourceStyleScheme *scheme);
-	const GtkSourceTagStyle * (* get_tag_style) 	(const GtkSourceStyleScheme *scheme,
-						     	 const gchar	  	    *style_name);	
+	const gchar		* (* get_name)		(GtkSourceStyleScheme *scheme);
+	const GtkSourceTagStyle * (* get_tag_style) 	(GtkSourceStyleScheme *scheme,
+						     	 const gchar          *style_name);
+
+	/* Padding for future expansion */
+	void (*_gtk_source_reserved1) (void);
+	void (*_gtk_source_reserved2) (void);
+	void (*_gtk_source_reserved3) (void);
+	void (*_gtk_source_reserved4) (void);	
 };
 
 GType                        gtk_source_style_scheme_get_type      (void) G_GNUC_CONST;
 
 
-const GtkSourceTagStyle	    *gtk_source_style_scheme_get_tag_style (const GtkSourceStyleScheme *scheme,
-								    const gchar		       *style_name);
-const gchar		    *gtk_source_style_scheme_get_name      (const GtkSourceStyleScheme *scheme);
+const GtkSourceTagStyle	    *gtk_source_style_scheme_get_tag_style (GtkSourceStyleScheme *scheme,
+								    const gchar          *style_name);
+const gchar		    *gtk_source_style_scheme_get_name      (GtkSourceStyleScheme *scheme);
 
 
 /* Default style scheme */

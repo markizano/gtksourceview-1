@@ -61,21 +61,21 @@ typedef struct _GtkPatternTag       GtkPatternTag;
 typedef struct _GtkPatternTagClass  GtkPatternTagClass;
 
 
-GType 	           gtk_source_tag_get_type        (void) G_GNUC_CONST;
-GtkSourceTagStyle *gtk_source_tag_get_style       (GtkSourceTag            *tag);
-void               gtk_source_tag_set_style       (GtkSourceTag            *tag,
-						   const GtkSourceTagStyle *style);
+GType 	           gtk_source_tag_get_type	(void) G_GNUC_CONST;
+GtkSourceTagStyle *gtk_source_tag_get_style	(GtkSourceTag            *tag);
+void               gtk_source_tag_set_style	(GtkSourceTag            *tag,
+						 const GtkSourceTagStyle *style);
 
-GType		 gtk_syntax_tag_get_type	(void) G_GNUC_CONST;
-GtkTextTag 	*gtk_syntax_tag_new		(const gchar 	*name, 
+GType              gtk_syntax_tag_get_type	(void) G_GNUC_CONST;
+GtkTextTag        *gtk_syntax_tag_new		(const gchar 	*name, 
 						 const gchar 	*pattern_start,
 						 const gchar 	*pattern_end);
 
-GType      	 gtk_pattern_tag_get_type	(void) G_GNUC_CONST;
-GtkTextTag	*gtk_pattern_tag_new		(const gchar 	*name, 
+GType              gtk_pattern_tag_get_type	(void) G_GNUC_CONST;
+GtkTextTag        *gtk_pattern_tag_new		(const gchar 	*name, 
 						 const gchar 	*pattern);
 
-GtkTextTag	*gtk_keyword_list_tag_new	(const gchar 	*name, 
+GtkTextTag        *gtk_keyword_list_tag_new	(const gchar 	*name, 
 						 const GSList 	*keywords,
 						 gboolean	 case_sensitive,
 						 gboolean	 match_empty_string_at_beginning,
@@ -85,14 +85,13 @@ GtkTextTag	*gtk_keyword_list_tag_new	(const gchar 	*name,
 
 #define gtk_block_comment_tag_new	gtk_syntax_tag_new
 
-GtkTextTag	*gtk_line_comment_tag_new	(const gchar    *name,
+GtkTextTag        *gtk_line_comment_tag_new	(const gchar    *name,
 						 const gchar    *pattern_start);
 
-GtkTextTag	*gtk_string_tag_new		(const gchar    *name,
+GtkTextTag        *gtk_string_tag_new		(const gchar    *name,
 						 const gchar    *pattern_start,
 						 const gchar	*pattern_end,
 						 gboolean        end_at_line_end);
-
 
 G_END_DECLS
 

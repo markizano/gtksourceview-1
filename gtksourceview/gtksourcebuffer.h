@@ -63,6 +63,12 @@ struct _GtkSourceBufferClass
 					 GtkTextIter     *end);
 	void (* marker_updated)         (GtkSourceBuffer *buffer,
 					 GtkTextIter     *where);
+
+	/* Padding for future expansion */
+	void (*_gtk_source_reserved1) 	(void);
+	void (*_gtk_source_reserved2) 	(void);
+	void (*_gtk_source_reserved3) 	(void);
+
 };
 
 #include <gtksourcemarker.h>
@@ -71,81 +77,79 @@ GType           	 gtk_source_buffer_get_type 		(void) G_GNUC_CONST;
 
 
 /* Constructor */
-GtkSourceBuffer	 	*gtk_source_buffer_new 			(GtkSourceTagTable     *table);
-GtkSourceBuffer 	*gtk_source_buffer_new_with_language 	(GtkSourceLanguage     *language);
+GtkSourceBuffer	 	*gtk_source_buffer_new 			(GtkSourceTagTable      *table);
+GtkSourceBuffer 	*gtk_source_buffer_new_with_language 	(GtkSourceLanguage      *language);
 
 /* Properties. */
-gboolean		 gtk_source_buffer_get_check_brackets   (GtkSourceBuffer       *buffer);
-void			 gtk_source_buffer_set_check_brackets	(GtkSourceBuffer       *buffer,
-							       	 gboolean               check_brackets);
+gboolean		 gtk_source_buffer_get_check_brackets   (GtkSourceBuffer        *buffer);
+void			 gtk_source_buffer_set_check_brackets	(GtkSourceBuffer        *buffer,
+							       	 gboolean                check_brackets);
 void                     gtk_source_buffer_set_bracket_match_style 
-                                                                (GtkSourceBuffer        *source_buffer,
-								 const gchar            *first_property_name,
-								 ...);
+                                                                (GtkSourceBuffer         *source_buffer,
+								 const GtkSourceTagStyle *style);
 
-gboolean		 gtk_source_buffer_get_highlight	(const GtkSourceBuffer *buffer);
-void			 gtk_source_buffer_set_highlight	(GtkSourceBuffer       *buffer,
-								 gboolean               highlight);
+gboolean		 gtk_source_buffer_get_highlight	(GtkSourceBuffer        *buffer);
+void			 gtk_source_buffer_set_highlight	(GtkSourceBuffer        *buffer,
+								 gboolean                highlight);
 
-gint			 gtk_source_buffer_get_max_undo_levels	(const GtkSourceBuffer *buffer);
-void			 gtk_source_buffer_set_max_undo_levels	(GtkSourceBuffer       *buffer,
-							    	 gint                   max_undo_levels);
+gint			 gtk_source_buffer_get_max_undo_levels	(GtkSourceBuffer        *buffer);
+void			 gtk_source_buffer_set_max_undo_levels	(GtkSourceBuffer        *buffer,
+							    	 gint                    max_undo_levels);
 
-/* Returned value must be unref */
-GtkSourceLanguage 	*gtk_source_buffer_get_language 	(GtkSourceBuffer       *buffer);
-void			 gtk_source_buffer_set_language 	(GtkSourceBuffer       *buffer, 
-								 GtkSourceLanguage     *language);
+GtkSourceLanguage 	*gtk_source_buffer_get_language 	(GtkSourceBuffer        *buffer);
+void			 gtk_source_buffer_set_language 	(GtkSourceBuffer        *buffer, 
+								 GtkSourceLanguage      *language);
 
-gunichar                 gtk_source_buffer_get_escape_char      (GtkSourceBuffer       *buffer);
-void                     gtk_source_buffer_set_escape_char      (GtkSourceBuffer       *buffer,
-								 gunichar               escape_char);
+gunichar                 gtk_source_buffer_get_escape_char      (GtkSourceBuffer        *buffer);
+void                     gtk_source_buffer_set_escape_char      (GtkSourceBuffer        *buffer,
+								 gunichar                escape_char);
 
 /* Utility method */
-gboolean		 gtk_source_buffer_find_bracket_match 	(GtkTextIter           *iter);
+gboolean		 gtk_source_buffer_find_bracket_match 	(GtkTextIter            *iter);
 
 /* Undo/redo methods */
-gboolean		 gtk_source_buffer_can_undo		(const GtkSourceBuffer *buffer);
-gboolean		 gtk_source_buffer_can_redo		(const GtkSourceBuffer *buffer);
+gboolean		 gtk_source_buffer_can_undo		(GtkSourceBuffer        *buffer);
+gboolean		 gtk_source_buffer_can_redo		(GtkSourceBuffer        *buffer);
 
-void			 gtk_source_buffer_undo			(GtkSourceBuffer       *buffer);
-void			 gtk_source_buffer_redo			(GtkSourceBuffer       *buffer);
+void			 gtk_source_buffer_undo			(GtkSourceBuffer        *buffer);
+void			 gtk_source_buffer_redo			(GtkSourceBuffer        *buffer);
 
-void			 gtk_source_buffer_begin_not_undoable_action (GtkSourceBuffer  *buffer);
-void			 gtk_source_buffer_end_not_undoable_action   (GtkSourceBuffer  *buffer);
+void			 gtk_source_buffer_begin_not_undoable_action (GtkSourceBuffer   *buffer);
+void			 gtk_source_buffer_end_not_undoable_action   (GtkSourceBuffer   *buffer);
 
 /* marker methods. */
-GtkSourceMarker         *gtk_source_buffer_create_marker        (GtkSourceBuffer       *buffer,
-								 const gchar           *name,
-								 const gchar           *type,
-								 const GtkTextIter     *where);
+GtkSourceMarker         *gtk_source_buffer_create_marker        (GtkSourceBuffer        *buffer,
+								 const gchar            *name,
+								 const gchar            *type,
+								 const GtkTextIter      *where);
 
-void                     gtk_source_buffer_move_marker          (GtkSourceBuffer       *buffer,
-								 GtkSourceMarker       *marker,
-								 const GtkTextIter     *where);
-void                     gtk_source_buffer_delete_marker        (GtkSourceBuffer       *buffer,
-								 GtkSourceMarker       *marker);
-GtkSourceMarker         *gtk_source_buffer_get_marker           (GtkSourceBuffer       *buffer,
-								 const gchar           *name);
+void                     gtk_source_buffer_move_marker          (GtkSourceBuffer        *buffer,
+								 GtkSourceMarker        *marker,
+								 const GtkTextIter      *where);
+void                     gtk_source_buffer_delete_marker        (GtkSourceBuffer        *buffer,
+								 GtkSourceMarker        *marker);
+GtkSourceMarker         *gtk_source_buffer_get_marker           (GtkSourceBuffer        *buffer,
+								 const gchar            *name);
 GSList                  *gtk_source_buffer_get_markers_in_region 
-                                                                (GtkSourceBuffer       *buffer,
-								 const GtkTextIter     *begin,
-								 const GtkTextIter     *end);
-GtkSourceMarker         *gtk_source_buffer_get_first_marker     (GtkSourceBuffer       *buffer);
-GtkSourceMarker         *gtk_source_buffer_get_last_marker      (GtkSourceBuffer       *buffer);
-void                     gtk_source_buffer_get_iter_at_marker   (GtkSourceBuffer       *buffer,
-								 GtkTextIter           *iter,
-								 GtkSourceMarker       *marker);
-GtkSourceMarker         *gtk_source_buffer_get_next_marker      (GtkSourceBuffer       *buffer,
-								 GtkTextIter           *iter);
-GtkSourceMarker         *gtk_source_buffer_get_prev_marker      (GtkSourceBuffer       *buffer,
-								 GtkTextIter           *iter);
+                                                                (GtkSourceBuffer        *buffer,
+								 const GtkTextIter      *begin,
+								 const GtkTextIter      *end);
+GtkSourceMarker         *gtk_source_buffer_get_first_marker     (GtkSourceBuffer        *buffer);
+GtkSourceMarker         *gtk_source_buffer_get_last_marker      (GtkSourceBuffer        *buffer);
+void                     gtk_source_buffer_get_iter_at_marker   (GtkSourceBuffer        *buffer,
+								 GtkTextIter            *iter,
+								 GtkSourceMarker        *marker);
+GtkSourceMarker         *gtk_source_buffer_get_next_marker      (GtkSourceBuffer        *buffer,
+								 GtkTextIter            *iter);
+GtkSourceMarker         *gtk_source_buffer_get_prev_marker      (GtkSourceBuffer        *buffer,
+								 GtkTextIter            *iter);
 
 /* INTERNAL private stuff - not even exported from the library on
  * many platforms
  */
-void			 _gtk_source_buffer_highlight_region    (GtkSourceBuffer        *source_buffer,
-								 GtkTextIter            *start,
-								 GtkTextIter            *end);
+void			 _gtk_source_buffer_highlight_region    (GtkSourceBuffer         *source_buffer,
+								 GtkTextIter             *start,
+								 GtkTextIter             *end);
 
 G_END_DECLS
 

@@ -22,7 +22,7 @@
 
 #include <glib.h>
 
-#include "gtksourcelanguage.h"
+#include <gtksourcelanguage.h>
 
 G_BEGIN_DECLS
 
@@ -48,6 +48,10 @@ struct _GtkSourceLanguagesManager
 struct _GtkSourceLanguagesManagerClass 
 {
 	GObjectClass              parent_class;
+
+	/* Padding for future expansion */
+	void (*_gtk_source_reserved1) (void);
+	void (*_gtk_source_reserved2) (void);
 };
 
 
@@ -65,6 +69,8 @@ GtkSourceLanguage
 								      (GtkSourceLanguagesManager *lm,
 							  	       const gchar               *mime_type);
 
+/* Property */
+const GSList	*gtk_source_languages_manager_get_lang_files_dirs     (GtkSourceLanguagesManager *lm);
 
 G_END_DECLS				
 

@@ -63,8 +63,8 @@ gtk_source_style_scheme_base_init (gpointer g_class)
 }
 
 const GtkSourceTagStyle *
-gtk_source_style_scheme_get_tag_style (const GtkSourceStyleScheme *scheme,
-				       const gchar		  *style_name)
+gtk_source_style_scheme_get_tag_style (GtkSourceStyleScheme *scheme,
+				       const gchar          *style_name)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme), NULL);
 	g_return_val_if_fail (style_name != NULL, NULL);
@@ -73,7 +73,7 @@ gtk_source_style_scheme_get_tag_style (const GtkSourceStyleScheme *scheme,
 }
 
 const gchar *
-gtk_source_style_scheme_get_name (const GtkSourceStyleScheme *scheme)
+gtk_source_style_scheme_get_name (GtkSourceStyleScheme *scheme)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme), NULL);
 
@@ -118,9 +118,9 @@ static void   gtk_source_default_style_scheme_init		(GtkSourceDefaultStyleScheme
 static void   gtk_source_default_style_scheme_finalize		(GObject			 *object);
 
 static const GtkSourceTagStyle *gtk_source_default_style_scheme_get_tag_style 
-								(const GtkSourceStyleScheme 	*scheme,
-								 const gchar			*style_name);
-static const gchar *gtk_source_default_style_scheme_get_name 	(const GtkSourceStyleScheme  	*scheme);
+								(GtkSourceStyleScheme *scheme,
+								 const gchar          *style_name);
+static const gchar *gtk_source_default_style_scheme_get_name 	(GtkSourceStyleScheme *scheme);
 
 
 static GType
@@ -191,14 +191,13 @@ new_tag_style (gchar* foreground,
 	ts = g_new0 (GtkSourceTagStyle, 1);
 
 	gdk_color_parse (foreground, &ts->foreground);
+	ts->mask |= GTK_SOURCE_TAG_STYLE_USE_FOREGROUND;
 
 	if (background != NULL)
 	{
 		gdk_color_parse (background, &ts->background);
-		ts->use_background = TRUE;
+		ts->mask |= GTK_SOURCE_TAG_STYLE_USE_BACKGROUND;
 	}
-	else
-		ts->use_background = FALSE;
 	
 	ts->italic	= italic;
 	ts->bold	= bold;
@@ -296,8 +295,8 @@ gtk_source_default_style_scheme_finalize (GObject *object)
 
 
 static const GtkSourceTagStyle *
-gtk_source_default_style_scheme_get_tag_style (const GtkSourceStyleScheme *scheme,
-					       const gchar		  *style_name)
+gtk_source_default_style_scheme_get_tag_style (GtkSourceStyleScheme *scheme,
+					       const gchar          *style_name)
 {
 	GtkSourceDefaultStyleScheme *ds;
 	const gpointer *style;
@@ -313,7 +312,7 @@ gtk_source_default_style_scheme_get_tag_style (const GtkSourceStyleScheme *schem
 }
 
 static const gchar *
-gtk_source_default_style_scheme_get_name (const GtkSourceStyleScheme *scheme)
+gtk_source_default_style_scheme_get_name (GtkSourceStyleScheme *scheme)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme), NULL);
 

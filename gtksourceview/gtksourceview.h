@@ -56,58 +56,57 @@ struct _GtkSourceViewClass
 {
 	GtkTextViewClass parent_class;
 
-	/* FIXME: do we really need it? - Paolo */
 	void (*undo) (GtkSourceView *view);
 	void (*redo) (GtkSourceView *view);
 
 	/* Padding for future expansion */
-	void (*_gtk_reserved1) (void);
-	void (*_gtk_reserved2) (void);
-	void (*_gtk_reserved3) (void);
+	void (*_gtk_source_reserved1) (void);
+	void (*_gtk_source_reserved2) (void);
+	void (*_gtk_source_reserved3) (void);
 };
 
 GType		 gtk_source_view_get_type 		(void) G_GNUC_CONST;
 
 /* Constructors */
 GtkWidget 	*gtk_source_view_new 			(void);
-GtkWidget 	*gtk_source_view_new_with_buffer	(GtkSourceBuffer     *buffer);
+GtkWidget 	*gtk_source_view_new_with_buffer	(GtkSourceBuffer *buffer);
 
 /* Properties */
-void 		 gtk_source_view_set_show_line_numbers 	(GtkSourceView       *view,
-							 gboolean             show);
-gboolean 	 gtk_source_view_get_show_line_numbers 	(const GtkSourceView *view);
+void 		 gtk_source_view_set_show_line_numbers 	(GtkSourceView   *view,
+							 gboolean         show);
+gboolean 	 gtk_source_view_get_show_line_numbers 	(GtkSourceView   *view);
 
-void 		 gtk_source_view_set_show_line_markers  (GtkSourceView       *view,
-							 gboolean             show);
-gboolean	 gtk_source_view_get_show_line_markers  (const GtkSourceView *view);
+void 		 gtk_source_view_set_show_line_markers  (GtkSourceView   *view,
+							 gboolean         show);
+gboolean	 gtk_source_view_get_show_line_markers  (GtkSourceView   *view);
 
-void 		 gtk_source_view_set_tabs_width 	(GtkSourceView       *view, 
-							 guint                width);
-guint            gtk_source_view_get_tabs_width         (const GtkSourceView *view);
+void 		 gtk_source_view_set_tabs_width 	(GtkSourceView   *view, 
+							 guint            width);
+guint            gtk_source_view_get_tabs_width         (GtkSourceView   *view);
 
-void		 gtk_source_view_set_auto_indent 	(GtkSourceView       *view, 
-							 gboolean             enable);
-gboolean	 gtk_source_view_get_auto_indent 	(GtkSourceView       *view);
+void		 gtk_source_view_set_auto_indent 	(GtkSourceView   *view, 
+							 gboolean         enable);
+gboolean	 gtk_source_view_get_auto_indent 	(GtkSourceView   *view);
 
 void		 gtk_source_view_set_insert_spaces_instead_of_tabs 
-							(GtkSourceView       *view, 
-							 gboolean             enable);
+							(GtkSourceView   *view, 
+							 gboolean         enable);
 gboolean	 gtk_source_view_get_insert_spaces_instead_of_tabs 
-							(const GtkSourceView *view);
+							(GtkSourceView   *view);
 
-void		 gtk_source_view_set_show_margin 	(GtkSourceView       *view,
-							 gboolean             show);
-gboolean 	 gtk_source_view_get_show_margin 	(const GtkSourceView *view);
+void		 gtk_source_view_set_show_margin 	(GtkSourceView   *view,
+							 gboolean         show);
+gboolean 	 gtk_source_view_get_show_margin 	(GtkSourceView   *view);
 
-void		 gtk_source_view_set_margin 		(GtkSourceView       *view,
-							 guint                margin);
-guint		 gtk_source_view_get_margin 		(const GtkSourceView *view);
+void		 gtk_source_view_set_margin 		(GtkSourceView   *view,
+							 guint            margin);
+guint		 gtk_source_view_get_margin 		(GtkSourceView   *view);
 
-void             gtk_source_view_set_marker_pixbuf      (GtkSourceView       *view,
-							 const gchar         *marker_type,
-							 GdkPixbuf           *pixbuf);
-GdkPixbuf	*gtk_source_view_get_marker_pixbuf      (GtkSourceView       *view,
-				       			 const gchar         *marker_type);
+void             gtk_source_view_set_marker_pixbuf      (GtkSourceView   *view,
+							 const gchar     *marker_type,
+							 GdkPixbuf       *pixbuf);
+GdkPixbuf	*gtk_source_view_get_marker_pixbuf      (GtkSourceView   *view,
+				       			 const gchar     *marker_type);
 
 G_END_DECLS
 #endif				/* end of SOURCE_VIEW_H__ */

@@ -27,12 +27,15 @@
 #include <gtk/gtktexttag.h>
 
 #include <gtksourceregex.h>
+#include <gtksourcetagstyle.h>
 
 G_BEGIN_DECLS
 
 struct _GtkSourceTag 
 {
 	GtkTextTag		 parent_instance;
+
+	GtkSourceTagStyle	*style;
 };
 
 struct _GtkSourceTagClass 
