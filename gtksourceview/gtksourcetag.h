@@ -44,16 +44,7 @@ G_BEGIN_DECLS
 #define GTK_IS_PATTERN_TAG_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), GTK_TYPE_PATTERN_TAG))
 #define GTK_PATTERN_TAG_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), GTK_TYPE_PATTERN_TAG, GtkPatternTagClass))
 
-#define GTK_TYPE_KEYWORD_TAG            (gtk_keyword_tag_get_type ())
-#define GTK_KEYWORD_TAG(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), GTK_TYPE_KEYWORD_TAG, GtkKeywordTag))
-#define GTK_KEYWORD_TAG_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), GTK_TYPE_KEYWORD_TAG, GtkKeywordTagClass))
-#define GTK_IS_KEYWORD_TAG(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GTK_TYPE_KEYWORD_TAG))
-#define GTK_IS_KEYWORD_TAG_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), GTK_TYPE_KEYWORD_TAG))
-#define GTK_KEYWORD_TAG_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), GTK_TYPE_KEYWORD_TAG, GtkKeywordTagClass))
-
-
 #define GTK_IS_SOURCE_TAG(obj)		(GTK_IS_PATTERN_TAG(obj) || GTK_IS_SYNTAX_TAG(obj))
-
 
 
 typedef struct _GtkSyntaxTag        GtkSyntaxTag;
@@ -61,9 +52,6 @@ typedef struct _GtkSyntaxTagClass   GtkSyntaxTagClass;
 
 typedef struct _GtkPatternTag       GtkPatternTag;
 typedef struct _GtkPatternTagClass  GtkPatternTagClass;
-
-typedef struct _GtkPatternTag       GtkKeywordTag;
-typedef struct _GtkPatternTagClass  GtkKeywordTagClass;
 
 struct _GtkSyntaxTag 
 {
@@ -101,9 +89,7 @@ GType      	 gtk_pattern_tag_get_type	(void) G_GNUC_CONST;
 GtkTextTag	*gtk_pattern_tag_new		(const gchar 	*name, 
 						 const gchar 	*pattern);
 
-#define gtk_keyword_tag_get_type	gtk_pattern_tag_get_type
-
-GtkTextTag	*gtk_keyword_tag_new		(const gchar 	*name, 
+GtkTextTag	*gtk_keyword_list_tag_new	(const gchar 	*name, 
 						 const GSList 	*keywords,
 						 gboolean	 case_sensitive,
 						 gboolean	 match_empty_string_at_beginning,
@@ -111,15 +97,10 @@ GtkTextTag	*gtk_keyword_tag_new		(const gchar 	*name,
 						 const gchar    *beginning_regex,
 						 const gchar    *end_regex);
 
-#define gtk_block_comment_tag_get_type	gtk_syntax_tag_get_type
 #define gtk_block_comment_tag_new	gtk_syntax_tag_new
-
-#define gtk_line_comment_tag_get_type	gtk_syntax_tag_get_type
 
 GtkTextTag	*gtk_line_comment_tag_new	(const gchar    *name,
 						 const gchar    *pattern_start);
-
-#define gtk_string_tag_get_type		gtk_syntax_tag_get_type
 
 GtkTextTag	*gtk_string_tag_new		(const gchar    *name,
 						 const gchar    *pattern_start,

@@ -22,6 +22,7 @@
 #include "gtktextsearch.h"
 #include "gtksourceview.h"
 #include "gtksourcelanguage.h"
+#include "gtksourcelanguagesmanager.h"
 
 static GtkTextBuffer *test_source (GtkSourceBuffer *buf);
 static void cb_move_cursor (GtkTextBuffer *buf, GtkTextIter *cursoriter, GtkTextMark *mark,
@@ -325,7 +326,7 @@ test_source (GtkSourceBuffer *buffer)
 	keywords = g_slist_append (keywords, "struct");
 	keywords = g_slist_append (keywords, "class");
 
-	tag = gtk_keyword_tag_new ("types", keywords, TRUE, TRUE, TRUE, NULL, NULL);
+	tag = gtk_keyword_list_tag_new ("types", keywords, TRUE, TRUE, TRUE, NULL, NULL);
 	/*
 	tag = gtk_pattern_tag_new ("types",
 				   "\\b\\(int\\|float\\|enum\\|bool\\|char\\|void\\|gint\\|"
@@ -371,7 +372,7 @@ test_source (GtkSourceBuffer *buffer)
 	keywords = g_slist_append (keywords, "pragma");
 	keywords = g_slist_append (keywords, "undef");
 
-	tag = gtk_keyword_tag_new ("defs", keywords, TRUE, FALSE, TRUE, "^[ \t]*#[ \t]*", NULL);
+	tag = gtk_keyword_list_tag_new ("defs", keywords, TRUE, FALSE, TRUE, "^[ \t]*#[ \t]*", NULL);
 	g_object_set (G_OBJECT (tag), "foreground", "tomato3", NULL);
 	list = g_list_append (list, (gpointer) tag);
 	g_slist_free (keywords);
@@ -600,12 +601,14 @@ main (int argc, char *argv[])
 		GtkSourceLanguage *language;
 		GSList *types = NULL;
 		
+		if (!gtk_source_languages_manager_init ())
+			return -1;
+		
 		dirs = g_slist_prepend (dirs, ".");
-				
-		gtk_source_set_language_specs_directories (dirs);
+		gtk_source_languages_manager_set_specs_dirs (dirs);		
 		g_slist_free (dirs);
 
-		langs = gtk_source_get_available_languages ();
+		langs = gtk_source_languages_manager_get_available_languages ();
 
 		while (langs != NULL)
 		{
@@ -633,7 +636,8 @@ main (int argc, char *argv[])
 
 		types = g_slist_prepend (types, "text/test");
 		gtk_source_language_set_mime_types (
-				GTK_SOURCE_LANGUAGE (gtk_source_get_available_languages ()->data),
+				GTK_SOURCE_LANGUAGE (
+					gtk_source_languages_manager_get_available_languages ()->data),
 				types);
 		g_slist_free (types);
 
@@ -650,13 +654,21 @@ main (int argc, char *argv[])
 			g_print ("No language found.");	
 
 		gtk_source_language_set_mime_types (
-				GTK_SOURCE_LANGUAGE (gtk_source_get_available_languages ()->data),
+				GTK_SOURCE_LANGUAGE (
+					gtk_source_languages_manager_get_available_languages ()->data),
 				NULL);
-		
+
+				
 	}
 
 	gtk_widget_set_usize (window, 400, 500);
 	gtk_widget_show_all (window);
 	gtk_main ();
+
+	g_print ("Shutting down languages manager...\n");	
+
+	gtk_source_languages_manager_shutdown ();
+	g_print ("Done.\n");
+
 	return (0);
 }

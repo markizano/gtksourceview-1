@@ -37,6 +37,7 @@ libgtksourceview_la_SOURCES = \
 	gtksourceregex.c \
 	gtksourcelanguage.c \
 	gtksourcelanguage.h \
+	gtksourcelanguagesmanager.h \
 	gtksourcetagstyle.h
 
 libgtksourceview_la_LIBADD = @DEP_LIBS@
@@ -49,7 +50,9 @@ libgtksourceview_include_HEADERS = \
 	gtksourceview.h \
 	gtksourceregex.h \
 	gtksourcelanguage.h \
+	gtksourcelanguagesmanager.h \
 	gtksourcetagstyle.h
+
 gtksourceview-marshal.h: gtksourceview-marshal.list
 	@GLIB_GENMARSHAL@ \
 		--prefix=gtksourceview_marshal $(srcdir)/gtksourceview-marshal.list --header > xgen-gmc \

@@ -11,10 +11,9 @@
         	<end-regex>\*/</end-regex>
 	</block-comment>
 
-	<string name = "String" style = "string">
+	<string name = "String" style = "string" end-at-line-end = "TRUE">
 		<start-regex>"</start-regex>
 		<end-regex>"</end-regex>
-		<end-at-line-end>TRUE</end-at-line-end>
 	</string>
 
 	<keyword-list name = "Keywords" style = "keyword" case-sensitive="TRUE">

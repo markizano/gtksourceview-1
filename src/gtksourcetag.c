@@ -249,16 +249,16 @@ case_insesitive_keyword (const gchar *keyword)
 }
 
 GtkTextTag *
-gtk_keyword_tag_new (const gchar  *name, 
-		     const GSList *keywords,
-		     gboolean      case_sensitive,
-		     gboolean      match_empty_string_at_beginning,
-		     gboolean      match_empty_string_at_end,
-		     const gchar  *beginning_regex,
-		     const gchar  *end_regex)
+gtk_keyword_list_tag_new (const gchar  *name, 
+			  const GSList *keywords,
+			  gboolean      case_sensitive,
+			  gboolean      match_empty_string_at_beginning,
+			  gboolean      match_empty_string_at_end,
+			  const gchar  *beginning_regex,
+			  const gchar  *end_regex)
 {
 	
-	GtkKeywordTag *tag;
+	GtkTextTag *tag;
 	GString *str;
 
 	g_return_val_if_fail (keywords != NULL, NULL);
@@ -301,18 +301,11 @@ gtk_keyword_tag_new (const gchar  *name,
 	if (match_empty_string_at_end)
 		g_string_append (str, "\\b");
 
-	tag = GTK_KEYWORD_TAG (g_object_new (GTK_TYPE_KEYWORD_TAG, 
-					     "name", name,
-					     NULL));
-	
-	if (!gtk_source_regex_compile (&(GTK_PATTERN_TAG (tag)->reg_pattern), str->str)) {
-		g_warning ("Regex pattern failed [%s]\n", str->str);
-		return NULL;
-	}
+	tag = gtk_pattern_tag_new (name, str->str);
 
 	g_string_free (str, TRUE);
 	
-	return GTK_TEXT_TAG (tag);
+	return tag;
 }
 
 GtkTextTag *
