@@ -1893,7 +1893,7 @@ update_syntax_regions (GtkSourceBuffer *source_buffer,
 		if (delim.offset > start_offset + delta)
 			delim.offset -= delta;
 
-		if (table_index > (table->len - 1) ||
+		if (table_index + 1 > table->len ||
 		    !delimiter_is_equal (&delim,
 					 &g_array_index (table,
 							 SyntaxDelimiter,
