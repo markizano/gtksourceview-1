@@ -33,6 +33,7 @@
 #include "gtksourceview-i18n.h"
 #include "gtksourcebuffer.h"
 #include "gtksourcetag.h"
+#include "gtksourcetag-private.h"
 
 #include "gtksourceundomanager.h"
 #include "gtksourceview-marshal.h"
@@ -565,8 +566,6 @@ gtk_source_buffer_set_property (GObject      *object,
 		case PROP_LANGUAGE:
 			gtk_source_buffer_set_language (source_buffer,
 							g_value_get_object (value));
-			/* FIXME: I think we should unref the object
-			 * here, since g_value_set_object refs it - Gustavo */
 			break;
 			
 		default:
@@ -794,6 +793,18 @@ gtk_source_buffer_real_delete_range (GtkTextBuffer *buffer,
 	delta = gtk_text_iter_get_offset (start) - 
 			gtk_text_iter_get_offset (end);
 
+	/* remove the markers in the deleted region if deleting more than one character */
+	if (ABS (delta) > 1)
+	{
+		markers = gtk_source_buffer_get_markers_in_region (GTK_SOURCE_BUFFER (buffer),
+								   start, end);
+		while (markers)
+		{
+			gtk_source_buffer_delete_marker (GTK_SOURCE_BUFFER (buffer), markers->data);
+			markers = g_slist_delete_link (markers, markers);
+		}
+	}
+		
 	parent_class->delete_range (buffer, start, end);
 
 	mark = gtk_text_buffer_get_insert (buffer);
@@ -2881,6 +2892,7 @@ gtk_source_buffer_move_marker (GtkSourceBuffer   *buffer,
 	g_return_if_fail (buffer != NULL && marker != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 	g_return_if_fail (GTK_IS_SOURCE_MARKER (marker));
+	g_return_if_fail (!gtk_text_mark_get_deleted (GTK_TEXT_MARK (marker)));
 	g_return_if_fail (where != NULL);
 
 	index = markers_lookup (buffer, marker);
@@ -2912,6 +2924,7 @@ gtk_source_buffer_delete_marker (GtkSourceBuffer *buffer,
 	g_return_if_fail (buffer != NULL && marker != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 	g_return_if_fail (GTK_IS_SOURCE_MARKER (marker));
+	g_return_if_fail (!gtk_text_mark_get_deleted (GTK_TEXT_MARK (marker)));
 
 	index = markers_lookup (buffer, marker);
 	
@@ -3115,8 +3128,78 @@ gtk_source_buffer_get_iter_at_marker (GtkSourceBuffer *buffer,
 	g_return_if_fail (buffer != NULL && marker != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 	g_return_if_fail (GTK_IS_SOURCE_MARKER (marker));
+	g_return_if_fail (!gtk_text_mark_get_deleted (GTK_TEXT_MARK (marker)));
 
 	gtk_text_buffer_get_iter_at_mark (GTK_TEXT_BUFFER (buffer),
 					  iter,
 					  GTK_TEXT_MARK (marker));
 }
+
+GtkSourceMarker *
+gtk_source_buffer_get_next_marker (GtkSourceBuffer *buffer,
+				   GtkTextIter     *iter)
+{
+	GtkSourceMarker *marker;
+	GArray *markers;
+	gint i, cmp;
+	
+	g_return_val_if_fail (buffer != NULL, NULL);
+	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
+	g_return_val_if_fail (iter != NULL, NULL);
+
+	marker = NULL;
+	markers = buffer->priv->markers;
+
+	i = markers_binary_search (buffer, iter, &cmp);
+	if (i < 0)
+		return NULL;
+	
+	if (cmp == 0)
+		/* return the first marker at the iter position */
+		i = markers_linear_lookup (buffer, NULL, i, -1);
+	else if (cmp > 0)
+		i++;
+
+	if (i < markers->len)
+	{
+		marker = g_array_index (markers, GtkSourceMarker *, i);
+		gtk_source_buffer_get_iter_at_marker (buffer, iter, marker);
+	}
+		
+	return marker;
+}
+
+GtkSourceMarker *
+gtk_source_buffer_get_prev_marker (GtkSourceBuffer *buffer,
+				   GtkTextIter     *iter)
+{
+	GtkSourceMarker *marker;
+	GArray *markers;
+	gint i, cmp;
+	
+	g_return_val_if_fail (buffer != NULL, NULL);
+	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
+	g_return_val_if_fail (iter != NULL, NULL);
+
+	marker = NULL;
+	markers = buffer->priv->markers;
+
+	i = markers_binary_search (buffer, iter, &cmp);
+	if (i < 0)
+		return NULL;
+	
+	if (cmp == 0)
+		/* return the last marker at the iter position */
+		i = markers_linear_lookup (buffer, NULL, i, 1);
+	else if (cmp < 0)
+		i--;
+
+	if (i >= 0)
+	{
+		marker = g_array_index (markers, GtkSourceMarker *, i);
+		gtk_source_buffer_get_iter_at_marker (buffer, iter, marker);
+	}
+		
+	return marker;
+}
+

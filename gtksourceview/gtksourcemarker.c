@@ -78,6 +78,7 @@ gtk_source_marker_get_line (GtkSourceMarker *marker)
 	
 	g_return_val_if_fail (marker != NULL, -1);
 	g_return_val_if_fail (GTK_IS_SOURCE_MARKER (marker), -1);
+	g_return_val_if_fail (!gtk_text_mark_get_deleted (GTK_TEXT_MARK (marker)), -1);
 
 	gtk_text_buffer_get_iter_at_mark (gtk_text_mark_get_buffer (GTK_TEXT_MARK (marker)),
 					  &iter, GTK_TEXT_MARK (marker));
@@ -118,6 +119,7 @@ _gtk_source_marker_changed (GtkSourceMarker *marker)
 
 	g_return_if_fail (marker != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_MARKER (marker));
+	g_return_if_fail (!gtk_text_mark_get_deleted (GTK_TEXT_MARK (marker)));
 
 	buffer = GTK_SOURCE_BUFFER (gtk_text_mark_get_buffer (GTK_TEXT_MARK (marker)));
 	
@@ -138,6 +140,7 @@ _gtk_source_marker_link (GtkSourceMarker *marker,
 	
 	g_return_if_fail (marker != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_MARKER (marker));
+	g_return_if_fail (!gtk_text_mark_get_deleted (GTK_TEXT_MARK (marker)));
 
 	if (!sibling)
 		return;
@@ -175,6 +178,7 @@ _gtk_source_marker_unlink (GtkSourceMarker *marker)
 	
 	g_return_if_fail (marker != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_MARKER (marker));
+	g_return_if_fail (!gtk_text_mark_get_deleted (GTK_TEXT_MARK (marker)));
 
 	m1 = g_object_steal_qdata (G_OBJECT (marker), quark_prev_marker);
 	m2 = g_object_steal_qdata (G_OBJECT (marker), quark_next_marker);

@@ -25,10 +25,16 @@
 #define __GTK_SOURCE_TAG_H__
 
 #include <gtk/gtktexttag.h>
-
-#include <gtksourceregex.h>
+#include <gtksourcetagstyle.h>
 
 G_BEGIN_DECLS
+
+#define GTK_TYPE_SOURCE_TAG             (gtk_source_tag_get_type ())
+#define GTK_SOURCE_TAG(obj)             (G_TYPE_CHECK_INSTANCE_CAST ((obj), GTK_TYPE_SOURCE_TAG, GtkSourceTag))
+#define GTK_SOURCE_TAG_CLASS(klass)     (G_TYPE_CHECK_CLASS_CAST ((klass), GTK_TYPE_SOURCE_TAG, GtkSourceTagClass))
+#define GTK_IS_SOURCE_TAG(obj)          (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GTK_TYPE_SOURCE_TAG))
+#define GTK_IS_SOURCE_TAG_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE ((klass), GTK_TYPE_SOURCE_TAG))
+#define GTK_SOURCE_TAG_GET_CLASS(obj)   (G_TYPE_INSTANCE_GET_CLASS ((obj), GTK_TYPE_SOURCE_TAG, GtkSourceTagClass))
 
 #define GTK_TYPE_SYNTAX_TAG             (gtk_syntax_tag_get_type ())
 #define GTK_SYNTAX_TAG(obj)             (G_TYPE_CHECK_INSTANCE_CAST ((obj), GTK_TYPE_SYNTAX_TAG, GtkSyntaxTag))
@@ -44,8 +50,9 @@ G_BEGIN_DECLS
 #define GTK_IS_PATTERN_TAG_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), GTK_TYPE_PATTERN_TAG))
 #define GTK_PATTERN_TAG_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), GTK_TYPE_PATTERN_TAG, GtkPatternTagClass))
 
-#define GTK_IS_SOURCE_TAG(obj)		(GTK_IS_PATTERN_TAG(obj) || GTK_IS_SYNTAX_TAG(obj))
 
+typedef struct _GtkSourceTag        GtkSourceTag;
+typedef struct _GtkSourceTagClass   GtkSourceTagClass;
 
 typedef struct _GtkSyntaxTag        GtkSyntaxTag;
 typedef struct _GtkSyntaxTagClass   GtkSyntaxTagClass;
@@ -53,32 +60,11 @@ typedef struct _GtkSyntaxTagClass   GtkSyntaxTagClass;
 typedef struct _GtkPatternTag       GtkPatternTag;
 typedef struct _GtkPatternTagClass  GtkPatternTagClass;
 
-struct _GtkSyntaxTag 
-{
-	GtkTextTag		 parent_instance;
 
-	gchar			*start;  
-	GtkSourceRegex		 reg_start;
-	GtkSourceRegex		 reg_end;
-};
-
-struct _GtkSyntaxTagClass 
-{
-	GtkTextTagClass		 parent_class; 
-};
-
-struct _GtkPatternTag 
-{
-	GtkTextTag		 parent_instance;
-
-	GtkSourceRegex		 reg_pattern;
-};
-
-struct _GtkPatternTagClass 
-{
-	GtkTextTagClass		 parent_class; 
-};
-
+GType 	           gtk_source_tag_get_type        (void) G_GNUC_CONST;
+GtkSourceTagStyle *gtk_source_tag_get_style       (GtkSourceTag            *tag);
+void               gtk_source_tag_set_style       (GtkSourceTag            *tag,
+						   const GtkSourceTagStyle *style);
 
 GType		 gtk_syntax_tag_get_type	(void) G_GNUC_CONST;
 GtkTextTag 	*gtk_syntax_tag_new		(const gchar 	*name, 

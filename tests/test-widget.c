@@ -124,7 +124,7 @@ view_toggled_cb (ViewsData *vd,
 			break;
 		case 2:
 			vd->show_markers = active;
-			set_func = gtk_source_view_set_show_line_pixmaps;
+			set_func = gtk_source_view_set_show_line_markers;
 			break;
 		case 3:
 			vd->auto_indent = active;
@@ -489,7 +489,7 @@ button_press_cb (GtkWidget *widget, GdkEventButton *ev, gpointer user_data)
 	view = GTK_SOURCE_VIEW (widget);
 	buffer = GTK_SOURCE_BUFFER (gtk_text_view_get_buffer (GTK_TEXT_VIEW (view)));
 	
-	if (!gtk_source_view_get_show_line_pixmaps (view))
+	if (!gtk_source_view_get_show_line_markers (view))
 		return FALSE;
 	
 	/* check that the click was on the left gutter */
@@ -603,7 +603,7 @@ create_window (ViewsData *vd)
 	g_object_set (G_OBJECT (view), 
 		      "tabs_width", vd->tab_stop, 
 		      "show_line_numbers", vd->show_numbers,
-		      "show_line_pixmaps", vd->show_markers,
+		      "show_line_markers", vd->show_markers,
 		      "show_margin", vd->show_margin,
 		      "auto_indent", vd->auto_indent,
 		      "insert_spaces_instead_of_tabs", vd->insert_spaces,
@@ -613,11 +613,11 @@ create_window (ViewsData *vd)
 	
 	/* add marker pixbufs */
 	pixbuf = gdk_pixbuf_new_from_file ("/usr/share/pixmaps/apple-green.png", NULL);
-	gtk_source_view_set_pixbuf (GTK_SOURCE_VIEW (view), MARKER_TYPE_1, pixbuf);
+	gtk_source_view_set_marker_pixbuf (GTK_SOURCE_VIEW (view), MARKER_TYPE_1, pixbuf);
 	g_object_unref (pixbuf);
 	
 	pixbuf = gdk_pixbuf_new_from_file ("/usr/share/pixmaps/apple-red.png", NULL);
-	gtk_source_view_set_pixbuf (GTK_SOURCE_VIEW (view), MARKER_TYPE_2, pixbuf);
+	gtk_source_view_set_marker_pixbuf (GTK_SOURCE_VIEW (view), MARKER_TYPE_2, pixbuf);
 	g_object_unref (pixbuf);
 	
 	return window;

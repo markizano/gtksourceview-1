@@ -135,6 +135,10 @@ GtkSourceMarker         *gtk_source_buffer_get_last_marker      (GtkSourceBuffer
 void                     gtk_source_buffer_get_iter_at_marker   (GtkSourceBuffer       *buffer,
 								 GtkTextIter           *iter,
 								 GtkSourceMarker       *marker);
+GtkSourceMarker         *gtk_source_buffer_get_next_marker      (GtkSourceBuffer       *buffer,
+								 GtkTextIter           *iter);
+GtkSourceMarker         *gtk_source_buffer_get_prev_marker      (GtkSourceBuffer       *buffer,
+								 GtkTextIter           *iter);
 
 /* INTERNAL private stuff - not even exported from the library on
  * many platforms

@@ -77,9 +77,9 @@ void 		 gtk_source_view_set_show_line_numbers 	(GtkSourceView       *view,
 							 gboolean             show);
 gboolean 	 gtk_source_view_get_show_line_numbers 	(const GtkSourceView *view);
 
-void 		 gtk_source_view_set_show_line_pixmaps	(GtkSourceView       *view,
-					    		 gboolean             show);
-gboolean	 gtk_source_view_get_show_line_pixmaps	(const GtkSourceView *view);
+void 		 gtk_source_view_set_show_line_markers  (GtkSourceView       *view,
+							 gboolean             show);
+gboolean	 gtk_source_view_get_show_line_markers  (const GtkSourceView *view);
 
 void 		 gtk_source_view_set_tabs_width 	(GtkSourceView       *view, 
 							 guint                width);
@@ -103,11 +103,11 @@ void		 gtk_source_view_set_margin 		(GtkSourceView       *view,
 							 guint                margin);
 guint		 gtk_source_view_get_margin 		(const GtkSourceView *view);
 
-void             gtk_source_view_set_pixbuf             (GtkSourceView       *view,
-							 const gchar         *key,
+void             gtk_source_view_set_marker_pixbuf      (GtkSourceView       *view,
+							 const gchar         *marker_type,
 							 GdkPixbuf           *pixbuf);
-GdkPixbuf	*gtk_source_view_get_pixbuf 		(const GtkSourceView *view,
-				       			 const gchar         *key);
+GdkPixbuf	*gtk_source_view_get_marker_pixbuf      (GtkSourceView       *view,
+				       			 const gchar         *marker_type);
 
 G_END_DECLS
 #endif				/* end of SOURCE_VIEW_H__ */

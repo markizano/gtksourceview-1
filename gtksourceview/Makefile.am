@@ -24,6 +24,7 @@ libgtksourceview_1_0_la_SOURCES = 		\
 	gtksourcebuffer.h 		\
 	gtksourcetag.c 			\
 	gtksourcetag.h 			\
+	gtksourcetag-private.h 		\
 	gtksourceview.c 		\
 	gtksourceview.h 		\
 	gtksourceundomanager.h 		\

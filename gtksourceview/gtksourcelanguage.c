@@ -913,39 +913,6 @@ parseSyntaxItem (xmlDocPtr doc, xmlNodePtr cur, xmlChar *name)
 	return tag;
 }
 
-
-static void
-apply_style_to_tag (GtkTextTag *tag, const GtkSourceTagStyle *ts)
-{
-	GValue italic = { 0, };
-	GValue bold = { 0, };
-	GValue foreground = { 0, };
-	GValue background = { 0, };
-
-	/* Foreground color. */
-	g_value_init (&foreground, GDK_TYPE_COLOR);
-	g_value_set_boxed (&foreground, &ts->foreground);
-	g_object_set_property (G_OBJECT (tag), "foreground_gdk", &foreground);
-
-	/* Background color. */
-	if (ts->use_background)
-	{
-		g_value_init (&background, GDK_TYPE_COLOR);
-		g_value_set_boxed (&background, &ts->background);
-		g_object_set_property (G_OBJECT (tag), "background_gdk", &background);
-	}
-
-	/* Bold setting. */
-	g_value_init (&italic, PANGO_TYPE_STYLE);
-	g_value_set_enum (&italic, ts->italic ? PANGO_STYLE_ITALIC : PANGO_STYLE_NORMAL);
-	g_object_set_property (G_OBJECT (tag), "style", &italic);
-
-	/* Italic setting. */
-	g_value_init (&bold, G_TYPE_INT);
-	g_value_set_int (&bold, ts->bold ? PANGO_WEIGHT_BOLD : PANGO_WEIGHT_NORMAL);
-	g_object_set_property (G_OBJECT (tag), "weight", &bold);
-}
-
 static void 
 tag_style_changed_cb (GtkSourceLanguage *language,
 		      const gchar       *name,
@@ -959,7 +926,7 @@ tag_style_changed_cb (GtkSourceLanguage *language,
 	ts = gtk_source_language_get_tag_style (language, name);
 
 	if (ts != NULL)
-		apply_style_to_tag (tag, ts);
+		gtk_source_tag_set_style (GTK_SOURCE_TAG (tag), ts);
 
 	g_free (ts);
 }
@@ -1029,7 +996,7 @@ parseTag (GtkSourceLanguage *language,
 		ts = gtk_source_language_get_tag_style (language, name);
 
 		if (ts != NULL)
-			apply_style_to_tag (tag, ts);
+			gtk_source_tag_set_style (GTK_SOURCE_TAG (tag), ts);
 
 		g_signal_connect_object (language, 
 					 "tag_style_changed",

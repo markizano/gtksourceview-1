@@ -1,4 +1,4 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- 
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*- 
  *  gtksourcetag.c
  *
  *  Copyright (C) 2001
@@ -29,9 +29,14 @@
 
 #include "gtksourceview-i18n.h"
 #include "gtksourcetag.h"
+#include "gtksourcetag-private.h"
 
-static GObjectClass 	*parent_syntax_class  = NULL;
-static GObjectClass 	*parent_pattern_class = NULL;
+static GtkTextTagClass          *parent_class = NULL;
+static GtkSourceTagClass 	*parent_syntax_class  = NULL;
+static GtkSourceTagClass 	*parent_pattern_class = NULL;
+
+static void		 gtk_source_tag_init 		(GtkSourceTag       *text_tag);
+static void		 gtk_source_tag_class_init 	(GtkSourceTagClass  *text_tag);
 
 static void		 gtk_syntax_tag_init 		(GtkSyntaxTag       *text_tag);
 static void		 gtk_syntax_tag_class_init 	(GtkSyntaxTagClass  *text_tag);
@@ -41,7 +46,106 @@ static void		 gtk_pattern_tag_init 		(GtkPatternTag      *text_tag);
 static void		 gtk_pattern_tag_class_init 	(GtkPatternTagClass *text_tag);
 static void		 gtk_pattern_tag_finalize 	(GObject            *object);
 
-/* Styntax tag */
+/* Source tag */
+
+GType
+gtk_source_tag_get_type (void)
+{
+	static GType our_type = 0;
+
+	if (our_type == 0) {
+		static const GTypeInfo our_info = {
+			sizeof (GtkSourceTagClass),
+			(GBaseInitFunc) NULL,
+			(GBaseFinalizeFunc) NULL,
+			(GClassInitFunc) gtk_source_tag_class_init,
+			NULL,	/* class_finalize */
+			NULL,	/* class_data */
+			sizeof (GtkSourceTag),
+			0,	/* n_preallocs */
+			(GInstanceInitFunc) gtk_source_tag_init
+		};
+
+		our_type =
+		    g_type_register_static (GTK_TYPE_TEXT_TAG,
+					    "GtkSourceTag", &our_info, 0);
+	}
+
+	return our_type;
+}
+
+static void
+gtk_source_tag_class_init (GtkSourceTagClass *klass)
+{
+	parent_class = g_type_class_peek_parent (klass);
+}
+
+static void
+gtk_source_tag_init (GtkSourceTag *text_tag)
+{
+}
+
+GtkSourceTagStyle *
+gtk_source_tag_get_style (GtkSourceTag *tag)
+{
+	GtkSourceTagStyle *style;
+	gint text_style, text_weight;
+	
+	g_return_val_if_fail (tag != NULL && GTK_IS_SOURCE_TAG (tag), NULL);
+
+	style = g_new0 (GtkSourceTagStyle, 1);
+
+	g_object_get (G_OBJECT (tag),
+		      "foreground_gdk", &style->foreground,
+		      "background_gdk", &style->background,
+		      "style", &text_style,
+		      "weight", &text_weight,
+		      NULL);
+
+	style->use_background = TRUE;
+	style->italic = ((text_style & PANGO_STYLE_ITALIC) != 0);
+	style->bold = ((text_weight & PANGO_WEIGHT_BOLD) != 0);
+		      
+	return style;
+}
+
+void 
+gtk_source_tag_set_style (GtkSourceTag *tag, const GtkSourceTagStyle *style)
+{
+	GValue italic = { 0, };
+	GValue bold = { 0, };
+	GValue foreground = { 0, };
+	GValue background = { 0, };
+
+	g_return_if_fail (tag != NULL && style != NULL);
+	g_return_if_fail (GTK_IS_SOURCE_TAG (tag));
+	
+	/* Foreground color. */
+	g_value_init (&foreground, GDK_TYPE_COLOR);
+	g_value_set_boxed (&foreground, &style->foreground);
+	g_object_set_property (G_OBJECT (tag), "foreground_gdk", &foreground);
+
+	/* Background color. */
+	if (style->use_background)
+	{
+		g_value_init (&background, GDK_TYPE_COLOR);
+		g_value_set_boxed (&background, &style->background);
+		g_object_set_property (G_OBJECT (tag), "background_gdk", &background);
+	}
+
+	/* Bold setting. */
+	g_value_init (&italic, PANGO_TYPE_STYLE);
+	g_value_set_enum (&italic, style->italic ? PANGO_STYLE_ITALIC : PANGO_STYLE_NORMAL);
+	g_object_set_property (G_OBJECT (tag), "style", &italic);
+
+	/* Italic setting. */
+	g_value_init (&bold, G_TYPE_INT);
+	g_value_set_int (&bold, style->bold ? PANGO_WEIGHT_BOLD : PANGO_WEIGHT_NORMAL);
+	g_object_set_property (G_OBJECT (tag), "weight", &bold);
+}
+
+
+/* Syntax tag */
 
 GType
 gtk_syntax_tag_get_type (void)
@@ -62,7 +166,7 @@ gtk_syntax_tag_get_type (void)
 		};
 
 		our_type =
-		    g_type_register_static (GTK_TYPE_TEXT_TAG,
+		    g_type_register_static (GTK_TYPE_SOURCE_TAG,
 					    "GtkSyntaxTag", &our_info, 0);
 	}
 
@@ -150,7 +254,7 @@ gtk_pattern_tag_get_type (void)
 		};
 
 		our_type =
-		    g_type_register_static (GTK_TYPE_TEXT_TAG,
+		    g_type_register_static (GTK_TYPE_SOURCE_TAG,
 					    "GtkPatternTag", &our_info, 0);
 	}
 	return (our_type);
@@ -159,7 +263,6 @@ gtk_pattern_tag_get_type (void)
 static void
 gtk_pattern_tag_init (GtkPatternTag *text_tag)
 {
-
 }
 
 static void
