@@ -72,7 +72,7 @@ static GtkItemFactoryEntry menu_items[] = {
 	{ "/_File",                   NULL,         0,               0, "<Branch>" },
 	{ "/File/_Open",              "<control>O", open_file_cb,    0, "<StockItem>", GTK_STOCK_OPEN },
 	{ "/File/sep1",               NULL,         0,               0, "<Separator>" },
-	{ "/File/_Quit",              "<control>Q", gtk_main_quit,   0 },
+	{ "/File/_Quit",              "<control>Q", gtk_main_quit,   0, "<StockItem>", GTK_STOCK_QUIT },
 	
 	{ "/_View",                   NULL,         0,               0, "<Branch>" },
 	{ "/View/_New View",          NULL,         new_view_cb,     0, "<StockItem>", GTK_STOCK_NEW },
