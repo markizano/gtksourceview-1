@@ -4,7 +4,7 @@ TODO (last update: 8 March 2003)
 Before next release:
 
 [ ] Reviewing the APIs
-[ ] Support for multiple views (Gustavo)
+[X] Support for multiple views (Gustavo)
 [ ] Removing the style themes stuff (Paolo)
 [ ] Finishing the .lang file stuff (Paolo)
 [ ] Reviewing the markers stuff code

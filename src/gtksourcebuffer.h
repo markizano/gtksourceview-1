@@ -56,6 +56,9 @@ struct _GtkSourceBufferClass
 					 gboolean         can_undo);
 	void (* can_redo)		(GtkSourceBuffer *buffer,
 					 gboolean         can_redo);
+	void (* highlight_updated)      (GtkSourceBuffer *buffer,
+					 GtkTextIter     *start,
+					 GtkTextIter     *end);
 };
 
 struct _GtkSourceBufferMarker 

@@ -50,6 +50,9 @@ static void gtk_source_view_pixbuf_foreach_unref (gpointer key,
 static void gtk_source_view_undo (GtkSourceView *view);
 static void gtk_source_view_redo (GtkSourceView *view);
 
+static void set_source_buffer (GtkSourceView *view,
+			       GtkTextBuffer *buffer);
+
 static void gtk_source_view_populate_popup (GtkTextView *view,
 					    GtkMenu     *menu);
 static void menuitem_activate_cb (GtkWidget   *menuitem,
@@ -147,8 +150,77 @@ gtk_source_view_finalize (GObject *object)
 					     NULL);
 		g_hash_table_destroy (view->pixmap_cache);
 	}
+	set_source_buffer (view, NULL);
 
 	G_OBJECT_CLASS (parent_class)->finalize (object);
+}
+
+static void 
+highlight_updated_cb (GtkSourceBuffer *buffer,
+		      GtkTextIter     *start,
+		      GtkTextIter     *end,
+		      GtkTextView     *text_view)
+{
+	GdkRectangle visible_rect, updated_rect, redraw_rect;
+	gint y, height;
+	
+	/* get visible area */
+	gtk_text_view_get_visible_rect (text_view, &visible_rect);
+	
+	/* get updated rectangle */
+	gtk_text_view_get_line_yrange (text_view, start, &y, &height);
+	updated_rect.y = y;
+	gtk_text_view_get_line_yrange (text_view, end, &y, &height);
+	updated_rect.height = y + height - updated_rect.y;
+	updated_rect.x = visible_rect.x;
+	updated_rect.width = visible_rect.width;
+
+	/* intersect both rectangles to see whether we need to queue a redraw */
+	if (gdk_rectangle_intersect (&updated_rect, &visible_rect, &redraw_rect)) {
+		GdkRectangle widget_rect;
+		
+		gtk_text_view_buffer_to_window_coords (text_view,
+						       GTK_TEXT_WINDOW_WIDGET,
+						       redraw_rect.x,
+						       redraw_rect.y,
+						       &widget_rect.x,
+						       &widget_rect.y);
+		
+		widget_rect.width = redraw_rect.width;
+		widget_rect.height = redraw_rect.height;
+		
+		gtk_widget_queue_draw_area (GTK_WIDGET (text_view),
+					    widget_rect.x,
+					    widget_rect.y,
+					    widget_rect.width,
+					    widget_rect.height);
+	}
+}
+
+static void
+set_source_buffer (GtkSourceView *view, GtkTextBuffer *buffer)
+{
+	/* keep our pointer to the source buffer in sync with
+	 * textview's, though it would be a lot nicer if GtkTextView
+	 * had a "set_buffer" signal */
+	if (view->source_buffer) {
+		g_signal_handlers_disconnect_by_func (view->source_buffer,
+						      highlight_updated_cb,
+						      view);
+		g_object_remove_weak_pointer (G_OBJECT (view->source_buffer),
+					      (gpointer *) &view->source_buffer);
+	}
+	if (buffer && GTK_IS_SOURCE_BUFFER (buffer)) {
+		view->source_buffer = GTK_SOURCE_BUFFER (buffer);
+		g_object_add_weak_pointer (G_OBJECT (buffer),
+					   (gpointer *) &view->source_buffer);
+		g_signal_connect (buffer,
+				  "highlight_updated",
+				  G_CALLBACK (highlight_updated_cb),
+				  view);
+	} else {
+		view->source_buffer = NULL;
+	}
 }
 
 static void
@@ -512,10 +584,16 @@ gtk_source_view_expose (GtkWidget      *widget,
 
 	event_handled = FALSE;
 	
+	/* maintain the our source_buffer pointer synchronized */
+	if (text_view->buffer != GTK_TEXT_BUFFER (view->source_buffer) &&
+	    GTK_IS_SOURCE_BUFFER (text_view->buffer)) {
+		set_source_buffer (view, text_view->buffer);
+	}
+	
 	/* check if the expose event is for the text window first, and
 	 * make sure the visible region is highlighted */
-	if (event->window == gtk_text_view_get_window (text_view,
-						       GTK_TEXT_WINDOW_TEXT)) {
+	if (event->window == gtk_text_view_get_window (text_view, GTK_TEXT_WINDOW_TEXT) &&
+	    view->source_buffer != NULL) {
 		GdkRectangle visible_rect;
 		GtkTextIter iter1, iter2;
 		
@@ -528,9 +606,8 @@ gtk_source_view_expose (GtkWidget      *widget,
 					     + visible_rect.height, NULL);
 		gtk_text_iter_forward_line (&iter2);
 
-		gtk_source_buffer_highlight_region (
-			GTK_SOURCE_BUFFER (text_view->buffer),
-			&iter1, &iter2);
+		gtk_source_buffer_highlight_region (view->source_buffer,
+						    &iter1, &iter2);
 	}
 
 	/* now check for the left window, which contains the margin */

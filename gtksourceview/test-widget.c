@@ -532,6 +532,29 @@ cb_move_cursor (GtkTextBuffer *b, GtkTextIter *cursoriter, GtkTextMark *mark, gp
 	gtk_label_set_text (GTK_LABEL (data), buf);
 }
 
+static void
+cb_new_view (GtkWidget *w, GtkSourceBuffer *buffer)
+{
+	GtkWidget *window, *sw, *view;
+	PangoFontDescription *font_desc = NULL;
+	
+	window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
+	sw = gtk_scrolled_window_new (NULL, NULL);
+	gtk_container_add (GTK_CONTAINER (window), sw);
+	gtk_widget_show (sw);
+	view = gtk_source_view_new_with_buffer (buffer);
+
+	font_desc = pango_font_description_from_string ("monospace 10");
+	if (font_desc != NULL) {
+		gtk_widget_modify_font (view, font_desc);
+		pango_font_description_free (font_desc);
+	}
+
+	gtk_container_add (GTK_CONTAINER (sw), view);
+	gtk_widget_show (view);
+	gtk_window_set_default_size (GTK_WINDOW (window), 400, 400);
+	gtk_widget_show (window);
+}
 
 int
 main (int argc, char *argv[])
@@ -580,6 +603,10 @@ main (int argc, char *argv[])
 	gtk_box_pack_start (GTK_BOX (vbox), button, FALSE, FALSE, 0);
 	gtk_signal_connect (GTK_OBJECT (button), "clicked", GTK_SIGNAL_FUNC (cb_convert), buf);
 
+	button = gtk_button_new_with_label ("New view");
+	gtk_box_pack_start (GTK_BOX (vbox), button, FALSE, FALSE, 0);
+	g_signal_connect (button, "clicked", G_CALLBACK (cb_new_view), buf);
+	
 	scrolled = gtk_scrolled_window_new (NULL, NULL);
 	gtk_box_pack_start (GTK_BOX (vbox), scrolled, TRUE, TRUE, 0);
 

@@ -45,6 +45,7 @@ struct _GtkSourceView {
 	GHashTable *pixmap_cache;
 
 	gchar *delete_range;
+	GtkSourceBuffer *source_buffer;
 };
 
 struct _GtkSourceViewClass {

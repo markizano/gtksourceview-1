@@ -76,6 +76,7 @@ typedef struct _PatternMatch         PatternMatch;
 enum {
 	CAN_UNDO = 0,
 	CAN_REDO,
+	HIGHLIGHT_UPDATED,
 	LAST_SIGNAL
 };
 
@@ -122,10 +123,9 @@ struct _GtkSourceBufferPrivate
 	gint                worker_batch_size;
 	guint               worker_handler;
 
-	/* view visible region */
-	gint                visible_start;
-	gint                visible_end;
-	
+	/* views highlight requests */
+	GtkTextRegion      *highlight_requests;
+
 	GtkUndoManager     *undo_manager;
 };
 
@@ -239,8 +239,9 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 		
 	object_class->finalize	= gtk_source_buffer_finalize;
 
-	klass->can_undo 	= NULL;
-	klass->can_redo 	= NULL;
+	klass->can_undo 	 = NULL;
+	klass->can_redo 	 = NULL;
+	klass->highlight_updated = NULL;
 
 	/* Do not set these signals handlers directly on the parent_class since
 	 * that will cause problems (a loop). */
@@ -268,6 +269,18 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 			  G_TYPE_NONE, 
 			  1, 
 			  G_TYPE_BOOLEAN);
+
+	buffer_signals[HIGHLIGHT_UPDATED] =
+	    g_signal_new ("highlight_updated",
+			  G_OBJECT_CLASS_TYPE (object_class),
+			  G_SIGNAL_RUN_LAST,
+			  G_STRUCT_OFFSET (GtkSourceBufferClass, highlight_updated),
+			  NULL, NULL,
+			  gtksourceview_marshal_VOID__BOXED_BOXED,
+			  G_TYPE_NONE, 
+			  2, 
+			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE,
+			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE);
 }
 
 static void
@@ -291,7 +304,9 @@ gtk_source_buffer_init (GtkSourceBuffer *buffer)
 	priv->refresh_region =  gtk_text_region_new (GTK_TEXT_BUFFER (buffer));
 	priv->syntax_regions =  g_array_new (FALSE, FALSE,
 					     sizeof (SyntaxDelimiter));
+	priv->highlight_requests = gtk_text_region_new (GTK_TEXT_BUFFER (buffer));
 	priv->worker_handler = 0;
+
 	/* initially the buffer is empty so it's entirely analyzed */
 	priv->worker_last_offset = -1;
 	priv->worker_batch_size = INITIAL_WORKER_BATCH;
@@ -349,6 +364,8 @@ gtk_source_buffer_finalize (GObject *object)
 
 	/* we can't delete marks if we're finalizing the buffer */
 	gtk_text_region_destroy (buffer->priv->refresh_region, FALSE);
+	gtk_text_region_destroy (buffer->priv->highlight_requests, FALSE);
+
 	g_object_unref (buffer->priv->undo_manager);
 
 	g_array_free (buffer->priv->syntax_regions, TRUE);
@@ -1213,24 +1230,44 @@ gtk_source_buffer_set_highlight (GtkSourceBuffer *buffer,
 static gboolean
 idle_worker (GtkSourceBuffer *source_buffer)
 {
+	GtkTextIter start_iter, end_iter, last_end_iter;
+	gint i;
+	
 	if (source_buffer->priv->worker_last_offset >= 0) {
 		/* the syntax regions table is incomplete */
 		build_syntax_regions_table (source_buffer, NULL);
 	}
 
-	if (source_buffer->priv->worker_last_offset < 0 ||
-	    source_buffer->priv->worker_last_offset >=  source_buffer->priv->visible_end) 
-	{
-		GtkTextIter start_iter, end_iter;
-		gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (source_buffer),
-						    &start_iter, 
-						    source_buffer->priv->visible_start);
-		gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (source_buffer),
-						    &end_iter, 
-						    source_buffer->priv->visible_end);
-		ensure_highlighted (source_buffer, 
-				    &start_iter, 
-				    &end_iter);
+	/* Now we highlight subregions requested by our views */
+	gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (source_buffer), &last_end_iter, 0);
+	for (i = 0; i < gtk_text_region_subregions (
+		     source_buffer->priv->highlight_requests); i++) {
+		gtk_text_region_nth_subregion (source_buffer->priv->highlight_requests,
+					       i, &start_iter, &end_iter);
+
+		if (source_buffer->priv->worker_last_offset < 0 ||
+		    source_buffer->priv->worker_last_offset >=
+		    gtk_text_iter_get_offset (&end_iter)) {
+			ensure_highlighted (source_buffer, 
+					    &start_iter, 
+					    &end_iter);
+			last_end_iter = end_iter;
+		} else {
+			/* since the subregions are ordered, we are
+			 * guaranteed here that all subsequent
+			 * subregions will be beyond the already
+			 * analyzed text */
+			break;
+		}
+	}
+	gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (source_buffer), &start_iter, 0);
+
+	if (!gtk_text_iter_equal (&start_iter, &last_end_iter)) {
+		/* remove already highlighted subregions from requests */
+		gtk_text_region_substract (source_buffer->priv->highlight_requests,
+					   &start_iter, &last_end_iter);
+		gtk_text_region_clear_zero_length_subregions (
+			source_buffer->priv->highlight_requests);
 	}
 	
 	if (source_buffer->priv->worker_last_offset < 0) {
@@ -2209,10 +2246,8 @@ refresh_range (GtkSourceBuffer *buffer,
 	/* Add the region to the refresh region */
 	gtk_text_region_add (buffer->priv->refresh_region, start, end);
 
-	/* and possibly install the idle worker */
-	if (buffer->priv->highlight) {
-		install_idle_worker (buffer);
-	}
+	/* Notify views of the updated highlight region */
+	g_signal_emit (buffer, buffer_signals [HIGHLIGHT_UPDATED], 0, start, end);
 }
 
 static void 
@@ -2252,6 +2287,20 @@ ensure_highlighted (GtkSourceBuffer *source_buffer,
 	}
 }
 
+static void 
+highlight_queue (GtkSourceBuffer *source_buffer,
+		 GtkTextIter     *start,
+		 GtkTextIter     *end)
+{
+	gtk_text_region_add (source_buffer->priv->highlight_requests,
+			     start,
+			     end);
+
+	DEBUG (g_message ("queueing highlight [%d, %d]",
+			  gtk_text_iter_get_offset (start),
+			  gtk_text_iter_get_offset (end)));
+}
+
 void
 gtk_source_buffer_highlight_region (GtkSourceBuffer *source_buffer,
 				    GtkTextIter     *start,
@@ -2264,17 +2313,14 @@ gtk_source_buffer_highlight_region (GtkSourceBuffer *source_buffer,
 	if (!source_buffer->priv->highlight)
 		return;
 
-	/* FIXME: support multiple views */
-	source_buffer->priv->visible_start = gtk_text_iter_get_offset (start);
-	source_buffer->priv->visible_end = gtk_text_iter_get_offset (end);
-
 #ifndef LAZIEST_MODE
 	if (source_buffer->priv->worker_last_offset < 0 ||
-	    source_buffer->priv->worker_last_offset >= source_buffer->priv->visible_end) {
+	    source_buffer->priv->worker_last_offset >= gtk_text_iter_get_offset (end)) {
 		ensure_highlighted (source_buffer, start, end);
 	} else
 #endif
 	{
+		highlight_queue (source_buffer, start, end);
 		install_idle_worker (source_buffer);
 	}
 }
