@@ -203,6 +203,9 @@ gtk_source_language_finalize (GObject *object)
 		xmlFree (lang->priv->section);
 
 		slist_deep_free (lang->priv->mime_types);
+
+		if (lang->priv->tag_name_to_style_name)
+			g_hash_table_destroy (lang->priv->tag_name_to_style_name);
 		
 		g_free (lang->priv); 
 	}

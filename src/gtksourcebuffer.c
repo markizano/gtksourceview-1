@@ -358,12 +358,8 @@ create_empty_tag_table (GtkSourceBuffer *buffer)
 	g_return_if_fail (GTK_TEXT_BUFFER (buffer)->tag_table == NULL);
 
 	tag_table = gtk_source_tag_table_new ();
-
-	/* Add the buffer to the table */
-	GTK_TEXT_TAG_TABLE (tag_table)->buffers = 
-		g_slist_prepend (GTK_TEXT_TAG_TABLE (tag_table)->buffers, buffer);
-
-	GTK_TEXT_BUFFER (buffer)->tag_table = GTK_TEXT_TAG_TABLE (tag_table);
+	g_object_set (G_OBJECT (buffer), "tag-table", tag_table, NULL);
+	g_object_unref (tag_table);
 }
 
 static GObject *
@@ -486,14 +482,9 @@ gtk_source_buffer_new (GtkSourceTagTable *table)
 {
 	GtkSourceBuffer *buffer;
 
-	if (table != NULL) 
-		buffer = GTK_SOURCE_BUFFER (g_object_new (GTK_TYPE_SOURCE_BUFFER, 
-							  "tag_table", table, 
-							  NULL));
-	else
-		buffer = GTK_SOURCE_BUFFER (g_object_new (GTK_TYPE_SOURCE_BUFFER, 
-							  "tag_table", gtk_source_tag_table_new (),
-							  NULL));
+	buffer = GTK_SOURCE_BUFFER (g_object_new (GTK_TYPE_SOURCE_BUFFER, 
+						  "tag-table", table, 
+						  NULL));
 	
 	return buffer;
 }
@@ -1526,6 +1517,25 @@ invalidate_syntax_regions (GtkSourceBuffer *source_buffer,
 
 	DEBUG (g_message ("invalidating from %d", offset));
 	
+	if (!gtk_source_buffer_get_syntax_entries (source_buffer))
+	{
+		/* Shortcut case: we don't have syntax entries, so we
+		 * won't build the table.  OTOH, we do need to refresh
+		 * the highilighting in case there are pattern
+		 * entries. */
+		GtkTextIter start, end;
+		
+		g_array_set_size (table, 0);
+		source_buffer->priv->worker_last_offset = -1;
+
+		gtk_text_buffer_get_bounds (GTK_TEXT_BUFFER (source_buffer), &start, &end);
+		if (from)
+			start = *from;
+		refresh_range (source_buffer, &start, &end);
+
+		return;
+	}
+	
 	/* check if the offset has been analyzed already */
 	if ((source_buffer->priv->worker_last_offset >= 0) &&
 	    (offset > source_buffer->priv->worker_last_offset))
@@ -1681,6 +1691,9 @@ build_syntax_regions_table (GtkSourceBuffer *source_buffer,
 	GTimer *timer;
 
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (source_buffer));
+	
+	/* we shouldn't have been called if the buffer has no syntax entries */
+	g_assert (gtk_source_buffer_get_syntax_entries (source_buffer) != NULL);
 	
 	/* check if we still have text to analyze */
 	if (source_buffer->priv->worker_last_offset < 0)
@@ -1854,6 +1867,27 @@ update_syntax_regions (GtkSourceBuffer *source_buffer,
 	table = source_buffer->priv->syntax_regions;
 	g_assert (table != NULL);
 
+	if (!source_buffer->priv->highlight)
+		return;
+	
+	if (!gtk_source_buffer_get_syntax_entries (source_buffer))
+	{
+		/* Shortcut case: we don't have syntax entries, so we
+		 * just refresh_range() the edited area */
+		gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (source_buffer),
+						    &start_iter, start_offset);
+		end_iter = start_iter;
+		if (delta > 0)
+			gtk_text_iter_forward_chars (&end_iter, delta);
+	
+		gtk_text_iter_set_line_offset (&start_iter, 0);
+		gtk_text_iter_forward_to_line_end (&end_iter);
+
+		refresh_range (source_buffer, &start_iter, &end_iter);
+
+		return;
+	}
+	
 	/* check if the offset is at an unanalyzed region */
 	if (source_buffer->priv->worker_last_offset >= 0 &&
 	    start_offset >= source_buffer->priv->worker_last_offset) {
@@ -2095,10 +2129,12 @@ search_patterns (GList       *matches,
 			pmatch->match.startindex = match.startindex + index;
 			pmatch->match.endindex = match.endindex + index;
 			
-			/* insert the match in order */
+			/* insert the match in order (prioritize longest match) */
 			for (p = matches; p; p = p->next) {
 				PatternMatch *tmp = p->data;
-				if (tmp->match.startpos > pmatch->match.startpos) {
+				if (tmp->match.startpos > pmatch->match.startpos ||
+				    (tmp->match.startpos == pmatch->match.startpos &&
+				     tmp->match.endpos < pmatch->match.endpos)) {
 					break;
 				}
 			}
@@ -2142,7 +2178,7 @@ check_pattern (GtkSourceBuffer *source_buffer,
 	static gint acc_length = 0;
 #endif
 	
-	if (length == 0)
+	if (length == 0 || !gtk_source_buffer_get_pattern_entries (source_buffer))
 		return;
 	
 	PROFILE ({

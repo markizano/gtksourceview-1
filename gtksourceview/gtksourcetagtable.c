@@ -190,12 +190,10 @@ gtk_source_tag_table_add_all (GtkSourceTagTable *table, const GSList *tags)
 static void
 foreach_remove_tag (GtkTextTag *tag, gpointer data)
 {
-	GtkTextTagTable *table;
-
-	table = GTK_TEXT_TAG_TABLE (data);
+	GSList **tags = data;
 
 	if (GTK_IS_SOURCE_TAG (tag))
-		gtk_text_tag_table_remove (table, tag);
+		*tags = g_slist_prepend (*tags, tag);
 }
 
 
@@ -210,6 +208,7 @@ foreach_remove_tag (GtkTextTag *tag, gpointer data)
 void 
 gtk_source_tag_table_remove_all_source_tags (GtkSourceTagTable *table)
 {
+	GSList *tags = NULL;
 	gint old_size;
 	
 	g_return_if_fail (GTK_IS_SOURCE_TAG_TABLE (table));
@@ -218,8 +217,16 @@ gtk_source_tag_table_remove_all_source_tags (GtkSourceTagTable *table)
 	
 	block_signals (table);
 
-	gtk_text_tag_table_foreach (GTK_TEXT_TAG_TABLE (table), foreach_remove_tag, table);
+	gtk_text_tag_table_foreach (GTK_TEXT_TAG_TABLE (table), foreach_remove_tag, &tags);
 
+	while (tags)
+	{
+		gtk_text_tag_table_remove (GTK_TEXT_TAG_TABLE (table),
+					   GTK_TEXT_TAG (tags->data));
+		tags = g_slist_next (tags);
+	}
+	g_slist_free (tags);
+	
 	unblock_signals (table);
 
 	if (gtk_text_tag_table_get_size (GTK_TEXT_TAG_TABLE (table)) != old_size)

@@ -155,8 +155,8 @@ theme_free (Theme *theme)
 	g_return_if_fail (theme != NULL);
 
 	g_free (theme->name);
-
 	g_hash_table_destroy (theme->styles);
+	g_free (theme);
 }
 
 
