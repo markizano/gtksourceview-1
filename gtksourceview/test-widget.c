@@ -19,7 +19,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <gtk/gtk.h>
-#include "gtktextsearch.h"
 #include "gtksourceview.h"
 #include "gtksourcelanguage.h"
 #include "gtksourcelanguagesmanager.h"
@@ -457,37 +456,6 @@ test_source (GtkSourceBuffer *buffer)
 
 	return GTK_TEXT_BUFFER (buffer);
 }
-static gboolean
-cb_func(GtkTextIter *iter1, GtkTextIter *iter2, gpointer data)
-{
-  gtk_text_buffer_delete(GTK_TEXT_BUFFER(gtk_text_iter_get_buffer(iter1)), iter1, iter2);
-
-  gtk_text_buffer_insert (GTK_TEXT_BUFFER(gtk_text_iter_get_buffer(iter1)), iter1, "FUCK", 4);
-
-
-
-  return FALSE;
-}
-
-static void
-cb_entry_activate (GtkWidget *widget, gpointer data)
-{
-  GtkTextSearch *search;
-  char *txt;
-  txt = gtk_editable_get_chars(GTK_EDITABLE(widget), 0, -1);
- 
-
-  search = gtk_text_search_new (GTK_TEXT_BUFFER(data), NULL, txt, GTK_ETEXT_SEARCH_TEXT_ONLY | GTK_ETEXT_SEARCH_CASE_INSENSITIVE, NULL);  
-  gtk_text_search_forward_foreach(search, cb_func, NULL);
-/*
-  if (gtk_text_search_forward (search, &iter1, &iter2))  {
-     gtk_text_buffer_place_cursor (GTK_TEXT_BUFFER(data), &iter1); 
-     gtk_text_buffer_move_mark (GTK_TEXT_BUFFER(data), gtk_text_buffer_get_insert(GTK_TEXT_BUFFER(data)), &iter2); 
-  }
-*/
-
-  g_free(txt);
-}
 
 static void
 cb_convert (GtkWidget *widget, gpointer data)
@@ -562,7 +530,6 @@ main (int argc, char *argv[])
 	GtkWidget *window;
 	GtkWidget *scrolled;
 	GtkWidget *vbox;
-	GtkWidget *entry;
 	GtkWidget *label;
 	GtkWidget *button;
 	GtkTextBuffer *buf;
@@ -596,9 +563,6 @@ main (int argc, char *argv[])
 	vbox = gtk_vbox_new (0, FALSE);
 	gtk_container_add (GTK_CONTAINER (window), vbox);
 
-	entry = gtk_entry_new ();
-	gtk_box_pack_start (GTK_BOX (vbox), entry, FALSE, FALSE, 2);
-
 	button = gtk_button_new_with_label ("convert to html (example is saved as test.html)");
 	gtk_box_pack_start (GTK_BOX (vbox), button, FALSE, FALSE, 0);
 	gtk_signal_connect (GTK_OBJECT (button), "clicked", GTK_SIGNAL_FUNC (cb_convert), buf);
@@ -613,8 +577,6 @@ main (int argc, char *argv[])
 	label = gtk_label_new ("label");
 	gtk_box_pack_start (GTK_BOX (vbox), label, FALSE, FALSE, 0);
 
-	g_signal_connect_closure (G_OBJECT (entry), "activate",
-				  g_cclosure_new ((GCallback) cb_entry_activate, buf, NULL), TRUE);
 	g_signal_connect_closure (G_OBJECT (buf), "mark_set",
 				  g_cclosure_new ((GCallback) cb_move_cursor, label, NULL), TRUE);
 	tw = gtk_source_view_new_with_buffer (GTK_SOURCE_BUFFER (buf));

@@ -1,5 +1,5 @@
-TODO (last update: 8 March 2003)
-================================
+TODO (last update: 13 March 2003)
+=================================
 
 Before next release:
 
@@ -13,9 +13,10 @@ Before next release:
 [ ] Reviewing the build stuff (Gustavo)
 [ ] i18n (Gustavo)
 [ ] Creating a bugzilla product (Paolo)
-[ ] Convert .lang files to the new format (we could write a perl script to translate
-    UltraEdit or TextPad stntax files in our format) (Gustavo)
-[ ] Removing gtktextsearch.[ch] files (Paolo)
+[ ] Convert .lang files to the new format (we could write a perl 
+    script to translate UltraEdit or TextPad stntax files in 
+    our format) (Gustavo)
+[X] Removing gtktextsearch.[ch] files (Paolo)
 
 Future releases:
 

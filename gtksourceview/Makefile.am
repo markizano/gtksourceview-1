@@ -21,8 +21,6 @@ $(libgtksourceview_la_SOURCES): $(BUILD_SOURCES)
 libgtksourceview_la_SOURCES = \
 	gtksourcebuffer.c \
 	gtksourcebuffer.h \
-	gtktextsearch.c \
-	gtktextsearch.h \
 	gtksourcetag.c \
 	gtksourcetag.h \
 	gtksourceview.c \
