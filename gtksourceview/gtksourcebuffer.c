@@ -347,7 +347,8 @@ gtk_source_buffer_finalize (GObject *object)
 		g_source_remove (buffer->priv->worker_handler);
 	}
 
-	gtk_text_region_destroy (buffer->priv->refresh_region);
+	/* we can't delete marks if we're finalizing the buffer */
+	gtk_text_region_destroy (buffer->priv->refresh_region, FALSE);
 	g_object_unref (buffer->priv->undo_manager);
 
 	g_array_free (buffer->priv->syntax_regions, TRUE);
@@ -2241,7 +2242,7 @@ ensure_highlighted (GtkSourceBuffer *source_buffer,
 						       &iter1, &iter2);
 			highlight_region (source_buffer, &iter1, &iter2);
 		}
-		gtk_text_region_destroy (region);
+		gtk_text_region_destroy (region, TRUE);
 		/* remove the just highlighted region */
 		gtk_text_region_substract (source_buffer->priv->refresh_region,
 					   start, 

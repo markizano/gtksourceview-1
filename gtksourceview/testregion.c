@@ -101,13 +101,13 @@ main (int argc, char **argv)
 		intersection = gtk_text_region_intersect (region, &iter1, &iter2);
 		if (intersection) {
 			gtk_text_region_debug_print (intersection);
-			gtk_text_region_destroy (intersection);
+			gtk_text_region_destroy (intersection, TRUE);
 		} else {
 			g_print ("no intersection\n");
 		}
 	}
 	
-	gtk_text_region_destroy (region);
+	gtk_text_region_destroy (region, TRUE);
 	g_object_unref (buffer);
 	
 	return 0;

@@ -25,6 +25,17 @@
 #include <glib.h>
 #include "gtktextregion.h"
 
+#undef ENABLE_DEBUG
+/*
+#define ENABLE_DEBUG
+*/
+
+#ifdef ENABLE_DEBUG
+#define DEBUG(x) (x)
+#else
+#define DEBUG(x)
+#endif
+
 typedef struct _Subregion {
 	GtkTextMark *start;
 	GtkTextMark *end;
@@ -107,17 +118,17 @@ gtk_text_region_new (GtkTextBuffer *buffer)
 }
 
 void 
-gtk_text_region_destroy (GtkTextRegion *region)
+gtk_text_region_destroy (GtkTextRegion *region, gboolean delete_marks)
 {
 	g_return_if_fail (region != NULL);
 
 	while (region->subregions) {
 		Subregion *sr = region->subregions->data;
+		if (delete_marks) {
+			gtk_text_buffer_delete_mark (region->buffer, sr->start);
+			gtk_text_buffer_delete_mark (region->buffer, sr->end);
+		}
 		g_free (sr);
-		/* We don't delete marks here since gtk_text_region_destroy
-		   is normally called from gtk_source_buffer_finalize and
-		   in that situation the buffer has a zero ref_count.
-		   Besides we never really owned the marks */
 		region->subregions = g_list_delete_link (region->subregions,
 							 region->subregions);
 	}
@@ -168,6 +179,12 @@ gtk_text_region_add (GtkTextRegion *region,
 	
 	g_return_if_fail (region != NULL && start != NULL && end != NULL);
 	
+	DEBUG (g_print ("---\n"));
+	DEBUG (gtk_text_region_debug_print (region));
+	DEBUG (g_message ("region_add (%d, %d)",
+			  gtk_text_iter_get_offset (start),
+			  gtk_text_iter_get_offset (end)));
+
 	gtk_text_iter_order (start, end);
 	
 	/* don't add zero-length regions */
@@ -229,6 +246,8 @@ gtk_text_region_add (GtkTextRegion *region,
 		if (gtk_text_iter_compare (&iter, end) < 0)
 			gtk_text_buffer_move_mark (region->buffer, sr->end, end);
 	}
+
+	DEBUG (gtk_text_region_debug_print (region));
 }
 
 
@@ -244,6 +263,12 @@ gtk_text_region_substract (GtkTextRegion *region,
 	Subregion *sr;
 	
 	g_return_if_fail (region != NULL && start != NULL && end != NULL);
+	
+	DEBUG (g_print ("---\n"));
+	DEBUG (gtk_text_region_debug_print (region));
+	DEBUG (g_message ("region_substract (%d, %d)",
+			  gtk_text_iter_get_offset (start),
+			  gtk_text_iter_get_offset (end)));
 	
 	gtk_text_iter_order (start, end);
 	
@@ -279,6 +304,8 @@ gtk_text_region_substract (GtkTextRegion *region,
 							       NULL, start, FALSE);
 
 			/* no further processing needed */
+			DEBUG (g_message ("subregion splitted"));
+			
 			return;
 			
 		} else {
@@ -290,6 +317,8 @@ gtk_text_region_substract (GtkTextRegion *region,
 	} else {
 		/* the starting point is outside (and so to the left)
                    of the first subregion */
+		DEBUG (g_message ("start is outside"));
+			
 		start_is_outside = TRUE;
 		
 	}
@@ -307,6 +336,8 @@ gtk_text_region_substract (GtkTextRegion *region,
 		gtk_text_buffer_move_mark (region->buffer, sr->start, end);
 	} else {
 		end_is_outside = TRUE;
+		DEBUG (g_message ("end is outside"));
+		
 	}
 	
 	/* finally remove any intermediate subregions */
@@ -333,6 +364,7 @@ gtk_text_region_substract (GtkTextRegion *region,
 			node = l;
 		}
 	}
+	DEBUG (gtk_text_region_debug_print (region));
 }
 
 gint 
