@@ -77,10 +77,10 @@ void             gtk_source_buffer_set_highlight	(GtkSourceBuffer       *buffer,
 							 gboolean               highlight);
 
 /* FIXME: TO BE REMOVED - Paolo */
-GList		*gtk_source_buffer_get_regex_tags	(const GtkSourceBuffer *buffer);
+GSList		*gtk_source_buffer_get_regex_tags	(const GtkSourceBuffer *buffer);
 void		 gtk_source_buffer_purge_regex_tags	(GtkSourceBuffer       *buffer);
 void		 gtk_source_buffer_install_regex_tags	(GtkSourceBuffer       *buffer,
-							 GList                 *entries);
+							 GSList                *entries);
 /* Utility method */
 gboolean	 gtk_source_buffer_find_bracket_match 	(GtkTextIter           *iter);
 

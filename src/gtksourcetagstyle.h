@@ -33,6 +33,8 @@ struct _GtkSourceTagStyle {
 	gboolean italic;
 	gboolean bold;
 
+	gboolean use_background;
+
 	gboolean use_default;
 };
 
@@ -53,9 +55,10 @@ gboolean		 gtk_source_tags_style_manager_set_current_theme	(const gchar 		 *them
 
 
 const GtkSourceTagStyle *gtk_source_get_default_tag_style 			(const gchar 		 *klass);
-
+/*
 void			*gtk_source_set_default_tag_style			(const gchar 		 *klass,
 								 		 const GtkSourceTagStyle *style);
+*/
 G_END_DECLS
 
 #endif  /* __GTK_SOURCE_TAG_STYLE_H__ */

@@ -458,10 +458,10 @@ get_tags_func (GtkTextTag *tag, gpointer data)
 {
 	g_return_if_fail (data != NULL);
 
-	GList *list = *(GList **) data;
+	GSList *list = *(GSList **) data;
 
 	if (GTK_IS_SOURCE_TAG (tag))
-		list = g_list_append (list, tag);
+		list = g_slist_prepend (list, tag);
 }
 
 static void
@@ -609,18 +609,18 @@ add_markers (gpointer key, gpointer value, gpointer user_data)
 	g_free (sublist);
 }
 
-GList *
+GSList *
 gtk_source_buffer_get_regex_tags (const GtkSourceBuffer *buffer)
 {
-	GList *list = NULL;
+	GSList *list = NULL;
 	GtkTextTagTable *table;
 
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
 
 	table = gtk_text_buffer_get_tag_table (GTK_TEXT_BUFFER (buffer));
 	gtk_text_tag_table_foreach (table, get_tags_func, &list);
-	list = g_list_first (list);
-
+	list = g_slist_reverse (list);
+	
 	return list;
 }
 
@@ -628,8 +628,8 @@ void
 gtk_source_buffer_purge_regex_tags (GtkSourceBuffer * buffer)
 {
 	GtkTextTagTable *table;
-	GList *list;
-	GList *cur;
+	GSList *list;
+	GSList *cur;
 	GtkTextIter start_iter;
 	GtkTextIter end_iter;
 
@@ -651,10 +651,10 @@ gtk_source_buffer_purge_regex_tags (GtkSourceBuffer * buffer)
 		gtk_text_tag_table_remove (table,
 					   GTK_TEXT_TAG (cur->data));
 		g_object_unref (G_OBJECT (cur->data));
-		cur = g_list_next (cur);
+		cur = g_slist_next (cur);
 	}
 
-	g_list_free (list);
+	g_slist_free (list);
 
 	if (buffer->priv->syntax_items) {
 		g_list_free (buffer->priv->syntax_items);
@@ -669,7 +669,7 @@ gtk_source_buffer_purge_regex_tags (GtkSourceBuffer * buffer)
 
 void
 gtk_source_buffer_install_regex_tags (GtkSourceBuffer *buffer,
-				      GList           *entries)
+				      GSList          *entries)
 {
 	GtkTextTagTable *tag_table;
 
@@ -715,7 +715,7 @@ gtk_source_buffer_install_regex_tags (GtkSourceBuffer *buffer,
 		if (name)
 			g_free (name);
 
-		entries = g_list_next (entries);
+		entries = g_slist_next (entries);
 	}
 
 	if (buffer->priv->syntax_items != NULL)

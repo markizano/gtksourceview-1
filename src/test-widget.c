@@ -294,17 +294,22 @@ gtk_source_buffer_load (GtkSourceBuffer * buffer,
 GtkTextBuffer *
 test_source (GtkSourceBuffer *buffer)
 {
+	/*
 	GtkTextTag *tag;
+	*/
 	GtkTextTagTable *table;
-	GList *list = NULL;
+	GSList *list = NULL;
 	GError *err = NULL;
+
+	GtkSourceLanguage *language;
+	/*
 	GSList *keywords = NULL;
-	
+	*/
 	if (!buffer)
 		buffer = GTK_SOURCE_BUFFER (gtk_source_buffer_new (NULL));
 
 	table = GTK_TEXT_BUFFER (buffer)->tag_table;
-
+#if 0
 	tag = gtk_pattern_tag_new ("gnu_typedef", "\\b\\(Gtk\\|Gdk\\|Gnome\\)[a-zA-Z0-9_]+");
 	g_object_set (G_OBJECT (tag), "foreground", "blue", NULL);
 	list = g_list_append (list, (gpointer) tag);
@@ -397,10 +402,25 @@ test_source (GtkSourceBuffer *buffer)
 	tag = gtk_string_tag_new ("string", "\"", "\"", TRUE);
 	g_object_set (G_OBJECT (tag), "foreground", "forest green", NULL);
 	list = g_list_append (list, (gpointer) tag);
+#endif
+	language = gtk_source_language_get_from_mime_type ("text/x-c");
+		
+	if (language != NULL)
+	{
+		g_print ("Name: %s\n", gtk_source_language_get_name (language));
+		
+		list = gtk_source_language_get_tags (language);
+		
+		gtk_source_buffer_install_regex_tags (buffer, list);
+		g_slist_foreach (list, (GFunc) g_object_unref, NULL);
+		g_slist_free (list);
 
-	gtk_source_buffer_install_regex_tags (buffer, list);
-	g_list_foreach (list, (GFunc) g_object_unref, NULL);
-	g_list_free (list);
+		g_object_unref (language);
+		
+	}
+	else
+		g_print ("No language found.");	
+
 
 #if 0
 	gtk_source_buffer_load (buffer, "test-widget.c", &err);
@@ -513,6 +533,8 @@ main (int argc, char *argv[])
 	GtkTextBuffer *buf;
 	GtkWidget *tw;
 	GdkPixbuf *pixbuf;
+	GSList *dirs = NULL;
+
 	/*
 	int i;
 	*/
@@ -520,6 +542,17 @@ main (int argc, char *argv[])
 	
 	gtk_init (&argc, &argv);
 	
+	if (!gtk_source_languages_manager_init ())
+			return -1;       
+		
+	if (!gtk_source_tags_style_manager_init())
+		return -1;
+
+	dirs = g_slist_prepend (dirs, ".");
+
+	gtk_source_languages_manager_set_specs_dirs (dirs);		
+	g_slist_free (dirs);
+
 	window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
 	gtk_signal_connect (GTK_OBJECT (window), "destroy", GTK_SIGNAL_FUNC (gtk_main_quit), NULL);
 
@@ -595,19 +628,20 @@ main (int argc, char *argv[])
 						   i, "three");
 	}
 	*/
+
+	
+#if 0
 	{
-		GSList *dirs = NULL;
 		const GSList *langs;
 		GtkSourceLanguage *language;
 		GSList *types = NULL;
 		
 		if (!gtk_source_languages_manager_init ())
+			return -1;       
+		
+		if (!gtk_source_tags_style_manager_init())
 			return -1;
 		
-		dirs = g_slist_prepend (dirs, ".");
-		gtk_source_languages_manager_set_specs_dirs (dirs);		
-		g_slist_free (dirs);
-
 		langs = gtk_source_languages_manager_get_available_languages ();
 
 		while (langs != NULL)
@@ -674,6 +708,7 @@ main (int argc, char *argv[])
 					gtk_source_languages_manager_get_available_languages ()->data),
 				NULL);			
 	}
+#endif
 
 	gtk_widget_set_usize (window, 400, 500);
 	gtk_widget_show_all (window);
@@ -682,6 +717,8 @@ main (int argc, char *argv[])
 	g_print ("Shutting down languages manager...\n");	
 
 	gtk_source_languages_manager_shutdown ();
+	gtk_source_tags_style_manager_shutdown ();
+
 	g_print ("Done.\n");
 
 	return (0);

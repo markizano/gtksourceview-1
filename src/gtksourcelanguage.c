@@ -33,7 +33,6 @@
 #include "gtksourcelanguage.h"
 #include "gtksourcetag.h"
 
-
 #define DEFAULT_GCONF_BASE_DIR		"/apps/gtksourceview"
 
 #define DEFAULT_LANGUAGE_DIR		DATADIR "/gtksourceview/language-specs"
@@ -59,6 +58,8 @@ struct _GtkSourceLanguagePrivate
 	gchar		*section;
 
 	GSList		*mime_types;
+
+	GHashTable	*tag_name_to_style_name;
 };
 
 static void		 gtk_source_language_class_init 	(GtkSourceLanguageClass 	*klass);
@@ -1131,8 +1132,45 @@ parseSyntaxItem (xmlDocPtr doc, xmlNodePtr cur, xmlChar *name)
 	return tag;
 }
 
+
+static void
+apply_style_to_tag (GtkTextTag *tag, const GtkSourceTagStyle *ts)
+{
+	GValue italic = { 0, };
+	GValue bold = { 0, };
+	GValue foreground = { 0, };
+	GValue background = { 0, };
+
+	/* Foreground color. */
+	g_value_init (&foreground, GDK_TYPE_COLOR);
+	g_value_set_boxed (&foreground, &ts->foreground);
+	g_object_set_property (G_OBJECT (tag), "foreground_gdk", &foreground);
+
+	/* Background color. */
+	if (ts->use_background)
+	{
+		g_value_init (&background, GDK_TYPE_COLOR);
+		g_value_set_boxed (&background, &ts->background);
+		g_object_set_property (G_OBJECT (tag), "background_gdk", &background);
+	}
+
+	/* Bold setting. */
+	g_value_init (&italic, PANGO_TYPE_STYLE);
+	g_value_set_enum (&italic, ts->italic ? PANGO_STYLE_ITALIC : PANGO_STYLE_NORMAL);
+	g_object_set_property (G_OBJECT (tag), "style", &italic);
+
+	/* Italic setting. */
+	g_value_init (&bold, G_TYPE_INT);
+	g_value_set_int (&bold, ts->bold ? PANGO_WEIGHT_BOLD : PANGO_WEIGHT_NORMAL);
+	g_object_set_property (G_OBJECT (tag), "weight", &bold);
+}
+
 static GSList *
-parseTag (xmlDocPtr doc, xmlNodePtr cur, GSList *tag_list)
+parseTag (const GtkSourceLanguage *language, 
+	  xmlDocPtr doc, 
+	  xmlNodePtr cur, 
+	  GSList *tag_list, 
+	  GHashTable *ht)
 {
 	GtkTextTag *tag = NULL;
 	xmlChar *name;
@@ -1181,19 +1219,33 @@ parseTag (xmlDocPtr doc, xmlNodePtr cur, GSList *tag_list)
 	}
 
 	if (tag != NULL)
+	{
+		const GtkSourceTagStyle	*ts;
+		
 		tag_list = g_slist_prepend (tag_list, tag);
-	
+
+		if (ht != NULL)
+			g_hash_table_insert (ht, g_strdup (name), g_strdup (style));
+
+		ts = gtk_source_language_get_tag_style (language, name);
+
+		if (ts != NULL)
+			apply_style_to_tag (tag, ts);
+
+	}
+		
 	xmlFree (name);
 	xmlFree (style);
 
 	return tag_list;
 }
 
-const GSList *
+GSList *
 gtk_source_language_get_tags (const GtkSourceLanguage *language)
 {
 	GSList *tag_list = NULL;
-	
+	gboolean populate_styles_table = FALSE;
+
 	xmlDocPtr doc;
 	xmlNodePtr cur;
 
@@ -1231,12 +1283,27 @@ gtk_source_language_get_tags (const GtkSourceLanguage *language)
 	/* FIXME: check that the language name, version, etcc are the 
 	 * right ones - Paolo */
 
+	if (language->priv->tag_name_to_style_name == NULL)
+	{
+		language->priv->tag_name_to_style_name = g_hash_table_new_full ((GHashFunc)g_str_hash,
+										(GEqualFunc)g_str_equal,
+										(GDestroyNotify)g_free,
+										(GDestroyNotify)g_free);
+
+		populate_styles_table = TRUE;
+	}
+
+
 	cur = cur->xmlChildrenNode;
 	g_return_val_if_fail (cur != NULL, NULL);
 	
 	while (cur != NULL)
 	{
-		tag_list = parseTag (doc, cur, tag_list);
+		tag_list = parseTag (language,
+				     doc, 
+				     cur, 
+				     tag_list, 
+				     populate_styles_table ? language->priv->tag_name_to_style_name : NULL);
 		
 		cur = cur->next;
 	}
@@ -1247,6 +1314,40 @@ gtk_source_language_get_tags (const GtkSourceLanguage *language)
 
 	return tag_list;
 }
+
+static const GtkSourceTagStyle *
+get_default_style_for_tag (const GtkSourceLanguage *language, const gchar *tag_name)
+{
+	const gchar *style_name;
+	
+	if (language->priv->tag_name_to_style_name == NULL)
+	{
+		GSList *list;
+		list = gtk_source_language_get_tags (language);
+
+		g_slist_foreach (list, (GFunc)g_object_unref, NULL);
+		g_slist_free (list);
+
+		g_return_val_if_fail (language->priv->tag_name_to_style_name != NULL, NULL);
+	}
+
+	style_name = (const gchar*)g_hash_table_lookup (language->priv->tag_name_to_style_name,
+							tag_name);
+
+	if (style_name != NULL)
+		return gtk_source_get_default_tag_style (style_name);
+	else
+		return NULL;
+}
+
+/* FIXME */
+const GtkSourceTagStyle	*
+gtk_source_language_get_tag_style (const GtkSourceLanguage *language,
+				   const gchar *tag_name)
+{
+	return 	get_default_style_for_tag (language, tag_name);
+}
+
 
 
 

@@ -24,6 +24,8 @@
 #include <glib-object.h> 
 #include <gtk/gtk.h> 
 
+#include "gtksourcetagstyle.h"
+
 G_BEGIN_DECLS
 
 #define GTK_TYPE_SOURCE_LANGUAGE		(gtk_source_language_get_type ())
@@ -37,8 +39,6 @@ typedef struct _GtkSourceLanguage		GtkSourceLanguage;
 typedef struct _GtkSourceLanguageClass		GtkSourceLanguageClass;
 
 typedef struct _GtkSourceLanguagePrivate	GtkSourceLanguagePrivate;
-
-typedef struct _GtkSourceTagStyle GtkSourceTagStyle;
 
 struct _GtkSourceLanguage 
 {
@@ -60,16 +60,18 @@ GtkSourceLanguage	*gtk_source_language_get_from_mime_type		(const gchar         
 const gchar	 	*gtk_source_language_get_name			(const GtkSourceLanguage *language);
 const gchar		*gtk_source_language_get_section		(const GtkSourceLanguage *language);
 
-const GSList		*gtk_source_language_get_tags			(const GtkSourceLanguage *language);
+GSList			*gtk_source_language_get_tags			(const GtkSourceLanguage *language);
 
 const GSList		*gtk_source_language_get_mime_types		(const GtkSourceLanguage *language);
 
 
 void			 gtk_source_language_set_mime_types		(GtkSourceLanguage       *language,
 								 	 GSList			 *mime_types);
-/*
+
 const GtkSourceTagStyle	*gtk_source_language_get_tag_style		(const GtkSourceLanguage *language,
 									 const gchar		 *tag_name);
+
+/*
 void			*gtk_source_language_set_tag_style		(const GtkSourceLanguage *language,
 									 const gchar		 *tag_name,
 								 	 const GtkSourceTagStyle *style);
