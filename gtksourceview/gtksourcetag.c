@@ -27,6 +27,7 @@
 
 #include <string.h>
 
+#include "gtksourceview-i18n.h"
 #include "gtksourcetag.h"
 
 static GObjectClass 	*parent_syntax_class  = NULL;

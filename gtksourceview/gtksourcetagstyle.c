@@ -23,8 +23,7 @@
 
 #include <string.h>
 
-#include <libgnome/gnome-i18n.h>
-
+#include "gtksourceview-i18n.h"
 #include "gtksourcetagstyle.h"
 
 typedef struct _GtkSourceTagsStyleManager	GtkSourceTagsStyleManager;

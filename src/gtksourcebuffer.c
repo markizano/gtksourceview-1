@@ -28,12 +28,10 @@
 #endif
 
 #include <string.h>
-
 #include <gtk/gtk.h>
-#include <libgnome/gnome-i18n.h>
 
+#include "gtksourceview-i18n.h"
 #include "gtksourcebuffer.h"
-
 #include "gtkundomanager.h"
 #include "gtksourceview-marshal.h"
 #include "gtktextregion.h"

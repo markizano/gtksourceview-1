@@ -14,14 +14,22 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU Library General Public License for more details.
  *
- *  You should have received a copy of the GNU Library General Public License*  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ *  You should have received a copy of the GNU Library General Public
+ *  License* along with this program; if not, write to the Free
+ *  Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
+ *  02111-1307, USA.
  */
+
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
 #include <pango/pango-tabs.h>
 
+#include "gtksourceview-i18n.h"
+#include "gtksourceview-marshal.h"
 #include "gtksourceview.h"
 
 #define GUTTER_PIXMAP 16
@@ -101,18 +109,26 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 	klass->undo = gtk_source_view_undo;
 	klass->redo = gtk_source_view_redo;
 
-	signals[UNDO] =
-		gtk_signal_new ("undo",
-				GTK_RUN_LAST | GTK_RUN_ACTION,
-				GTK_CLASS_TYPE (object_class),
-				GTK_SIGNAL_OFFSET (GtkSourceViewClass, undo),
-				gtk_marshal_VOID__VOID, GTK_TYPE_NONE, 0);
-	signals[REDO] =
-		gtk_signal_new ("redo",
-				GTK_RUN_LAST | GTK_RUN_ACTION,
-				GTK_CLASS_TYPE (object_class),
-				GTK_SIGNAL_OFFSET (GtkSourceViewClass, redo),
-				gtk_marshal_VOID__VOID, GTK_TYPE_NONE, 0);
+	signals [UNDO] =
+		g_signal_new ("undo",
+			      G_TYPE_FROM_CLASS (klass),
+			      G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
+			      G_STRUCT_OFFSET (GtkSourceViewClass, undo),
+			      NULL,
+			      NULL,
+			      gtksourceview_marshal_VOID__VOID,
+			      G_TYPE_NONE,
+			      0);
+	signals [REDO] =
+		g_signal_new ("redo",
+			      G_TYPE_FROM_CLASS (klass),
+			      G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
+			      G_STRUCT_OFFSET (GtkSourceViewClass, redo),
+			      NULL,
+			      NULL,
+			      gtksourceview_marshal_VOID__VOID,
+			      G_TYPE_NONE,
+			      0);
 
 	binding_set = gtk_binding_set_by_class (klass);
 	gtk_binding_entry_add_signal (binding_set,
@@ -268,7 +284,7 @@ gtk_source_view_populate_popup (GtkTextView *text_view,
 	gtk_widget_show (menuitem);
 
 	/* create undo menuitem. */
-	menuitem = gtk_menu_item_new_with_label ("Undo");
+	menuitem = gtk_menu_item_new_with_label (_("Undo"));
 	g_object_set_data (G_OBJECT (menuitem), "gtk-signal", "undo");
 	g_signal_connect (G_OBJECT (menuitem),
 			  "activate",
@@ -280,7 +296,7 @@ gtk_source_view_populate_popup (GtkTextView *text_view,
 	gtk_widget_show (menuitem);
 
 	/* create redo menuitem. */
-	menuitem = gtk_menu_item_new_with_label ("Redo");
+	menuitem = gtk_menu_item_new_with_label (_("Redo"));
 	g_object_set_data (G_OBJECT (menuitem), "gtk-signal", "redo");
 	g_signal_connect (G_OBJECT (menuitem),
 			  "activate",
@@ -491,12 +507,10 @@ gtk_source_view_paint_margin (GtkSourceView *view,
 				   numbers,
 				   &count);
 
-	layout = gtk_widget_create_pango_layout (GTK_WIDGET (view), "");
-
 	/* set size. */
 	str = g_strdup_printf ("%d", MAX (999,
 					  gtk_text_buffer_get_line_count (text_view->buffer)));
-	pango_layout_set_text (layout, str, -1);
+	layout = gtk_widget_create_pango_layout (GTK_WIDGET (view), str);
 	g_free (str);
 
 	pango_layout_get_pixel_size (layout, &text_width, NULL);

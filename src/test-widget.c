@@ -53,8 +53,8 @@ gtk_source_buffer_convert_to_html (GtkSourceBuffer * buffer,
 
 	str = g_string_new ("<html>\n");
 	g_string_append (str, "<head>\n");
-	g_string_sprintfa (str, "<title>%s</title>\n",
-			   title ? title : "GtkSourceView converter");
+	g_string_append_printf (str, "<title>%s</title>\n",
+				title ? title : "GtkSourceView converter");
 	g_string_append (str, "</head>\n");
 	g_string_append (str, "<body bgcolor=white>\n");
 	g_string_append (str, "<pre>");
@@ -83,13 +83,13 @@ gtk_source_buffer_convert_to_html (GtkSourceBuffer * buffer,
 						       value);
 				col = g_value_get_boxed (value);
 				if (col) {
-					g_string_sprintfa (str,
-							   "<font color=#%02X%02X%02X>",
-							   col->red / 256,
-							   col->green /
-							   256,
-							   col->blue /
-							   256);
+					g_string_append_printf (str,
+								"<font color=#%02X%02X%02X>",
+								col->red / 256,
+								col->green /
+								256,
+								col->blue /
+								256);
 					font = TRUE;
 				}
 				value = &val2;
@@ -556,7 +556,7 @@ main (int argc, char *argv[])
 	g_slist_free (dirs);
 
 	window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
-	gtk_signal_connect (GTK_OBJECT (window), "destroy", GTK_SIGNAL_FUNC (gtk_main_quit), NULL);
+	g_signal_connect (window, "destroy", G_CALLBACK (gtk_main_quit), NULL);
 
 	buf = test_source (NULL);
 
@@ -565,7 +565,7 @@ main (int argc, char *argv[])
 
 	button = gtk_button_new_with_label ("convert to html (example is saved as test.html)");
 	gtk_box_pack_start (GTK_BOX (vbox), button, FALSE, FALSE, 0);
-	gtk_signal_connect (GTK_OBJECT (button), "clicked", GTK_SIGNAL_FUNC (cb_convert), buf);
+	g_signal_connect (button, "clicked", G_CALLBACK (cb_convert), buf);
 
 	button = gtk_button_new_with_label ("New view");
 	gtk_box_pack_start (GTK_BOX (vbox), button, FALSE, FALSE, 0);
@@ -597,11 +597,11 @@ main (int argc, char *argv[])
 
 	button = gtk_button_new_with_label ("Toggle line pixmaps");
 	gtk_box_pack_start (GTK_BOX (vbox), button, FALSE, FALSE, 0);
-	gtk_signal_connect (GTK_OBJECT (button), "clicked", GTK_SIGNAL_FUNC (cb_toggle), tw);
+	g_signal_connect (button, "clicked", G_CALLBACK (cb_toggle), tw);
 
 	button = gtk_button_new_with_label ("Toggle line numbers");
 	gtk_box_pack_start (GTK_BOX (vbox), button, FALSE, FALSE, 0);
-	gtk_signal_connect (GTK_OBJECT (button), "clicked", GTK_SIGNAL_FUNC (cb_line_numbers_toggle), tw);
+	g_signal_connect (button, "clicked", G_CALLBACK (cb_line_numbers_toggle), tw);
 
 	pixbuf = gdk_pixbuf_new_from_file ("/usr/share/pixmaps/apple-green.png", NULL);
 	gtk_source_view_add_pixbuf (GTK_SOURCE_VIEW (tw), "one", pixbuf, FALSE);
@@ -711,7 +711,7 @@ main (int argc, char *argv[])
 	}
 #endif
 
-	gtk_widget_set_usize (window, 400, 500);
+	gtk_window_set_default_size (GTK_WINDOW (window), 400, 500);
 	gtk_widget_show_all (window);
 	gtk_main ();
 

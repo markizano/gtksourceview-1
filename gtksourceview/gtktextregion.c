@@ -22,8 +22,13 @@
  * Boston, MA 02111-1307, USA.  
  */
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
 #include <glib.h>
 #include "gtktextregion.h"
+#include "gtksourceview-i18n.h"
 
 #undef ENABLE_DEBUG
 /*

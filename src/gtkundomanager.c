@@ -28,10 +28,16 @@
  * See the ChangeLog files for a list of changes. 
  */
 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
 #include <glib.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "gtksourceview-i18n.h"
+#include "gtksourceview-marshal.h"
 #include "gtkundomanager.h"
 
 typedef struct _GtkUndoAction		GtkUndoAction;
@@ -169,7 +175,7 @@ gtk_undo_manager_class_init (GtkUndoManagerClass *klass)
 			      G_SIGNAL_RUN_LAST,
 			      G_STRUCT_OFFSET (GtkUndoManagerClass, can_undo),
 			      NULL, NULL,
-			      gtk_marshal_VOID__BOOLEAN,
+			      gtksourceview_marshal_VOID__BOOLEAN,
 			      G_TYPE_NONE,
 			      1,
 			      G_TYPE_BOOLEAN);
@@ -180,7 +186,7 @@ gtk_undo_manager_class_init (GtkUndoManagerClass *klass)
 			      G_SIGNAL_RUN_LAST,
 			      G_STRUCT_OFFSET (GtkUndoManagerClass, can_redo),
 			      NULL, NULL,
-			      gtk_marshal_VOID__BOOLEAN,
+			      gtksourceview_marshal_VOID__BOOLEAN,
 			      G_TYPE_NONE,
 			      1,
 			      G_TYPE_BOOLEAN);

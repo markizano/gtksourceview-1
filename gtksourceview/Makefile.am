@@ -1,24 +1,23 @@
 INCLUDES = \
-	$(WARN_CFLAGS) \
 	-DDATADIR=\""$(datadir)"\" \
 	-DG_LOG_DOMAIN=\"GtkSourceView\" \
-	-I$(top_srcdir) \
-	-I$(top_srcdir)/src \
-	@DEP_CFLAGS@
-
-# testing executable
-noinst_PROGRAMS = test-widget testregion
-
-# libs
-lib_LTLIBRARIES = libgtksourceview.la
+	-DG_DISABLE_DEPRECATED \
+	-DGTK_DISABLE_DEPRECATED \
+	-DGDK_DISABLE_DEPRECATED \
+	-I$(top_srcdir) -I$(srcdir) \
+	$(WARN_CFLAGS) \
+	$(DEP_CFLAGS)
 
 BUILT_SOURCES = \
 	gtksourceview-marshal.c \
 	gtksourceview-marshal.h
 
-$(libgtksourceview_la_SOURCES): $(BUILD_SOURCES)
+# libs
+lib_LTLIBRARIES = libgtksourceview.la
 
 libgtksourceview_la_SOURCES = \
+	gtksourceview-marshal.h \
+	gtksourceview-marshal.c \
 	gtksourcebuffer.c \
 	gtksourcebuffer.h \
 	gtksourcetag.c \
@@ -27,8 +26,6 @@ libgtksourceview_la_SOURCES = \
 	gtksourceview.h \
 	gtkundomanager.h \
 	gtkundomanager.c \
-	gtksourceview-marshal.h \
-	gtksourceview-marshal.c \
 	gtktextregion.h \
 	gtktextregion.c \
 	gtksourceregex.h \
@@ -36,13 +33,14 @@ libgtksourceview_la_SOURCES = \
 	gtksourcelanguage.c \
 	gtksourcelanguage.h \
 	gtksourcelanguagesmanager.h \
-	gtksourcetagstyle.h	\
-	gtksourcetagstyle.c
+	gtksourcetagstyle.h \
+	gtksourcetagstyle.c \
+	gtksourceview-i18n.h \
+	gtksourceview-i18n.c
 
+libgtksourceview_la_LIBADD = $(DEP_LIBS)
 
-libgtksourceview_la_LIBADD = @DEP_LIBS@
-
-libgtksourceview_includedir=$(includedir)/gtksourceview
+libgtksourceview_includedir = $(includedir)/gtksourceview
 
 libgtksourceview_include_HEADERS = \
 	gtksourcebuffer.h \
@@ -51,7 +49,8 @@ libgtksourceview_include_HEADERS = \
 	gtksourceregex.h \
 	gtksourcelanguage.h \
 	gtksourcelanguagesmanager.h \
-	gtksourcetagstyle.h
+	gtksourcetagstyle.h \
+	gtktextregion.h
 
 gtksourceview-marshal.h: gtksourceview-marshal.list
 	@GLIB_GENMARSHAL@ \
@@ -66,18 +65,19 @@ gtksourceview-marshal.c: gtksourceview-marshal.h
 	&& cp xgen-gmc $(@F) \
 	&& rm -f xgen-gmc
 
-# The testing binary magic
+# testing executables
+noinst_PROGRAMS = test-widget testregion
+
 test_widget_SOURCES = test-widget.c
 
 test_widget_LDADD = \
 	libgtksourceview.la \
-	@DEP_LIBS@
+	$(DEP_LIBS)
 
 testregion_SOURCES = testregion.c
 
 testregion_LDADD = \
 	libgtksourceview.la \
-	@DEP_LIBS@
+	$(DEP_LIBS)
 
-
-EXTRA_DIST=gtksourceview-marshal.list
+EXTRA_DIST = gtksourceview-marshal.list

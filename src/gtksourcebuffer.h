@@ -26,7 +26,7 @@
 
 #include <regex.h>
 #include <gtk/gtk.h>
-#include "gtksourcetag.h"
+#include <gtksourcetag.h>
 
 G_BEGIN_DECLS
 

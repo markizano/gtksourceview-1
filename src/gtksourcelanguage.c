@@ -28,8 +28,8 @@
 #include <gconf/gconf.h>
 #include <gconf/gconf-client.h>
 
+#include "gtksourceview-i18n.h"
 #include "gtksourcelanguagesmanager.h"
-
 #include "gtksourcelanguage.h"
 #include "gtksourcetag.h"
 

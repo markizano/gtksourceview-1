@@ -31,7 +31,7 @@
 #ifndef __GTK_UNDO_MANAGER_H__
 #define __GTK_UNDO_MANAGER_H__
 
-#include "gtksourcebuffer.h"
+#include <gtksourcebuffer.h>
 
 G_BEGIN_DECLS
 

@@ -1,0 +1,74 @@
+# Spanish translation for GtkSourceView
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"POT-Creation-Date: 2003-03-14 10:50-0300\n"
+"PO-Revision-Date: 2003-03-14 10:54-0300\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#. create undo menuitem.
+#: src/gtksourceview.c:287
+msgid "Undo"
+msgstr "Deshacer"
+
+#. create redo menuitem.
+#: src/gtksourceview.c:299
+msgid "Redo"
+msgstr "Rehacer"
+
+#: src/gtksourcetagstyle.c:86
+msgid "Default"
+msgstr ""
+
+#: src/gtksourcetagstyle.c:95
+msgid "Base-N Integer"
+msgstr ""
+
+#: src/gtksourcetagstyle.c:100
+msgid "Character"
+msgstr ""
+
+#: src/gtksourcetagstyle.c:105
+msgid "Comment"
+msgstr ""
+
+#: src/gtksourcetagstyle.c:110
+msgid "Data Type"
+msgstr ""
+
+#: src/gtksourcetagstyle.c:115
+msgid "Decimal"
+msgstr ""
+
+#: src/gtksourcetagstyle.c:120
+msgid "Floating Point"
+msgstr ""
+
+#: src/gtksourcetagstyle.c:125
+msgid "Keyword"
+msgstr ""
+
+#: src/gtksourcetagstyle.c:130
+msgid "Others"
+msgstr ""
+
+#: src/gtksourcetagstyle.c:135
+msgid "Preprocessor"
+msgstr ""
+
+#: src/gtksourcetagstyle.c:141
+msgid "String"
+msgstr ""
+
+#: src/gtksourcetagstyle.c:146
+msgid "Specials"
+msgstr ""

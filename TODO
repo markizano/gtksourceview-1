@@ -10,8 +10,8 @@ Before next release:
 [ ] Reviewing the markers stuff code
 [ ] Writing a gtk_source_buffer_remove_all_tags and 
     use it in GtkSourceBuffer instead of gtk_text_buffer_remove_all_tags (Paolo)
-[ ] Reviewing the build stuff (Gustavo)
-[ ] i18n (Gustavo)
+[X] Reviewing the build stuff (Gustavo)
+[X] i18n (Gustavo)
 [ ] Creating a bugzilla product (Paolo)
 [ ] Convert .lang files to the new format (we could write a perl 
     script to translate UltraEdit or TextPad stntax files in 
