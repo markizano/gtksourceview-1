@@ -135,6 +135,9 @@ static guint 	 buffer_signals[LAST_SIGNAL] = { 0 };
 
 static void 	 gtk_source_buffer_class_init		(GtkSourceBufferClass    *klass);
 static void 	 gtk_source_buffer_init			(GtkSourceBuffer         *klass);
+static GObject  *gtk_source_buffer_constructor          (GType                    type,
+							 guint                    n_construct_properties,
+							 GObjectConstructParam   *construct_param);
 static void 	 gtk_source_buffer_finalize		(GObject                 *object);
 
 static void 	 gtk_source_buffer_can_undo_handler 	(GtkSourceUndoManager    *um,
@@ -240,7 +243,8 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 	parent_class 	= g_type_class_peek_parent (klass);
 	tb_class	= GTK_TEXT_BUFFER_CLASS (klass);
 		
-	object_class->finalize	= gtk_source_buffer_finalize;
+	object_class->constructor = gtk_source_buffer_constructor;
+	object_class->finalize	  = gtk_source_buffer_finalize;
 
 	klass->can_undo 	 = NULL;
 	klass->can_redo 	 = NULL;
@@ -330,6 +334,35 @@ gtk_source_buffer_init (GtkSourceBuffer *buffer)
 			  buffer);
 }
 
+static GObject *
+gtk_source_buffer_constructor (GType                  type,
+			       guint                  n_construct_properties,
+			       GObjectConstructParam *construct_param)
+{
+	GObject *g_object;
+	
+	g_object = G_OBJECT_CLASS (parent_class)->constructor (type, 
+							       n_construct_properties,
+							       construct_param);
+	
+	if (g_object) {
+		GtkSourceBuffer *source_buffer = GTK_SOURCE_BUFFER (g_object);
+		
+		/* we can't create the tag in gtk_source_buffer_init
+		 * since we haven't set a tag table yet, and creating
+		 * the tag forces the creation of an empty table */
+		source_buffer->priv->bracket_match_tag = 
+			gtk_text_buffer_create_tag (GTK_TEXT_BUFFER (source_buffer),
+						    NULL,
+						    "foreground", "white",
+						    "background", "red",
+						    "weight", PANGO_WEIGHT_BOLD,
+						    NULL);
+	}
+	
+	return g_object;
+}
+
 static void
 hash_remove_func (gpointer key, gpointer value, gpointer user_data)
 {
@@ -402,14 +435,6 @@ gtk_source_buffer_new (GtkTextTagTable *table)
 		buffer = GTK_SOURCE_BUFFER (g_object_new (GTK_TYPE_SOURCE_BUFFER, 
 							  NULL));
 	
-	
-	buffer->priv->bracket_match_tag = 
-		gtk_text_buffer_create_tag (GTK_TEXT_BUFFER (buffer),
-					    "gsb-bracket-match",
-					    "foreground", "white",
-					    "background", "red",
-					    "weight", PANGO_WEIGHT_BOLD,
-					    NULL);
 	return buffer;
 }
 

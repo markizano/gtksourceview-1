@@ -219,6 +219,9 @@ set_source_buffer (GtkSourceView *view, GtkTextBuffer *buffer)
 	/* keep our pointer to the source buffer in sync with
 	 * textview's, though it would be a lot nicer if GtkTextView
 	 * had a "set_buffer" signal */
+	/* FIXME: in gtk 2.3 we have a buffer property so we can
+	 * connect to the notify signal.  Unfortunately we can't
+	 * depend on gtk 2.3 yet (see bug #108353) */
 	if (view->source_buffer) {
 		g_signal_handlers_disconnect_by_func (view->source_buffer,
 						      highlight_updated_cb,
@@ -288,13 +291,13 @@ gtk_source_view_populate_popup (GtkTextView *text_view,
 	if (!buffer && !GTK_IS_SOURCE_BUFFER (buffer))
 		return;
 
-	/* what is this for? */
+	/* separator */
 	menuitem = gtk_menu_item_new ();
 	gtk_menu_shell_insert (GTK_MENU_SHELL (menu), menuitem, 3);
 	gtk_widget_show (menuitem);
 
 	/* create undo menuitem. */
-	menuitem = gtk_menu_item_new_with_label (_("Undo"));
+	menuitem = gtk_image_menu_item_new_from_stock ("gtk-undo", NULL);
 	g_object_set_data (G_OBJECT (menuitem), "gtk-signal", "undo");
 	g_signal_connect (G_OBJECT (menuitem),
 			  "activate",
@@ -306,7 +309,7 @@ gtk_source_view_populate_popup (GtkTextView *text_view,
 	gtk_widget_show (menuitem);
 
 	/* create redo menuitem. */
-	menuitem = gtk_menu_item_new_with_label (_("Redo"));
+	menuitem = gtk_image_menu_item_new_from_stock ("gtk-redo", NULL);
 	g_object_set_data (G_OBJECT (menuitem), "gtk-signal", "redo");
 	g_signal_connect (G_OBJECT (menuitem),
 			  "activate",
