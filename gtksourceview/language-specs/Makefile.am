@@ -3,6 +3,7 @@ EXTRA_DIST = 			\
 	c.lang			\
 	cpp.lang		\
 	diff.lang		\
+	desktop.lang		\
 	html.lang		\
 	idl.lang		\
 	java.lang		\
