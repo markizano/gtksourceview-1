@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- <!DOCTYPE language SYSTEM "language.dtd"> -->
-<language name="C++" version="1.0" section="Sources" mimetypes="text/x-cpp;text/x-c-header">
+<language name="C++" version="1.0" section="Sources" mimetypes="text/x-c++;text/x-cpp;text/x-c-header">
   <escape-char>\</escape-char>
   <syntax-items>
     <line-comment name="Line Comment" class="comment">

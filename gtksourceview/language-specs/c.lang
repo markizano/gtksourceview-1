@@ -74,7 +74,7 @@
 	</pattern-item>
 
 	<pattern-item name = "Decimal" style = "Decimal">
-		<regex>\b[1-9][0-9]*\([Uu]\([Ll]\|LL\|ll\)?\|\([Ll]\|LL\|ll\)[Uu]?\)?\b</regex>
+		<regex>\b\([1-9][0-9]*\|0\)\([Uu]\([Ll]\|LL\|ll\)?\|\([Ll]\|LL\|ll\)[Uu]?\)?\b</regex>
 	</pattern-item>
 
 	<pattern-item name = "Floating Point Number" style = "Floating Point">
@@ -82,7 +82,7 @@
 	</pattern-item>
 
 	<pattern-item name = "Octal Number" style = "Base-N Integer">
-		<regex>\b0[0-7]*\([Uu]\([Ll]\|LL\|ll\)?\|\([Ll]\|LL\|ll\)[Uu]?\)?\b</regex>
+		<regex>\b0[0-7]+\([Uu]\([Ll]\|LL\|ll\)?\|\([Ll]\|LL\|ll\)[Uu]?\)?\b</regex>
 	</pattern-item>
 
 	<pattern-item name = "Hex Number" style = "Base-N Integer">
