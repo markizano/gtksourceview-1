@@ -237,6 +237,11 @@ gtk_source_default_style_scheme_init (GtkSourceDefaultStyleScheme *scheme)
 			     g_strdup (N_("Data Type")),
 			     ts);
 
+	ts = new_tag_style ("#008A8C", NULL, FALSE, FALSE);
+	g_hash_table_insert (scheme->styles, 
+			     g_strdup (N_("Function")),
+			     ts);
+
 	ts = new_tag_style ("#FF00FF", NULL, FALSE, FALSE);
 	g_hash_table_insert (scheme->styles, 
 			     g_strdup (N_("Decimal")),
