@@ -561,9 +561,8 @@ gtk_source_buffer_set_property (GObject      *object,
 	switch (prop_id)
 	{
 		case PROP_ESCAPE_CHAR:
-			source_buffer->priv->escape_char = g_value_get_uint (value);
-			if (source_buffer->priv->highlight)
-				invalidate_syntax_regions (source_buffer, NULL, 0);
+			gtk_source_buffer_set_escape_char (source_buffer,
+							   g_value_get_uint (value));
 			break;
 			
 		case PROP_CHECK_BRACKETS:
@@ -1174,15 +1173,15 @@ void
 gtk_source_buffer_set_max_undo_levels (GtkSourceBuffer *buffer,
 				       gint             max_undo_levels)
 {
-	gint old_value;
-	
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 
-	old_value = gtk_source_undo_manager_get_max_undo_levels (buffer->priv->undo_manager);
-	gtk_source_undo_manager_set_max_undo_levels (buffer->priv->undo_manager,
-						     max_undo_levels);
-	if (old_value != max_undo_levels)
+	if (gtk_source_undo_manager_get_max_undo_levels (
+		    buffer->priv->undo_manager) != max_undo_levels)
+	{
+		gtk_source_undo_manager_set_max_undo_levels (buffer->priv->undo_manager,
+							     max_undo_levels);
 		g_object_notify (G_OBJECT (buffer), "max_undo_levels");
+	}
 }
 
 void
@@ -1411,14 +1410,13 @@ void
 gtk_source_buffer_set_check_brackets (GtkSourceBuffer *buffer,
 				      gboolean         check_brackets)
 {
-	gboolean old_value;
-	
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 
-	old_value = buffer->priv->check_brackets;
-	buffer->priv->check_brackets = check_brackets;
-	if (old_value != check_brackets)
+	if (check_brackets != buffer->priv->check_brackets)
+	{
+		buffer->priv->check_brackets = check_brackets;
 		g_object_notify (G_OBJECT (buffer), "check_brackets");
+	}
 }
 
 void 
@@ -1429,7 +1427,8 @@ gtk_source_buffer_set_bracket_match_style (GtkSourceBuffer *source_buffer,
 	va_list list;
 	
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (source_buffer));
-	
+	g_return_if_fail (first_property_name != NULL);
+
 	/* create the tag if not already done so */
 	if (!source_buffer->priv->bracket_match_tag)
 	{
@@ -2816,4 +2815,27 @@ gtk_source_buffer_get_language (GtkSourceBuffer *buffer)
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
 
 	return buffer->priv->language;
+}
+
+gunichar 
+gtk_source_buffer_get_escape_char (GtkSourceBuffer *buffer)
+{
+	g_return_val_if_fail (buffer != NULL && GTK_IS_SOURCE_BUFFER (buffer), 0);
+
+	return buffer->priv->escape_char;
+}
+
+void 
+gtk_source_buffer_set_escape_char (GtkSourceBuffer *buffer,
+				   gunichar         escape_char)
+{
+	g_return_if_fail (buffer != NULL && GTK_IS_SOURCE_BUFFER (buffer));
+
+	if (escape_char != buffer->priv->escape_char)
+	{
+		buffer->priv->escape_char = escape_char;
+		if (buffer->priv->highlight)
+			invalidate_syntax_regions (buffer, NULL, 0);
+		g_object_notify (G_OBJECT (buffer), "escape_char");
+	}
 }

@@ -101,6 +101,10 @@ const GtkSourceLanguage *gtk_source_buffer_get_language 	(GtkSourceBuffer       
 void			 gtk_source_buffer_set_language 	(GtkSourceBuffer       *buffer, 
 								 GtkSourceLanguage     *language);
 
+gunichar                 gtk_source_buffer_get_escape_char      (GtkSourceBuffer       *buffer);
+void                     gtk_source_buffer_set_escape_char      (GtkSourceBuffer       *buffer,
+								 gunichar               escape_char);
+
 /* Utility method */
 gboolean		 gtk_source_buffer_find_bracket_match 	(GtkTextIter           *iter);
 
