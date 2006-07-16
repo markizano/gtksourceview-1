@@ -32,9 +32,7 @@
                     <start>\/\/</start>
                     <end>$</end>
                     <include>
-                        <context id="comment-continue">
-                            <match>\\\n</match>
-                        </context>
+                        <context ref="def:line-continue"/>
                         <context ref="def:comment:*"/>
                     </include>
                 </context>
@@ -43,9 +41,6 @@
                     <start>\/\*</start>
                     <end>\*\/</end>
                     <include>
-                        <context id="open-comment-in-comment" extend-parent="false" style-ref="error">
-                            <match>\/\*</match>
-                        </context>
                         <context ref="def:comment:*"/>
                     </include>
                 </context>
@@ -97,9 +92,7 @@
                     <start>"</start>
                     <end>"</end>
                     <include>
-                        <context id="string-continue" style-ref="escape">
-                            <match>\\\n</match>
-                        </context>
+                        <context ref="def:line-continue"/>
                         <context ref="def:c-style-escape"/>
                     </include>
                 </context>

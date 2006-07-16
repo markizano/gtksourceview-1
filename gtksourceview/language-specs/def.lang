@@ -7,7 +7,7 @@
         <style id="net-address"    _name="Net Address"/>
         <style id="note"           _name="Note"/>
         <style id="escape"         _name="Escape"/>
-        
+
         <style id="comment"        _name="Comment"/>
         <style id="error"          _name="Error"/>
         <style id="preprocessor"   _name="Preprocessor"/>
@@ -71,7 +71,7 @@
             <match>\%{float}</match>
         </context>
 
-        <define-regex id="net-address" extended="true" case-insensitive="true"> 
+        <define-regex id="net-address" extended="true" case-insensitive="true">
                 \%[                                         # separator
                 (https?|ftp|nntp|news|javascript|about):    # protocol
                 [^\ \n]* [^\ \n.:;,?&gt;&lt;)]              # address
@@ -99,6 +99,11 @@
                     <match>\b(FIXME|TODO|XXX)\b</match>
                 </context>
             </include>
+        </context>
+
+        <context id="line-continue">
+            <start>\\$</start>
+            <end>^</end>
         </context>
 
         <context id="c-style-escape" style-ref="escape">

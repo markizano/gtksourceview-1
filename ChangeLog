@@ -1,5 +1,11 @@
 2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/language-specs/def.lang: added C-like trailing
+	backslash "line-continue" context.
+	* gtksourceview/language-specs/c.lang: use it here.
+
+2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* configure.in:
 	* gtksourceview-1.0.pc.in: removed
 	* gtksourceview-2.0.pc.in: added
