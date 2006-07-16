@@ -88,6 +88,13 @@ Each mimetype has to be separated with a semicolon.
 </para></listitem>
 </varlistentry>
 
+<varlistentry>
+<term><code>globs</code> (optional)</term>
+<listitem><para>
+The semicolon-separated list of globs associated to the language.
+</para></listitem>
+</varlistentry>
+
 </variablelist>
 
 </refsect1>

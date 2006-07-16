@@ -22,6 +22,7 @@
 	Added "globs" attribute; made "globs" and "mimetypes" attributes
 	optional.
 	* tests/test-widget.c: use gtk_source_languages_manager_get_language_for_filename.
+	* docs/reference/lang-reference.sgml: mention globs attribute here.
 
 2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
 
