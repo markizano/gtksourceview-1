@@ -1,4 +1,4 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*- 
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*-
  *
  *  gtksourceengine.c - Abstract base class for highlighting engines
  *
@@ -26,62 +26,29 @@
 #include "gtksourcebuffer.h"
 #include "gtksourceengine.h"
 
-static void gtk_source_engine_class_init (GtkSourceEngineClass *klass);
-static void gtk_source_engine_init (GtkSourceEngine *engine);
 
-static GObjectClass *parent_class = NULL;
+G_DEFINE_TYPE (GtkSourceEngine, gtk_source_engine, G_TYPE_OBJECT)
 
-GType
-gtk_source_engine_get_type (void)
-{
-	static GType our_type = 0;
 
-	if (!our_type) {
-		static const GTypeInfo our_info = {
-			sizeof (GtkSourceEngineClass),
-			NULL,	/* base_init */
-			NULL,	/* base_finalize */
-			(GClassInitFunc) gtk_source_engine_class_init,
-			NULL,	/* class_finalize */
-			NULL,	/* class_data */
-			sizeof (GtkSourceEngine),
-			0,	/* n_preallocs */
-			(GInstanceInitFunc) gtk_source_engine_init
-		};
-
-		our_type = g_type_register_static (G_TYPE_OBJECT,
-						   "GtkSourceEngine",
-						   &our_info, 
-						   0);
-	}
-	
-	return our_type;
-}
-	
 static void
 gtk_source_engine_class_init (GtkSourceEngineClass *klass)
 {
-	GObjectClass *object_class;
-
-	object_class = G_OBJECT_CLASS (klass);
-	parent_class = g_type_class_peek_parent (klass);
-
 	klass->attach_buffer = NULL;
 }
+
 
 static void
 gtk_source_engine_init (GtkSourceEngine *engine)
 {
 }
 
-void 
+
+void
 gtk_source_engine_attach_buffer (GtkSourceEngine *engine,
-				 GtkSourceBuffer *buffer)
+				 GtkTextBuffer   *buffer)
 {
-	g_return_if_fail (engine != NULL);
 	g_return_if_fail (GTK_IS_SOURCE_ENGINE (engine));
 	g_return_if_fail (GTK_SOURCE_ENGINE_GET_CLASS (engine)->attach_buffer);
 
 	GTK_SOURCE_ENGINE_GET_CLASS (engine)->attach_buffer (engine, buffer);
 }
-

@@ -1,4 +1,4 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*- 
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*-
  *  gtksourcecontextengine.h
  *
  *  Copyright (C) 2003 - Gustavo Giráldez
@@ -23,29 +23,9 @@
 #define __GTK_SOURCE_CONTEXT_ENGINE_H__
 
 #include <gtksourceview/gtksourceengine.h>
-#include "libegg/regex/eggregex.h"
+#include <gtksourceview/gtksourcelanguage.h>
 
 G_BEGIN_DECLS
-
-/* FIXME: cut and pasted here: need a reorganization. */
-
-enum _ContextType
-{
-	CONTEXT_TYPE_SIMPLE = 0,
-	CONTEXT_TYPE_CONTAINER,
-};
-typedef enum _ContextType ContextType;
-
-#define GTK_SOURCE_CONTEXT_ENGINE_ERROR gtk_source_context_engine_error_quark ()
-
-typedef enum {
-	GTK_SOURCE_CONTEXT_ENGINE_ERROR_DUPLICATED_ID = 0,
-	GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_ARGS,
-	GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_PARENT,
-	GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_REF,
-	GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_WHERE,
-	GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_START_REF,
-} GtkSourceContextEngineError;
 
 #define GTK_TYPE_SOURCE_CONTEXT_ENGINE            (gtk_source_context_engine_get_type ())
 #define GTK_SOURCE_CONTEXT_ENGINE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), GTK_TYPE_SOURCE_CONTEXT_ENGINE, GtkSourceContextEngine))
@@ -58,7 +38,7 @@ typedef struct _GtkSourceContextEngine        GtkSourceContextEngine;
 typedef struct _GtkSourceContextEngineClass   GtkSourceContextEngineClass;
 typedef struct _GtkSourceContextEnginePrivate GtkSourceContextEnginePrivate;
 
-struct _GtkSourceContextEngine 
+struct _GtkSourceContextEngine
 {
 	GtkSourceEngine engine;
 
@@ -66,14 +46,14 @@ struct _GtkSourceContextEngine
 	GtkSourceContextEnginePrivate *priv;
 };
 
-struct _GtkSourceContextEngineClass 
+struct _GtkSourceContextEngineClass
 {
 	GtkSourceEngineClass parent_class;
 };
 
 GType		 gtk_source_context_engine_get_type	(void) G_GNUC_CONST;
 
-GtkSourceEngine	*gtk_source_context_engine_new		(const gchar *id);
+GtkSourceEngine	*gtk_source_context_engine_new		(GtkSourceLanguage	*lang);
 
 gboolean	 gtk_source_context_engine_define_context
 							(GtkSourceContextEngine	 *ce,
@@ -101,8 +81,6 @@ gboolean	 gtk_source_context_engine_add_ref 	(GtkSourceContextEngine	 *ce,
 							 gchar			 *ref_id,
 							 gboolean		  all,
 							 GError			**error);
-
-GQuark		 gtk_source_context_engine_error_quark	(void);
 
 G_END_DECLS
 

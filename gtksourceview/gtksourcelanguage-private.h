@@ -1,4 +1,5 @@
-/*  gtksourcelanguage-private.h
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*-
+ *  gtksourcelanguage-private.h
  *
  *  Copyright (C) 2003 - Paolo Maggi <paolo.maggi@polito.it>
  *
@@ -21,13 +22,12 @@
 #define __GTK_SOURCE_LANGUAGE_PRIVATE_H__
 
 #include <glib.h>
-#include "gtksourcesimpleengine.h"
 #include "gtksourcecontextengine.h"
 #include "gtksourcelanguagesmanager.h"
 
 G_BEGIN_DECLS
 
-struct _GtkSourceLanguagePrivate 
+struct _GtkSourceLanguagePrivate
 {
 	gchar			*lang_file_name;
 	/* this is allocated by libxml, it should be freed using xmlFree() */
@@ -35,22 +35,18 @@ struct _GtkSourceLanguagePrivate
 
 	/* this is allocated by libxml, it should be freed using xmlFree() */
 	gchar			*id;
-	
+
 	/* this is allocated by libxml, it should be freed using xmlFree() */
 	gchar			*name;
 	/* this is allocated by libxml, it should be freed using xmlFree() */
 	gchar			*section;
 
+	/* maps style names to default styles (e.g. "comment" to "def:comment") */
+	GHashTable		*styles;
+
 	gint                     version;
-	
+
 	GSList			*mime_types;
-
-	/* this maps from style names to their parent styles */
-	GHashTable		*tag_id_to_style_name;
-	/* this maps style names to GtkSourceTagStyle structs */
-	GHashTable		*tag_id_to_style;
-
-	GtkSourceStyleScheme 	*style_scheme;
 
 	GtkSourceLanguagesManager *languages_manager;
 };
@@ -59,17 +55,11 @@ GtkSourceLanguage *_gtk_source_language_new_from_file (const gchar			*filename,
 						       GtkSourceLanguagesManager	*lm);
 gchar *_gtk_source_language_strconvescape (gchar *source);
 
-GtkSourceLanguagesManager *gtk_source_language_get_languages_manager (GtkSourceLanguage *language);
-
-gboolean _gtk_source_language_file_parse_version1 (GtkSourceLanguage      *language,
-						   GSList                **tags,
-						   GtkSourceSimpleEngine  *engine,
-						   gboolean                populate_styles_table);
+GtkSourceLanguagesManager *_gtk_source_language_get_languages_manager (GtkSourceLanguage *language);
 
 gboolean _gtk_source_language_file_parse_version2 (GtkSourceLanguage      *language,
-						   GSList                **tags,
-						   GtkSourceContextEngine *engine,
-						   gboolean                populate_styles_table);
+						   GtkSourceContextEngine *engine);
+GtkSourceEngine *_gtk_source_language_create_engine (GtkSourceLanguage *language);
 
 G_END_DECLS
 

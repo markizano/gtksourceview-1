@@ -1,4 +1,4 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*- 
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*-
  *
  *  gtksourceengine.h - Abstract base class for highlighting engines
  *
@@ -33,28 +33,31 @@ G_BEGIN_DECLS
 #define GTK_IS_SOURCE_ENGINE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), GTK_TYPE_SOURCE_ENGINE))
 #define GTK_SOURCE_ENGINE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), GTK_TYPE_SOURCE_ENGINE, GtkSourceEngineClass))
 
-typedef struct _GtkSourceEngine			GtkSourceEngine;
-typedef struct _GtkSourceEngineClass		GtkSourceEngineClass;
+typedef struct _GtkSourceEngine	GtkSourceEngine;
+typedef struct _GtkSourceEngineClass	GtkSourceEngineClass;
 
-struct _GtkSourceEngine 
+struct _GtkSourceEngine
 {
 	GObject g_object;
 };
 
+G_END_DECLS
+/* FIXME */
 #include <gtksourceview/gtksourcebuffer.h>
+G_BEGIN_DECLS
 
-struct _GtkSourceEngineClass 
+struct _GtkSourceEngineClass
 {
 	GObjectClass parent_class;
 
-	void     (* attach_buffer)    (GtkSourceEngine   *engine,
-				       GtkSourceBuffer   *buffer);
+	void     (* attach_buffer)    (GtkSourceEngine *engine,
+				       GtkTextBuffer   *buffer);
 };
 
 GType       gtk_source_engine_get_type 	       (void) G_GNUC_CONST;
 
-void        gtk_source_engine_attach_buffer    (GtkSourceEngine   *engine,
-						GtkSourceBuffer   *buffer);
+void        gtk_source_engine_attach_buffer    (GtkSourceEngine *engine,
+						GtkTextBuffer   *buffer);
 
 
 G_END_DECLS

@@ -1,4 +1,4 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- 
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*-
  *
  * gtktextregion.h - GtkTextMark based region utility functions
  *
@@ -19,7 +19,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
+ * Boston, MA 02111-1307, USA.
  */
 
 #ifndef __GTK_TEXT_REGION_H__
@@ -40,7 +40,7 @@ struct _GtkTextRegionIterator {
 	/*< private >*/
 	gpointer dummy1;
 	guint32  dummy2;
-	gpointer dummy3;	
+	gpointer dummy3;
 };
 
 GtkTextRegion *gtk_text_region_new                          (GtkTextBuffer *buffer);
@@ -56,6 +56,8 @@ void           gtk_text_region_add                          (GtkTextRegion     *
 void           gtk_text_region_subtract                     (GtkTextRegion     *region,
 							     const GtkTextIter *_start,
 							     const GtkTextIter *_end);
+void           gtk_text_region_subtract_region              (GtkTextRegion     *region,
+							     GtkTextRegion     *region2);
 
 gint           gtk_text_region_subregions                   (GtkTextRegion *region);
 

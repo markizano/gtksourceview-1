@@ -1,5 +1,39 @@
 2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	New version of syntax highlighting, with modifications stored
+	in the tree.
+
+	gtksourcetagstyle.[ch], gtksourcetagtable.[ch], gtksourcetag-private.h,
+	gtksourcesimpleengine.[ch] are not used and will be removed.
+	gtksourcelanguage-parser-1.c is not used, but will be modified later
+	to use new engine.
+
+	* gtktextbuffer.[ch]: made text-inserted and text-deleted signals
+	carry offsets instead of iters and text. Removed dependency on
+	GtkSourceTagTable. Replaced GtkSourceTagStyle with GtkSourceStyle.
+	Added "debug" signal. Made it use G_DEFINE_TYPE instead of
+	hand-written get_type() function.
+	gtk_source_buffer_real_insert_text, gtk_source_buffer_real_delete_range:
+	modified for new text-inserted and text-deleted signals signature.
+	iter_has_syntax_tag: commented it out, it will be removed.
+	gtk_source_buffer_set_bracket_match_style: use GtkSourceStyle.
+	gtk_source_buffer_set_language: removed FIXME's related to GtkSourceTagTable.
+	* gtksourcecontextengine.[ch]: new versions.
+	* gtksourceengine.[ch]: made it use GtkTextBuffer, it's more convenient.
+	* gtksourcelanguage.[ch], gtksourcelanguage-private.h: removed tag-related
+	stuff, disabled parsing lang files version 1.
+	* gtksourcemarker.[ch]: made gtk_source_marker_get_buffer return gpointer,
+	to avoid problems with cross-including headers.
+	* gtksourcestyle.[ch]: new files, with GtkSourceStyle. GtkSourceTagStyle became
+	this.
+	* gtksourcestylescheme.[ch]: removed old signals and methods.
+	* gtksourcetag.[ch]: GtkSourceTag does not carry style anymore, it's just
+	an auxiliary GtkTextTag subclass to distinguish it from user's tags.
+	* gtktextregion.[ch]: (gtk_text_region_subtract_region): new function.
+	* gtksourceview/Makefile.am: reflect changes above.
+
+2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	=== Started soc-2006 branch ===
 
 	* autogen.sh: use absolute path in srcdir to make test-widget
@@ -120,15 +154,15 @@
 2006-01-16  Paolo Maggi  <paolo@gnome.org>
 
 	Fixed bug #318577 – win32 port
-	
+
 	Based on a patch by Tor Lillqvist modified by Paolo Borelli
-	
+
 	* configure.in: added gtksourceview-zip to AC_CONFIG_FILES
-	
+
 	* makefile.am: added gtksourceview-zip.in to EXTRA_DIST
-	
+
 	* gtksourceview-zip.in: new file
-	
+
 	* gtksourceview/Makefile.am: define PREFIX in INCLUDES
 
 	* gtksourceview/gtksourcelanguage.c
@@ -137,7 +171,7 @@
 	 (get_mime_types_from_file): ditto
 	(language_file_parse):  use GMappedFile and xmlParseMemory instead of
 	xmlParseFile
-	
+
 2006-01-15  Marco Barisione  <barisione@gmail.com>
 
 	* gtksourceview/gtksourcesimpleengine.c: use EggRegex instead of
@@ -238,11 +272,11 @@
 2006-01-03  Paolo Maggi  <paolo@gnome.org>
 
 	Fixes bug #170604 – Syntax for GNU Octave
-	
+
 	* gtksourceview/language-specs/Makefile.am: added octave.lang
-	
+
 	* gtksourceview/language-specs/octave.lang: new file by
-	Søren Hauberg <soren@hauberg.org> and 
+	Søren Hauberg <soren@hauberg.org> and
 	Muthiah Annamalai <gnumuthu@users.sf.net>
 
 === gtksourceview 1.5.3 ===
@@ -281,7 +315,7 @@
 2005-12-31  Paolo Maggi  <paolo@gnome.org>
 
 	* gtksourceview/language-specs/fortran.lang: does not mark "^COMMON" as
-	a comment. Based on a patch by John Spray <jcs116@york.ac.uk>. 
+	a comment. Based on a patch by John Spray <jcs116@york.ac.uk>.
 	Fixes bug #168090 (Recognise fortran line comments better)
 
 2005-12-30  Paolo Maggi  <paolo@gnome.org>
@@ -292,7 +326,7 @@
 2005-12-30  Paolo Maggi  <paolo@gnome.org>
 
 	* gtksourceview/language-specs/php.lang: changed Section to "Scripts".
-	Fixed bug #316587 (PHP syntax file should be in the "Scripting" 
+	Fixed bug #316587 (PHP syntax file should be in the "Scripting"
 	section instead of "Sources")
 
 2005-12-30  Paolo Maggi  <paolo@gnome.org>
@@ -303,23 +337,23 @@
 
 	* gtksourceview/language-specs/ini.lang: s/Quote/Quoted
 
-	* gtksourceview/language-specs/ruby.lang: fixed bug #316612 (Ruby 
+	* gtksourceview/language-specs/ruby.lang: fixed bug #316612 (Ruby
 	coloration problems). Patch by Michael Witrant <mike@lepton.fr>
 
 2005-12-30  Paolo Maggi  <paolo@gnome.org>
 
-	* gtksourceview/language-specs/css.lang: fixed bug #323750 (CSS 
+	* gtksourceview/language-specs/css.lang: fixed bug #323750 (CSS
 	highlighting missing "font" property).
 
 2005-12-30  Paolo Maggi  <paolo@gnome.org>
 
-	* gtksourceview/language-specs/perl.lang: fixed bug #323999 (perl 
-	inline pod not properly highlighted). Based on a patch by 
+	* gtksourceview/language-specs/perl.lang: fixed bug #323999 (perl
+	inline pod not properly highlighted). Based on a patch by
 	Jaap Karssenberg <pardus@cpan.org>
 
 2005-12-28  Paolo Borelli  <pborelli@katamail.com>
 
-	* gtksourceview/gtksourcebuffer.c (build_syntax_regions_table): 
+	* gtksourceview/gtksourcebuffer.c (build_syntax_regions_table):
 	avoid possible division by zero bug with inaccurate implementations
 	of GTimer (for instance win32). Noticed by Stefan Knorr (bug 321898).
 
@@ -393,7 +427,7 @@
 
 2005-10-18  Nate Nielsen  <nielsen@memberwebs.com>
 
-	* gtksourceview/language-specs/javascript.lang: Moved 
+	* gtksourceview/language-specs/javascript.lang: Moved
 	'const' into keywords. See bug #317978
 
 === gtksourceview 1.4.2 ===
@@ -477,7 +511,7 @@
 	* gtksourceview/gtksourceiter.c
 	(pointer_from_offset_skipping_decomp) (g_utf8_strcasestr)
 	(g_utf8_strrcasestr) (g_utf8_caselessnmatch)
-	(forward_chars_with_skipping) (strbreakup): 
+	(forward_chars_with_skipping) (strbreakup):
 	s/G_NORMALIZE_ALL/G_NORMALIZE_NFD. See bug #303239 for more info.
 
 2005-08-03  Paolo Borelli  <pborelli@katamail.com>
@@ -487,25 +521,25 @@
 2005-08-03  Paolo Maggi  <paolo@gnome.org>
 
 	Fixed bug #171734: Updated SQL language specification
-	
-	* gtksourceview/language-specs/sql.lang: updated the gtksourceview SQL 
-	language specification so that it covers all the functionality 
-	new in Oracle Database 10g Release 1. Improved the handling of 
-	top-level SQL statements. 
+
+	* gtksourceview/language-specs/sql.lang: updated the gtksourceview SQL
+	language specification so that it covers all the functionality
+	new in Oracle Database 10g Release 1. Improved the handling of
+	top-level SQL statements.
 	Patch by Evert Verhellen <evert.verhellen@advalvas.be>
 
 2005-08-03  Paolo Maggi  <paolo@gnome.org>
 
-	Fixed bug #307456: Multiline string literals in C# break syntax 
+	Fixed bug #307456: Multiline string literals in C# break syntax
 	highlighting at end of line
-	
-	* gtksourceview/language-specs/csharp.lang: added support for @"" 
+
+	* gtksourceview/language-specs/csharp.lang: added support for @""
 	strings. Patch by Brion Vibber <brion@pobox.com>
 
 2005-08-03  Paolo Maggi  <paolo@gnome.org>
 
 	Fixe bug #309438: a couple of typos in the .po file
-	
+
 	* gtksourceview/gtksourcetag.c (gtk_source_tag_class_init):
 	s/associated to/associated with
 
@@ -513,17 +547,17 @@
 	"non whitespace characters" to clarify
 
 2005-08-03  Paolo Maggi  <paolo@gnome.org>
-	
+
 	Fixed bug #310219: RDF files not recognized as XML for syntax coloring
-	
+
 	* gtksourceview/language-specs/xml.lang: added the
-	"text/rdf" mime-type. 
+	"text/rdf" mime-type.
 
 2005-08-03  Paolo Maggi  <paolo@gnome.org>
 
 	Fixed bug #310249: Latex "comment" environment support
-	
-	* gtksourceview/language-specs/latex.lang: added support for 
+
+	* gtksourceview/language-specs/latex.lang: added support for
 	comment environment in latex syntax. Patch by Riccardo Lancellotti
 
 2005-08-03  Paolo Maggi  <paolo@gnome.org>
@@ -531,7 +565,7 @@
 	Fixed bug #311517: Missing mime type in javascript.lang
 
 	* gtksourceview/language-specs/javascript.lang: added the
-	"application/x-javascript" mime-type. 
+	"application/x-javascript" mime-type.
 	Patch by Marco Barisione  <marco.bari@vene.ws>
 
 2005-07-28  Marco Barisione <barisione@gmail.com>
@@ -569,7 +603,7 @@
 
 2005-07-27  Paolo Borelli  <pborelli@katamail.com>
 
-	* gtksourceview/gtksourceview.c (key_press_event): override the 
+	* gtksourceview/gtksourceview.c (key_press_event): override the
 	handler and chain up the textview handler instead of connecting
 	to the signal, so that applications have a chance to handle the
 	signal themselves. Bug #310294.
@@ -588,12 +622,12 @@
 2005-06-23  Paolo Maggi  <paolo@gnome.org>
 
 	* gtksourceview/language-specs/sql.lang: use \ as escape char.
-	Fixes bug #305958. 
+	Fixes bug #305958.
 
 2005-06-23  Paolo Maggi  <paolo@gnome.org>
 
-	* gtksourceview/language-specs/fortran.lang: added STOP keyword, 
-	improved comments management. Based on a patch by 
+	* gtksourceview/language-specs/fortran.lang: added STOP keyword,
+	improved comments management. Based on a patch by
 	John Spray <jcs116@york.ac.uk>. Partially fixes bug #168090
 
 2005-06-21  Paolo Maggi  <paolo@gnome.org>
@@ -609,7 +643,7 @@
 2005-06-21  Paolo Maggi  <paolo@gnome.org>
 
 	* gtksourceview/gtksourcebuffer.c (iter_has_syntax_tag): fixed
-	memory leak (#300796). 
+	memory leak (#300796).
 	Based on a patch by Yevgen Muntyan <muntyan@tamu.edu>.
 
 2005-04-01  Adi Attar  <aattar@cvs.gnome.org>
@@ -635,7 +669,7 @@
 === gtksourceview 1.1.93 ===
 
 2005-03-01  Paolo Maggi  <paolo@gnome.org>
-	
+
 	* configure.in:
 	* README:
 	* NEWS: 1.1.93 release
@@ -645,15 +679,15 @@
 	Patches by Paolo Borelli <pbor@katamail.com>
 
 	* gtksourceview/gtksourceiter.c (pointer_from_offset_skipping_decomp);
-	"offset" passed to pointer_from_offset_skipping_decomp is the number of chars 
-	before the match in the string after both casefold and normalize. 
-	The function walks the original string one character at a time and to 
-	find out how much to substract from offset it has to both casefold and 
-	normalize the current char. Before the patch, it didn't casefold the 
-	current char, and since casefold may change the lenght of the string 
+	"offset" passed to pointer_from_offset_skipping_decomp is the number of chars
+	before the match in the string after both casefold and normalize.
+	The function walks the original string one character at a time and to
+	find out how much to substract from offset it has to both casefold and
+	normalize the current char. Before the patch, it didn't casefold the
+	current char, and since casefold may change the lenght of the string
 	it ended up returning a pointer to the wrong character in the string.
-	(forward_chars_with_skipping): minimal 
-	workaround to avoid the infinite loop of bug #168247.  It doesn't fix the 
+	(forward_chars_with_skipping): minimal
+	workaround to avoid the infinite loop of bug #168247.  It doesn't fix the
 	problem, just the symptom.
 
 2005-02-27  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
@@ -664,8 +698,8 @@
 
 2005-02-24  Paolo Maggi  <paolo@gnome.org>
 
-	* gtksourceview/gtksourcebuffer.c (gtk_source_buffer_finalize): 
-	fixed bug #168229 (disconnect tag table signal handlers in destructor). 
+	* gtksourceview/gtksourcebuffer.c (gtk_source_buffer_finalize):
+	fixed bug #168229 (disconnect tag table signal handlers in destructor).
 	Patch by Yevgen Muntyan <muntyan@tamu.edu>.
 
 2005-02-24  Paolo Maggi  <paolo@gnome.org>
@@ -683,33 +717,33 @@
 
 === gtksourceview 1.1.92 ===
 
-2005-02-07  Paolo Maggi  <paolo@gnome.org> 
+2005-02-07  Paolo Maggi  <paolo@gnome.org>
 
 	* configure.in: set version to 1.1.92
-	
+
 	* NEWS:
 	* README: updated
 
 2005-02-07  Paolo Maggi  <paolo@gnome.org>
 
-	* gtksourceview/language-specs/latex.lang: fixed bug #128223 (Latex: \$ 
+	* gtksourceview/language-specs/latex.lang: fixed bug #128223 (Latex: \$
 	and \% are not escaped)
 
-	* gtksourceview/language-specs/python.lang: fixed bug #126589 (Python: 
+	* gtksourceview/language-specs/python.lang: fixed bug #126589 (Python:
 	Embolden punctuation/operators, numbers)
 
 2005-02-03  Paolo Maggi  <paolo@gnome.org>
 
 	* gtksourceview/gtksourceundomanager.c
-	(gtk_source_undo_manager_set_max_undo_levels): do not resize the 
+	(gtk_source_undo_manager_set_max_undo_levels): do not resize the
 	undo action list if max_undo_levels < 1
 
 === gtksourceview 1.1.91 ===
 
-2005-01-25  Paolo Maggi  <paolo@gnome.org> 
+2005-01-25  Paolo Maggi  <paolo@gnome.org>
 
 	* configure.in: set version to 1.1.91
-	
+
 	* NEWS:
 	* README: updated
 
@@ -727,18 +761,18 @@
 	* gtksourceview/gtksourcetagtable.c:
 	* gtksourceview/gtksourceundomanager.c:
 	* gtksourceview/gtksourceview.c:
-	Added some missing documentation and improved existing one. 
+	Added some missing documentation and improved existing one.
 
 2005-01-24  Paolo Maggi  <paolo@gnome.org>
 
 	* gtksourceview/gtksourceprintjob.c
-	(gtk_source_print_job_class_init): fixed bug #149337 ("font description 
+	(gtk_source_print_job_class_init): fixed bug #149337 ("font description
 	name" in gtksourceview difficult to translate)
 
 2005-01-24  Paolo Maggi  <paolo@gnome.org>
 
 	* gtksourceview/gtksourceundomanager.c
-	(gtk_source_undo_manager_insert_text_handler): fixed 
+	(gtk_source_undo_manager_insert_text_handler): fixed
 	bug #141993 (Text insertion undo manager should not assume text length).
 	Thanks to Theppitak Karoonboonyanan <thep@linux.thai.net>.
 
@@ -747,15 +781,15 @@
 	* gtksourceview/gtksourceview.c (compute_indentation)
 	(key_press_cb): fixed a problem with indentation when
 	you try to indent a line starting with a space and the cursor
-	is put before the last space character. 
-	Also fixed bug #154039 (gedit cannot determine Japanese input 
-	when autoindent is enable). 
+	is put before the last space character.
+	Also fixed bug #154039 (gedit cannot determine Japanese input
+	when autoindent is enable).
 	Thanks to Takao Fujiwara <Takao.Fujiwara@Sun.COM> and
 	Choe Hwanjin <choe.hwanjin@gmail.com>.
 
 2005-01-24  Paolo Maggi  <paolo@gnome.org>
 
-	* gtksourceview/language-specs/R.lang: fixed bug #163971 ("Assign 
+	* gtksourceview/language-specs/R.lang: fixed bug #163971 ("Assign
 	operator" should perhaps be "Assignment operator" in gtksourceview)
 
 2005-01-22  Paolo Maggi  <paolo@gnome.org>
@@ -772,7 +806,7 @@
 	(gtk_source_undo_manager_check_list_size)
 	(gtk_source_undo_manager_merge_action)
 	(gtk_source_undo_manager_set_max_undo_levels)
-	(gtk_source_undo_manager_modified_changed_handler): fixed bug 
+	(gtk_source_undo_manager_modified_changed_handler): fixed bug
 	#132828 (Undoing/Redoing to a non-modified state should unset modified)
 
 === gtksourceview 1.1.90 ===
@@ -819,19 +853,19 @@
 
 	* docs/reference/tmpl/view.sgml: updated
 
-	* gtksourceview/gtksourceview.c (gtk_source_view_class_init): new 
+	* gtksourceview/gtksourceview.c (gtk_source_view_class_init): new
 	"highlight_current_line" property
-	(gtk_source_view_set_property): manage new "highlight_current_line" 
+	(gtk_source_view_set_property): manage new "highlight_current_line"
 	property
 	(gtk_source_view_get_property): ditto
 	(gtk_source_view_paint_margin): use bold font to paint the line
-	number of the current line 
+	number of the current line
 	(gtk_source_view_expose): highlight the current line
 	(gtk_source_view_get_highlight_current_line): new method
 	(gtk_source_view_set_highlight_current_line): ditto
 
 	* gtksourceview/gtksourceview.h: added new methods
-	gtk_source_view_get_highlight_current_line and 
+	gtk_source_view_get_highlight_current_line and
 	gtk_source_view_set_highlight_current_line
 
 	* tests/test-widget.c (hl_line_toggled_cb) (create_view_window): added
@@ -841,7 +875,7 @@
 
 	* gtksourceview/language-specs/Makefile.am: added nemerle.lang
 
-	* gtksourceview/language-specs/nemerle.lang: new file (from 
+	* gtksourceview/language-specs/nemerle.lang: new file (from
 	gtksourceview-sharp)
 
 	* gtksourceview/language-specs/vbnet.lang: fixed mimetypes.
@@ -851,13 +885,13 @@
 
 	* HACKING: update mail address
 
-	* gtksourceview/gtksourceprintjob.c (print_page): fixes bug 
+	* gtksourceview/gtksourceprintjob.c (print_page): fixes bug
 	#144492(gtksourceview/gtksourceprintjob.c: linenumbering) when printing
-	selected lines only. Patch by Paul Bolle <pebolle@tiscali.nl> 
+	selected lines only. Patch by Paul Bolle <pebolle@tiscali.nl>
 
 2005-01-07  Paolo Maggi  <paolo@gnome.org>
 
-	New language specification file for TCL provided by Riccardo 
+	New language specification file for TCL provided by Riccardo
 	Lancellotti <riccardo@weblab.ing.unimo.it> (bug #154312)
 
 	* gtksourceview/language-specs/Makefile.am: added tcl.lang
@@ -867,23 +901,23 @@
 2005-01-07  Paolo Maggi  <paolo@gnome.org>
 
 	* gtksourceview/language-specs/pascal.lang: fixed bug #150477 (Potential
-	"Types Class" typo in gtksourceview message). Patch by 
+	"Types Class" typo in gtksourceview message). Patch by
 	Thierry Moisan  <thierryn@videotron.ca>
 
 2005-01-07  Paolo Maggi  <paolo@gnome.org>
 
-	* gtksourceview/language-specs/xml.lang: fixed bug #151995 (XML Markup 
+	* gtksourceview/language-specs/xml.lang: fixed bug #151995 (XML Markup
 	Highlighting does not handle CDATA correctly). s/DTD/DOCTYPE.
 	Does not mark DOCTYPE for translation.
 
 2005-01-07  Paolo Maggi  <paolo@gnome.org>
 
-	* gtksourceview/language-specs/python.lang: fixes bug 150497 ("Self" 
+	* gtksourceview/language-specs/python.lang: fixes bug 150497 ("Self"
 	message in gtksourceview should perhaps not be translated)
 
 2005-01-07  Paolo Maggi  <paolo@gnome.org>
 
-	* gtksourceview/language-specs/perl.lang: fixes bug #150490 (POD 
+	* gtksourceview/language-specs/perl.lang: fixes bug #150490 (POD
 	acronym in gtksourceview seemingly unnecessarily expanded)
 
 2005-01-07  Paolo Maggi  <paolo@gnome.org>
@@ -893,18 +927,18 @@
 	See bug #143874.
 
 	* gtksourceview/gtksourceprintjob.c (get_text_simple)
-	(get_text_with_style): correctly gets the paragraphs to print; 
-	for empty lines gtk_text_iter_forward_to_line_end() would skip the 
-	empty line, thus causing the incorrect numbering. 
-	(create_layout_for_para): ellipsizes the paragraph when text wrapping 
-	is disabled; for empty paragraphs, pango_layout_iter_get_baseline() 
-	returns 0, so checks this condition and adds a space character to 
+	(get_text_with_style): correctly gets the paragraphs to print;
+	for empty lines gtk_text_iter_forward_to_line_end() would skip the
+	empty line, thus causing the incorrect numbering.
+	(create_layout_for_para): ellipsizes the paragraph when text wrapping
+	is disabled; for empty paragraphs, pango_layout_iter_get_baseline()
+	returns 0, so checks this condition and adds a space character to
 	force the calculation of the baseline
 
 2004-12-27  Paolo Maggi  <paolo@gnome.org>
 
-	* gtksourceview/language-specs/php.lang: adds text/x-php-source and 
-	application/x-php-source to mimetypes (fixes bug #162190: PHP 
+	* gtksourceview/language-specs/php.lang: adds text/x-php-source and
+	application/x-php-source to mimetypes (fixes bug #162190: PHP
 	language-spec should work for phps files). Patch by David A Knight
 	<david@ritter.demon.co.uk>.
 
@@ -916,9 +950,9 @@
 2004-12-07  Paolo Maggi  <paolo@gnome.org>
 
 	* gtksourceview/language-specs/xml.lang: added "image/svg+xml" to
-	list of supported mime-types (fixed bug #142628: "gedit should 
+	list of supported mime-types (fixed bug #142628: "gedit should
 	automatically set "Highlight Mode" to XML for image/svg+xml files")
-	
+
 2004-12-07  Paolo Maggi  <paolo@gnome.org>
 
 	* gtksourceview/language-specs/pascal.lang : fixed "Number"
@@ -927,7 +961,7 @@
 
 	* INSTALL: updated
 
-	* gtksourceview/language-specs/fortran.lang: Add support for 
+	* gtksourceview/language-specs/fortran.lang: Add support for
 	ancient-style line comments (a line beginning with C), add "data",
 	"block data","common" keywords (patch by  John Spray (bug #143970)
 
@@ -987,14 +1021,14 @@
 	* HACKING: Updated files for new release.
 
 2004-07-22  Travis Snoozy  <ai2097@yahoo.com>
-	
-	* gtksourceview/language-specs//texinfo.lang: 
-	Created an initial texinfo highlighting definition. Most (all?) of 
+
+	* gtksourceview/language-specs//texinfo.lang:
+	Created an initial texinfo highlighting definition. Most (all?) of
 	the keywords are picked up. Still needs work :).
 
 2004-07-21  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
 
-	* gtksourceview/gtksourceiter.c (forward_chars_with_skipping) 
+	* gtksourceview/gtksourceiter.c (forward_chars_with_skipping)
 	(pointer_from_offset_skipping_decomp): Use g_utf8_normalize()
 	instead of g_unicode_canonical_decomposition() to calculate
 	normalized character lengths.
@@ -1012,13 +1046,13 @@
 
 2004-07-21  Arnaud LE ROUZIC <lerouzic@pge.cnrs-gif.fr>
 
-	* gtksourceview/language-specs/perl.lang: 
+	* gtksourceview/language-specs/perl.lang:
 	a string starting by $# must not be considered as a comment.
 
 2004-07-21  Gavin Brown <gavin.brown@uk.com>
 
 	* gtksourceview/language-specs/perl.lang: adds support for
-	Perl's POD documentation. Also adds in method calls ($object->method) 
+	Perl's POD documentation. Also adds in method calls ($object->method)
 	and the "our" keyword. Makes strings multiline.
 
 2004-07-20  Paolo Maggi  <paolo.maggi@polito.it>
@@ -1037,7 +1071,7 @@
 	gtk_source_print_job_{set,get}_{,numbers_,header_footer_}font_desc().
 	Also add "{,numbers_,header_footer_}font_desc" properties.
 
-	* gtksourceview/gtksourceprintjob.c: Rewrite printing code to 
+	* gtksourceview/gtksourceprintjob.c: Rewrite printing code to
 	use Pango and gnome-print functions to print Pango objects rather than
 	being a separate implementation of layout.
 
@@ -1057,7 +1091,7 @@
 2004-06-21  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
 
 	Patch by Paul Bolle:
-	
+
 	* gtksourceview/gtksourceprintjob.c (print_page): Fixed line
 	numbering (bug #144492)
 
@@ -1096,7 +1130,7 @@
 2004-04-18  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
 
 	Patch by Benoît Dejean <TaZForEver@free.fr>:
-	
+
 	* gtksourceview/language-specs/c.lang: Updated to highlight C99
 	keywords, types and macros.
 	* gtksourceview/language-specs/python.lang: Highlight Python 2.3
@@ -1121,7 +1155,7 @@
 2004-03-22  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
 
 	* configure.in: Version 1.0.0
-	
+
 	* README:
 	* NEWS: Updated for new release.
 
@@ -1156,7 +1190,7 @@
 	(g_utf8_strcasestr, g_utf8_strrcasestr): Correctly return a pointer to
 	the original string, taking into account decompositions in the
 	normalized string which is used for the actual comparing.
-	(forward_chars_with_skipping, lines_match, backward_lines_match): 
+	(forward_chars_with_skipping, lines_match, backward_lines_match):
 	Really fix searching now (sigh).
 
 2004-03-06  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
@@ -1177,7 +1211,7 @@
 2004-03-05  Paolo Maggi  <paolo.maggi@polito.it>
 
 	* gtksourceview/language-specs/csharp.lang: updated mime-types to work
-	with the new shared-mime-info database (patch by 
+	with the new shared-mime-info database (patch by
 	Tim Vismor <tvismor@acm.org>).
 
 === gtksourceview 0.9.1 ===
@@ -1208,18 +1242,18 @@
 
 2004-02-20  Gustavo Giráldez  <gustavo.giraldez@gmx.net>
 
-	* autogen.sh: 
+	* autogen.sh:
 	* configure.in: Set DEPRECATED_FLAGS variable and compiler
 	warnings according to maintainer mode (i.e. full deprecated flags
 	and error compiler warnings if maintainer mode is on).
 
-	* gtksourceview/Makefile.am: 
+	* gtksourceview/Makefile.am:
 	* tests/Makefile.am: Use DEPRECATED_FLAGS.
 
 	* gtksourceview/language-specs/csharp.lang: Highlight "value" in
 	C# (bug #134405, algol firenze linux it).
-	
-	* gtksourceview/gtksourceregex.h: 
+
+	* gtksourceview/gtksourceregex.h:
 	* gtksourceview/gtksourceregex.c (gtk_source_regex_search)
 	(gtk_source_regex_match): Added options to disable beginning and
 	end of line anchor matching at string ends.
@@ -1265,7 +1299,7 @@
 
 	* configure.in: Bump version number to 0.9.0.  Require intltool 0.30.
 
-	* README: 
+	* README:
 	* NEWS: Update for new release
 
 2004-02-12  Jeroen Zwartepoorte  <jeroen@xs4all.nl>
@@ -1293,7 +1327,7 @@
 	* configure.in: Added Irish locale "ga" to ALL_LINGUAS
 
 2004.01.10  Arafat Medini <lumina@silverpen.de>
-                                                                                
+
         * configure.in: Added Arabic locale "ar" to ALL_LINGUAS
 
 2004-01-08  Jody Goldberg <jody@gnome.org>
@@ -1338,7 +1372,7 @@
 2003-12-16  Gustavo Giraldez  <gustavo.giraldez@gmx.net>
 
 	* tests/Makefile.am: Put back GTK_DISABLE_DEPRECATED flag.
-	
+
 	* tests/test-widget.c: Migrated menu creation code from
 	GtkItemFactory to the new action based objects in Gtk+ 2.3.  As a
 	side effect, now all view windows get their own menu and
@@ -1365,10 +1399,10 @@
 
 	* gtksourceview/language-specs/csharp.lang: Support for C#
 	highlighting (file from John Luke, bug 115040).
-	
+
 	* gtksourceview/language-specs/msil.lang: MSIL hightlighting spec
 	(file from Antonio Ognio Cesti, bug 125252).
-	
+
 	* gtksourceview/language-specs/Makefile.am: Distribute csharp.lang
 	and msil.lang.
 
@@ -1436,7 +1470,7 @@
 
 2003-09-27  Gustavo Giraldez  <gustavo.giraldez@gmx.net>
 
-	* gtksourceview/gtksourceundomanager.c (gtk_source_undo_manager_undo) 
+	* gtksourceview/gtksourceundomanager.c (gtk_source_undo_manager_undo)
 	(gtk_source_undo_manager_delete_range_handler): When undoing a
 	delete action, place the cursor where it really was when the user
 	deleted the text (bug #112682).
@@ -1465,10 +1499,10 @@
 
 2003-09-25  Gustavo Giraldez  <gustavo.giraldez@gmx.net>
 
-	* gtksourceview/gtksourcelanguage.c (gtk_source_language_finalize): 
+	* gtksourceview/gtksourcelanguage.c (gtk_source_language_finalize):
 	Remove debugging output (bug #121204).
 
-	* gtksourceview/gtksourceiter.c (backward_lines_match) 
+	* gtksourceview/gtksourceiter.c (backward_lines_match)
 	(gtk_source_iter_backward_search): Fix backward case-insensitive
 	search (bug #114666).
 
@@ -1518,7 +1552,7 @@
 2003-08-25  Gustavo Giraldez  <gustavo.giraldez@gmx.net>
 
 	* configure.in: Bumped intltool required version to 0.27 to get
-	support for translated .lang files.  Bumped version number for new 
+	support for translated .lang files.  Bumped version number for new
 	release.
 	* README: Updated for new release.
 
@@ -1590,7 +1624,7 @@
 2003-07-19  Paolo Maggi <paolo.maggi@polito.it>
 
 	* gtksourceview/gtksourcebuffer.c (gtk_source_buffer_set_bracket_match_style):
-	manage the cases in which GTK_SOURCE_TAG_STYLE_USE_FOREGROUND and or 
+	manage the cases in which GTK_SOURCE_TAG_STYLE_USE_FOREGROUND and or
 	GTK_SOURCE_TAG_STYLE_USE_BACKGROUND are not set.
 
 	* gtksourceview/gtksourcelanguage.c (gtk_source_language_set_tag_style):
@@ -1611,7 +1645,7 @@
 	* po/no.po:
 
 2003-07-10  Hasbullah Bin Pit  <sebol@ikhlas.com>
-                                                                                 
+
         * configure.in: Added "ms" (Malay) to ALL_LINGUAS.
 
 2003-07-09  Dafydd Harries  <daf@parnassus.ath.cx>
@@ -1623,9 +1657,9 @@
 	* configure.in: Added "it" (Italian) to ALL_LINGUAS.
 
 2003-07-06  Artur Flinta  <aflinta@cvs.gnome.org>
-                                                                                
+
         * configure.in: Added "pl" to ALL_LINGUAS.
-	
+
 === gtksourceview 0.4.0 ===
 
 2003-06-30  Paolo Maggi  <paolo.maggi@polito.it>
@@ -1656,12 +1690,12 @@
 
 	* configure.in: Added "he" (Hebrew) to ALL_LINGUAS.
 
-2003-06-23  Paolo Maggi <paolo.maggi@polito.it> 
+2003-06-23  Paolo Maggi <paolo.maggi@polito.it>
 
 	* gtksourceview/gtksourcelanguage-private.h (GtkSourceLanguagePrivate):
 	added id, renamed tag_name_to_style_name to tag_id_to_style_name and
 	tag_name_to_style to tag_id_to_style
-	
+
 	* gtksourceview/gtksourcelanguage.c (gtk_source_language_finalize):
 	free id
 	(escape_id): new function
@@ -1670,15 +1704,15 @@
 	(parseLineComment)(parseLineComment)(parseString)(parseKeywordList)
 	(parsePatternItem)(parseSyntaxItem)(parseTag): set tag id
 	(tag_style_changed_cb): use tag instead of name
-	
-	* gtksourceview/gtksourcelanguage.h (gtk_source_language_get_id): new 
+
+	* gtksourceview/gtksourcelanguage.h (gtk_source_language_get_id): new
 	method
-	
+
 	* gtksourceview/gtksourcetag-private.h (GtkSourceTag): added id
-	
+
 	* gtksourceview/gtksourcetag.[ch]: added the id arg to all constructors,
 	added id and tag_style properties
-	
+
 2003-06-18  Dmitry G. Mastrukov  <dmitry@taurussoft.org>
 
 	* configure.in: Added Belarusian to ALL_LINGUAS.
@@ -1742,7 +1776,7 @@
 
 2003-06-12  Anders Carlsson  <andersca@codefactory.se>
 
-	* gtksourceview/gtksourceview.c (draw_line_markers): 
+	* gtksourceview/gtksourceview.c (draw_line_markers):
 	Use gdk_draw_pixbuf.
 
 2003-06-12  Paolo Maggi <paolo.maggi@polito.it>
@@ -1753,7 +1787,7 @@
 	glib-2.0 gdk-2.0 from Requires.
 
 === gtksourceview 0.3.0 ===
-	
+
 2003-06-07  Gustavo Gir??ldez  <gustavo.giraldez@gmx.net>
 
 	* README
@@ -1768,21 +1802,21 @@
 
 	* TODO: Updated
 
-	* docs/reference/gtksourceview-sections.txt: removed 
-	gtk_source_buffer_find_bracket_match, added 
+	* docs/reference/gtksourceview-sections.txt: removed
+	gtk_source_buffer_find_bracket_match, added
 	gtk_source_iter_find_matching_bracket
 
 	* gtksourceview/gtksourcebuffer.c: #include "gtksourceiter.h",
-	rename gtk_source_buffer_find_bracket_match to 
+	rename gtk_source_buffer_find_bracket_match to
 	gtk_source_iter_find_matching_bracket
 
-	* gtksourceview/gtksourcebuffer.h: removed 
+	* gtksourceview/gtksourcebuffer.h: removed
 	gtk_source_buffer_find_bracket_match
 
-	* gtksourceview/gtksourceiter.h: added 
+	* gtksourceview/gtksourceiter.h: added
 	gtk_source_iter_find_matching_bracket
 
-	* gtksourceview/gtksourcestylescheme.h: added a list of 
+	* gtksourceview/gtksourcestylescheme.h: added a list of
 	required styles
 
 2003-06-04  Abel Cheung  <maddog@linux.org.hk>
@@ -1805,7 +1839,7 @@
 	* tests/test-widget.c: Save the opened filename and print it in
 	the footer.  A bit nicer print progress indicator and some other
 	printing configuration changed.
-	
+
 2003-06-02  Gustavo Gir??ldez  <gustavo.giraldez@gmx.net>
 
 	* configure.in: Add libgnomeprint/libgnomeprintui dependencies.
@@ -1839,7 +1873,7 @@
 
 	* tests/test-widget.c: Implemented "Print Preview" menu option to
 	test new printing functionality.
-	
+
 	* autogen.sh: Treat compiler warnings as errors by default.
 
 2003-05-31  Christian Neumair  <chris@gnome-de.org>
@@ -1882,7 +1916,7 @@
 2003-05-26  Gustavo Gir??ldez  <gustavo.giraldez@gmx.net>
 
 	* configure.in: Require intltool 0.26.
-	
+
 	* gtksourceview/gtksourcelanguage-private.h:
 	* gtksourceview/gtksourcelanguage.c: Add support for translated
 	.lang files.
@@ -1900,10 +1934,10 @@
 
 	* autogen.sh: Enable documentation build by default.
 	* HACKING: Added documentation policy for new API.
-	
+
 2003-05-25  Gustavo Giraldez  <gustavo.giraldez@gmx.net>
 
-	* configure.in: 
+	* configure.in:
 	* Makefile.am: Added reference documentation building
 	infrastructure.
 
@@ -1923,15 +1957,15 @@
 	* gtksourceview/gtksourcetagtable.c
 	(gtk_source_tag_table_add_tags): Fixed typo in gtk-doc comment
 	header.
-	
+
 2003-05-25  Duarte Loreto <happyguy_pt@hotmail.com>
 
         * configure.in: Add Portuguese (pt) to ALL_LINGUAS.
 
 2003-05-24  Gustavo Gir??ldez  <gustavo.giraldez@gmx.net>
 
-	* gtksourceview/language-specs/ada.lang: 
-	* gtksourceview/language-specs/c.lang: 
+	* gtksourceview/language-specs/ada.lang:
+	* gtksourceview/language-specs/c.lang:
 	* gtksourceview/language-specs/cpp.lang: Changed pattern for
 	matching character constants (patch by Michael Terry, bug #113498)
 
@@ -1946,7 +1980,7 @@
 	* configure.in: Added cs (Czech) to ALL_LINGUAS.
 
 === gtksourceview 0.2.1 ===
-	
+
 2003-05-20  Gustavo Giraldez  <gustavo.giraldez@gmx.net>
 
 	* NEWS: updated for new release
@@ -1961,9 +1995,9 @@
 	* gtksourceview/gtksourceregex.c:
 	* gtksourceview/gtksourcetag.c:
 	* gtksourceview/gtksourcetag-private.h:
-	* gtksourceview/gtksourcebuffer.c: 
+	* gtksourceview/gtksourcebuffer.c:
 	Regular expression syntax changed to POSIX Extended.
-	Changed all occurrences of GtkSourceRegex objects to a pointer to 
+	Changed all occurrences of GtkSourceRegex objects to a pointer to
 	GtkSourceRegex, since now their implementation is opaque to the
 	rest of the library.
 	Changed prototype of gtk_source_regex_match to return a gboolean
@@ -1977,7 +2011,7 @@
 	* gtksourceview/gnu-regex: Directory containing private copy of
 	GNU regular expressions library for platforms not based on the GNU
 	C library (built conditionally).
-	
+
 	* README: Added section about the .lang file format
 	* gtksourceview/language-specs/language.dtd: DTD for .lang files
 	* gtksourceview/language-specs/*.lang: Changed all regular
@@ -1995,19 +2029,19 @@
 
 	Workaround for bug #81893
 
-	* gtksourceview/gtksourceview.c (gtk_source_view_grab_focus): 
+	* gtksourceview/gtksourceview.c (gtk_source_view_grab_focus):
 	new function
 
 2003-05-13  Michael Terry  <mterry@fastmail.fm>
 
 	* Makefile.am, configure.in, gtksourceview-1.0.pc.in,
-	  gtksourceview/Makefile.am, 
+	  gtksourceview/Makefile.am,
 	  gtksourceview/gtksourcelanguage-private.h,
 	  gtksourceview/gtksourcelanguagesmanager.c,
 	  gtksourceview/gtksourcetagtable.c,
 	  gtksourceview/gtksourceview-i18n.c, tests/Makefile.am:
 	  Removed dependency on libgnome from gtksourceview code.
-	* configure.in: Allowed the tests to not be built, via a 
+	* configure.in: Allowed the tests to not be built, via a
 	  --disable-build-tests configure flag.
 
 2003-05-13  Paolo Maggi  <paolo.maggi@polito.it>
@@ -2033,11 +2067,11 @@
 2003-05-08  Paolo Maggi  <paolo.maggi@polito.it>
 
 	* gtksourceview/gtksourcebuffer.c
-	* gtksourceview/gtksourceview.c: fixed compilation problems 
+	* gtksourceview/gtksourceview.c: fixed compilation problems
 	with gcc 2.9.x (patch by Mohammed Sameer <Uniball@gmx.net>)
 
 === gtksourceview 0.2.0 ===
-	
+
 2003-05-05  Gustavo Giraldez  <gustavo.giraldez@gmx.net>
 
 	* configure.in: Bumped version number to 0.2.0 due to the
@@ -2047,11 +2081,11 @@
 
 2003-05-05  Paolo Maggi  <paolo.maggi@polito.it>
 
-	"src" dir renamed to "gtksourceview", in this way headers 
+	"src" dir renamed to "gtksourceview", in this way headers
 	can be properly namespaced
 
 === gtksourceview 0.1.0 ===
-	
+
 2003-05-02  Gustavo Giraldez  <gustavo.giraldez@gmx.net>
 
 	New GtkSourceView widget by Paolo Maggi and Gustavo Gir??ldez.
@@ -2067,7 +2101,7 @@
 	* Smart HOME/END keys move to the first/last character in the line
 	  before moving to the real begin/end (patch by Jeroen Zwartepoorte)
 	* Auto indentation support
-	
+
 2003-04-15  Christian Neumair  <chris@gnome-de.org>
 
 	* configure.in: Changed AC_PROG_LIBTOOL macro to AM_PROG_LIBTOOL.
@@ -2091,7 +2125,7 @@
 
 2003-01-02  Gustavo Giraldez  <gustavo.giraldez@gmx.net>
 
-	* autogen.sh: Changed to standard gnome2 autogen.sh 
+	* autogen.sh: Changed to standard gnome2 autogen.sh
 	* ltmain.sh: Removed, since it's installed by libtoolize.
 	* configure.in: Updated required Gtk+ version.
 	* src/Makefile.am: Added gtktextregion.[ch] and testregion test
@@ -2118,7 +2152,7 @@
 	margin painting from the expose handler.
 	* src/test-widget.c: Set a monospaced font instead of using the
 	default theme font.
-	
+
 2002-09-22  Jeroen Zwartepoorte  <jeroen@xs4all.nl>
 
 	* src/gtksourcebuffer.h:
@@ -2169,8 +2203,8 @@
 
 2002-05-22  Mikael Hermansson  <tyan@linux.se>
 
-	* src/gtksourcebuffer.c: (gtk_source_buffer_real_delete_range), 
-	fix bug that made it impossible to remove syntax embended text. 
+	* src/gtksourcebuffer.c: (gtk_source_buffer_real_delete_range),
+	fix bug that made it impossible to remove syntax embended text.
 	(reported by Mario Motta <mmotta@guest.net>)
 
 2002-03-31  Jeroen Zwartepoorte  <jeroen@xs4all.nl>
@@ -2227,32 +2261,32 @@
 
 2002-03-10  Mikael Hermansson  <tyan@linux.se>
 
-	* gtksourcebuffer.[c/h] (gtk_source_buffer_update_info): 
-	This function will reread file stat() from disc and update 
+	* gtksourcebuffer.[c/h] (gtk_source_buffer_update_info):
+	This function will reread file stat() from disc and update
 	GtkSourceBufferInfo structure.
-	(update_buffer_info): Fixed so it doesn't read file stat() when 
+	(update_buffer_info): Fixed so it doesn't read file stat() when
 	getstat == FALSE
 
 2002-03-06  Mikael Hermansson  <tyan@linux.se>
 
-	* gtktextsearch.[c/h]: This is a new object class for searching in the 
-	buffer. Hopefully this API will work better than the old 
-	gtk_text_iter_forward_search implementation :-) 
+	* gtktextsearch.[c/h]: This is a new object class for searching in the
+	buffer. Hopefully this API will work better than the old
+	gtk_text_iter_forward_search implementation :-)
 
 	* Makefile.am: added gtktextsearch.[c/h] to sources list
 
 2002-02-11  Mikael Hermansson  <tyan@linux.se>
 
-	* gtksourcebuffer.c:  remove all compile warnings. 
-	(gtk_source_buffer_set_filename): Should not g_strdup/g_free 
+	* gtksourcebuffer.c:  remove all compile warnings.
+	(gtk_source_buffer_set_filename): Should not g_strdup/g_free
 	if passed filename == info->filename just return from without change.
 
 2002-02-09  Mikael Hermansson  <tyan@linux.se>
 
-	* gtksourcebuffer.c/h (gtk_source_buffer_get_filename): 
+	* gtksourcebuffer.c/h (gtk_source_buffer_get_filename):
 	Allocate a new filename string instead of return const char*
- 	user should g_free it after use. 
- 	(gtk_source_buffer_save/load): Now will set "modifed" flag to 
+ 	user should g_free it after use.
+ 	(gtk_source_buffer_save/load): Now will set "modifed" flag to
 	FALSE after load/save success has been completed...
 
 2002-03-07  Jeroen Zwartepoorte  <jeroen@xs4all.nl>
@@ -2262,18 +2296,18 @@
 
 2001-12-30  Mikael Hermansson  <tyan@linux.se>
 
-	* gtksourcebuffer.c: (in move_cursor): Make sure 
-	gtk_source_buffer_find_bracket_match() is only called if 
+	* gtksourcebuffer.c: (in move_cursor): Make sure
+	gtk_source_buffer_find_bracket_match() is only called if
 	check_brackets == TRUE
 
 Sat Feb  09 05:41:59 2002 CET Mikael Hermansson  <tyan@linux.se>
 
-	* gtksourcebuffer.[c/h] added new API: 
+	* gtksourcebuffer.[c/h] added new API:
 	gtk_source_buffer_save[_with_character_encoding]()
 	gtk_source_buffer_load[_with_character_encoding](),
 	gtk_source_buffer_set_filename(),
 	gtk_source_buffer_get_filename(),
-	gtk_source_buffer_get_info(): GtkSourceBufferInfo structure holds 
+	gtk_source_buffer_get_info(): GtkSourceBufferInfo structure holds
 	file-/buffer status.
 
 2002-02-06  Jeroen Zwartepoorte  <jeroen@xs4all.nl>
@@ -2315,14 +2349,14 @@ Sat Jan 26 10:50:43 AM PST 2002 Chris Phelps <chicane@reninet.com>
 
 2001-12-30  Dave Camp  <dave@ximian.com>
 
-	* src/gtksourceview.c (get_line_marker): Pass an overall_alpha of 
+	* src/gtksourceview.c (get_line_marker): Pass an overall_alpha of
 	255 to gdk_pixbuf_composite() instead of 127.
 
 	* src/gtksourcebuffer.c (gtk_source_buffer_line_remove_marker): Removed the extraneous list destruction and hashtable removal at the end of the function.  Removing a marker no longer removes all markers.
 
 Sun Dec  30 10:40:08 2001 CET Mikael Hermansson  <tyan@linux.se>
 
-  * gtksourcebuffer.c: 
+  * gtksourcebuffer.c:
      - get rid of connect_[before/after] signals on "insert/delete" callbacks.
         Now the sourcebuffer is  virtually overidding the default insert_text/delete_range handlers.
   * gtksourceview.c:
@@ -2356,7 +2390,7 @@ Mon Dec 10 04:58:22 PM PST 2001 Chris Phelps <chicane@reninet.com>
 Sat Dec  08 03:46:47 2001 CET Mikael Hermansson  <tyan@linux.se>
 
   * Hmm It's time to start contribute to my old project again. Nothing new so far except I have changed ISP provider and my new email is tyan@linux.se.
-    Maybe I have some old/new stuff in my local source repository (at http://tyan.homeip.net) but it looks like like Chris has already done some good stuff :-)  
+    Maybe I have some old/new stuff in my local source repository (at http://tyan.homeip.net) but it looks like like Chris has already done some good stuff :-)
 
 Thu Dec 06 02:25:29 AM PST 2001 Chris Phelps <chicane@reninet.com>
    * split the line pixmap code up between the view and buffer implementations.
@@ -2369,7 +2403,7 @@ Thu Dec 06 01:14:40 AM PST 2001 Chris Phelps <chicane@reninet.com>
      on the final line of the view even if it is empty.
 
 Thu Dec 06 01:13:42 AM PST 2001 Chris Phelps <chicane@reninet.com>
-   * I have resurected this module and put it to use in Glimmer, and 
+   * I have resurected this module and put it to use in Glimmer, and
      Dave Camp is playing with it in Dryad as a test bed for gnome-debug
 
 Sat Feb 17  13:19:53 2001 CET Mikael Hermansson<mikeh@bahnhof.se>
@@ -2378,13 +2412,13 @@ Sat Feb 17  13:19:53 2001 CET Mikael Hermansson<mikeh@bahnhof.se>
 
 Sat Feb 17  13:03:59 2001 CET Mikael Hermansson  <mikeh@bahnhof.se>
 
-  * gtktextview.c bugfixes in find_correct_bracket/key_press_event code that made 
+  * gtktextview.c bugfixes in find_correct_bracket/key_press_event code that made
   the bracket sometime show up incorrectly in line.
 
 Sat Feb 17  02:19:27 2001 CET Mikael Hermansson  <mikeh@bahnhof.se>
 
-  * gtksourceview.c if source_view->auto_indent = TRUE the keypress implementation 
-    will automatic inserting whitespaces before/after on operator characters like [=<>!], comma [,] 
+  * gtksourceview.c if source_view->auto_indent = TRUE the keypress implementation
+    will automatic inserting whitespaces before/after on operator characters like [=<>!], comma [,]
     and begin parantes[(]. This is hardcoded values and will probadly only work on
     C/C++/Java/python or similar programing languages syntax.
 
@@ -2392,8 +2426,8 @@ Fri Feb 16  23:56:46 2001 CET Mikael Hermansson  <mikeh@bahnhof.se>
 
   * test.c cb_convert() replaced creat/write functions with fopen family instead
 
-  * gtksourceview.c killed some warnings, fixed bug in gtk_source_view_set_show_line_numbers() 
-    that made the widget show line numbers even if you set it to FALSE. 
+  * gtksourceview.c killed some warnings, fixed bug in gtk_source_view_set_show_line_numbers()
+    that made the widget show line numbers even if you set it to FALSE.
 
 Mon Feb 12  18:17:56 2001 CET Mikael Hermansson  <mikeh@bahnhof.se>
 
@@ -2443,7 +2477,7 @@ Mon Dec 10 04:58:22 PM PST 2001 Chris Phelps <chicane@reninet.com>
 Sat Dec 08  03:46:47 2001 CET Mikael Hermansson  <tyan@linux.se>
 
   * Hmm It's time to start contribute to my old project again. Nothing new so far except I have changed ISP provider and my new email is tyan@linux.se.
-    Maybe I have some old/new stuff in my local source repository (at http://tyan.homeip.net) but it looks like like Chris has already done some good stuff :-)  
+    Maybe I have some old/new stuff in my local source repository (at http://tyan.homeip.net) but it looks like like Chris has already done some good stuff :-)
 
 Thu Dec 06 02:25:29 AM PST 2001 Chris Phelps <chicane@reninet.com>
    * split the line pixmap code up between the view and buffer implementations.
@@ -2456,7 +2490,7 @@ Thu Dec 06 01:14:40 AM PST 2001 Chris Phelps <chicane@reninet.com>
      on the final line of the view even if it is empty.
 
 Thu Dec 06 01:13:42 AM PST 2001 Chris Phelps <chicane@reninet.com>
-   * I have resurected this module and put it to use in Glimmer, and 
+   * I have resurected this module and put it to use in Glimmer, and
      Dave Camp is playing with it in Dryad as a test bed for gnome-debug
 
 Sat Feb 17  13:19:53 2001 CET Mikael Hermansson  <mikeh@bahnhof.se>
@@ -2465,13 +2499,13 @@ Sat Feb 17  13:19:53 2001 CET Mikael Hermansson  <mikeh@bahnhof.se>
 
 Sat Feb 17  13:03:59 2001 CET Mikael Hermansson  <mikeh@bahnhof.se>
 
-  * gtktextview.c bugfixes in find_correct_bracket/key_press_event code that made 
+  * gtktextview.c bugfixes in find_correct_bracket/key_press_event code that made
   the bracket sometime show up incorrectly in line.
 
 Sat Feb 17  02:19:27 2001 CET Mikael Hermansson  <mikeh@bahnhof.se>
 
-  * gtksourceview.c if source_view->auto_indent = TRUE the keypress implementation 
-    will automatic inserting whitespaces before/after on operator characters like [=<>!], comma [,] 
+  * gtksourceview.c if source_view->auto_indent = TRUE the keypress implementation
+    will automatic inserting whitespaces before/after on operator characters like [=<>!], comma [,]
     and begin parantes[(]. This is hardcoded values and will probadly only work on
     C/C++/Java/python or similar programing languages syntax.
 
@@ -2479,8 +2513,8 @@ Fri Feb 16  23:56:46 2001 CET Mikael Hermansson  <mikeh@bahnhof.se>
 
   * test.c cb_convert() replaced creat/write functions with fopen family instead
 
-  * gtksourceview.c killed some warnings, fixed bug in gtk_source_view_set_show_line_numbers() 
-    that made the widget show line numbers even if you set it to FALSE. 
+  * gtksourceview.c killed some warnings, fixed bug in gtk_source_view_set_show_line_numbers()
+    that made the widget show line numbers even if you set it to FALSE.
 
 Mon Feb 12  18:17:56 2001 CET Mikael Hermansson  <mikeh@bahnhof.se>
 

@@ -1,4 +1,4 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*- 
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*-
  *  gtksourcebuffer.h
  *
  *  Copyright (C) 1999,2000,2001,2002 by:
@@ -27,7 +27,9 @@
 #define __GTK_SOURCE_BUFFER_H__
 
 #include <gtk/gtk.h>
-#include <gtksourceview/gtksourcetagtable.h>
+#include <gtksourceview/gtksourcelanguage.h>
+#include <gtksourceview/gtksourcemarker.h>
+#include <gtksourceview/gtksourcestyle.h>
 
 G_BEGIN_DECLS
 
@@ -42,7 +44,7 @@ typedef struct _GtkSourceBuffer			GtkSourceBuffer;
 typedef struct _GtkSourceBufferClass		GtkSourceBufferClass;
 typedef struct _GtkSourceBufferPrivate		GtkSourceBufferPrivate;
 
-struct _GtkSourceBuffer 
+struct _GtkSourceBuffer
 {
 	GtkTextBuffer text_buffer;
 
@@ -66,35 +68,34 @@ struct _GtkSourceBufferClass
 
 	/* highlighting engines connect to these */
 	void (* text_inserted)          (GtkSourceBuffer   *buffer,
-					 const GtkTextIter *start,
-					 const GtkTextIter *end);
+					 gint               start_offset,
+					 gint               end_offset);
 	void (* text_deleted)           (GtkSourceBuffer   *buffer,
-					 const GtkTextIter *where,
-					 const gchar       *text);
+					 gint               offset,
+					 gint               length);
 	void (* update_highlight)       (GtkSourceBuffer   *buffer,
 					 const GtkTextIter *start,
 					 const GtkTextIter *end,
 					 gboolean           synchronous);
 
-};
+	void (* debug)			(GtkSourceBuffer   *buffer);
 
-#include <gtksourceview/gtksourcemarker.h>
-#include <gtksourceview/gtksourcelanguage.h>
+};
 
 GType           	 gtk_source_buffer_get_type 		(void) G_GNUC_CONST;
 
 
 /* Constructor */
-GtkSourceBuffer	 	*gtk_source_buffer_new 			(GtkSourceTagTable      *table);
+GtkSourceBuffer	 	*gtk_source_buffer_new 			(GtkTextTagTable        *table);
 GtkSourceBuffer 	*gtk_source_buffer_new_with_language 	(GtkSourceLanguage      *language);
 
 /* Properties. */
 gboolean		 gtk_source_buffer_get_check_brackets   (GtkSourceBuffer        *buffer);
 void			 gtk_source_buffer_set_check_brackets	(GtkSourceBuffer        *buffer,
 							       	 gboolean                check_brackets);
-void                     gtk_source_buffer_set_bracket_match_style 
+void                     gtk_source_buffer_set_bracket_match_style
                                                                 (GtkSourceBuffer         *source_buffer,
-								 const GtkSourceTagStyle *style);
+								 const GtkSourceStyle    *style);
 
 gboolean		 gtk_source_buffer_get_highlight	(GtkSourceBuffer        *buffer);
 void			 gtk_source_buffer_set_highlight	(GtkSourceBuffer        *buffer,
@@ -105,7 +106,7 @@ void			 gtk_source_buffer_set_max_undo_levels	(GtkSourceBuffer        *buffer,
 							    	 gint                    max_undo_levels);
 
 GtkSourceLanguage 	*gtk_source_buffer_get_language 	(GtkSourceBuffer        *buffer);
-void			 gtk_source_buffer_set_language 	(GtkSourceBuffer        *buffer, 
+void			 gtk_source_buffer_set_language 	(GtkSourceBuffer        *buffer,
 								 GtkSourceLanguage      *language);
 
 /* Undo/redo methods */
@@ -131,7 +132,7 @@ void                     gtk_source_buffer_delete_marker        (GtkSourceBuffer
 								 GtkSourceMarker        *marker);
 GtkSourceMarker         *gtk_source_buffer_get_marker           (GtkSourceBuffer        *buffer,
 								 const gchar            *name);
-GSList                  *gtk_source_buffer_get_markers_in_region 
+GSList                  *gtk_source_buffer_get_markers_in_region
                                                                 (GtkSourceBuffer        *buffer,
 								 const GtkTextIter      *begin,
 								 const GtkTextIter      *end);

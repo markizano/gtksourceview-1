@@ -1,4 +1,5 @@
-/*  gtksourcestylescheme.c
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*-
+ *  gtksourcestylescheme.c
  *
  *  Copyright (C) 2003 - Paolo Maggi <paolo.maggi@polito.it>
  *
@@ -17,438 +18,177 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
 #include "gtksourceview-i18n.h"
-
 #include "gtksourcestylescheme.h"
 
-
-static void gtk_source_style_scheme_base_init (gpointer g_class);
-
-GType
-gtk_source_style_scheme_get_type (void)
+struct _GtkSourceStyleSchemePrivate
 {
-	static GType source_style_scheme_type = 0;
+	GtkSourceStyleScheme *parent;
+	GHashTable *styles;
+};
 
-	if (!source_style_scheme_type)
-	{
-		static const GTypeInfo source_style_scheme_info =
-		{
-			sizeof (GtkSourceStyleSchemeClass),  	/* class_size */
-			gtk_source_style_scheme_base_init,	/* base_init */
-			NULL,			    		/* base_finalize */
-		};
-		
-		source_style_scheme_type = g_type_register_static (G_TYPE_INTERFACE, 
-								   "GtkSourceStyleScheme",
-					      			   &source_style_scheme_info, 
-								   0);
-	}
+static GtkSourceStyleScheme *default_scheme;
 
-	return source_style_scheme_type;
+G_DEFINE_TYPE (GtkSourceStyleScheme, gtk_source_style_scheme, G_TYPE_OBJECT)
+
+static void
+gtk_source_style_scheme_finalize (GObject *object)
+{
+	GtkSourceStyleScheme *scheme = GTK_SOURCE_STYLE_SCHEME (object);
+
+	g_hash_table_destroy (scheme->priv->styles);
+
+	if (scheme->priv->parent)
+		g_object_unref (scheme->priv->parent);
+
+	G_OBJECT_CLASS (gtk_source_style_scheme_parent_class)->finalize (object);
 }
 
 static void
-gtk_source_style_scheme_base_init (gpointer g_class)
+gtk_source_style_scheme_class_init (GtkSourceStyleSchemeClass *klass)
 {
-	static gboolean initialized = FALSE;
+	GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
-	if (! initialized)
-    	{
-		g_signal_new ("style_changed",
-			      G_TYPE_FROM_CLASS (g_class),
-			      G_SIGNAL_RUN_LAST,
-			      G_STRUCT_OFFSET (GtkSourceStyleSchemeClass, style_changed),
-			      NULL, NULL,
-			      g_cclosure_marshal_VOID__STRING,
-			      G_TYPE_NONE, 1, G_TYPE_STRING);
+	object_class->finalize = gtk_source_style_scheme_finalize;
 
-      		initialized = TRUE;
-    	}
+	g_type_class_add_private (object_class, sizeof (GtkSourceStyleSchemePrivate));
 }
 
-/**
- * gtk_source_style_scheme_get_tag_style:
- * @scheme: a #GtkSourceStyleScheme.
- * @style_name: the name of a style.
- *
- * Gets the tag associated with the given @style_name in the style @scheme.
- *
- * Return value: a #GtkSourceTagStyle.
- **/
-GtkSourceTagStyle *
-gtk_source_style_scheme_get_tag_style (GtkSourceStyleScheme *scheme,
-				       const gchar          *style_name)
+static void
+gtk_source_style_scheme_init (GtkSourceStyleScheme *scheme)
 {
+	scheme->priv = G_TYPE_INSTANCE_GET_PRIVATE (scheme, GTK_TYPE_SOURCE_STYLE_SCHEME,
+						    GtkSourceStyleSchemePrivate);
+	scheme->priv->styles = g_hash_table_new_full (g_str_hash, g_str_equal, g_free,
+						      (GDestroyNotify) gtk_source_style_free);
+}
+
+GtkSourceStyleScheme *
+gtk_source_style_scheme_new (GtkSourceStyleScheme *parent)
+{
+	GtkSourceStyleScheme *scheme;
+
+	g_return_val_if_fail (!parent || GTK_IS_SOURCE_STYLE_SCHEME (parent), NULL);
+
+	scheme = g_object_new (GTK_TYPE_SOURCE_STYLE_SCHEME, NULL);
+
+	if (parent)
+		scheme->priv->parent = g_object_ref (parent);
+
+	return scheme;
+}
+
+GtkSourceStyle *
+gtk_source_style_scheme_get_style (GtkSourceStyleScheme *scheme,
+				   const gchar          *style_name)
+{
+	GtkSourceStyle *style = NULL;
+
 	g_return_val_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme), NULL);
 	g_return_val_if_fail (style_name != NULL, NULL);
 
-	return GTK_SOURCE_STYLE_SCHEME_GET_CLASS (scheme)->get_tag_style (scheme, style_name);
-}
+	style = g_hash_table_lookup (scheme->priv->styles, style_name);
 
-/**
- * gtk_source_style_scheme_get_name:
- * @scheme: a #GtkSourceStyleScheme.
- *
- * Gets the name of the given style @scheme.
- *
- * Return value: the name of the style scheme.
- **/
-const gchar *
-gtk_source_style_scheme_get_name (GtkSourceStyleScheme *scheme)
-{
-	g_return_val_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme), NULL);
+	if (style)
+		return gtk_source_style_copy (style);
 
-	return GTK_SOURCE_STYLE_SCHEME_GET_CLASS (scheme)->get_name (scheme);
-}
-
-/**
- * gtk_source_style_scheme_get_style_names:
- * @scheme: a #GtkSourceStyleScheme.
- *
- * Gets a list of style names in the given style @scheme.
- *
- * Return value: a list of 
- **/
-GSList *
-gtk_source_style_scheme_get_style_names (GtkSourceStyleScheme *scheme)
-{
-	g_return_val_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme), NULL);
-
-	return GTK_SOURCE_STYLE_SCHEME_GET_CLASS (scheme)->get_style_names (scheme);
-}
-
-
-/* Default Style Scheme */
-
-#define GTK_TYPE_SOURCE_DEFAULT_STYLE_SCHEME            (gtk_source_default_style_scheme_get_type ())
-#define GTK_SOURCE_DEFAULT_STYLE_SCHEME(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), GTK_TYPE_SOURCE_DEFAULT_STYLE_SCHEME, GtkSourceDefaultStyleScheme))
-#define GTK_SOURCE_DEFAULT_STYLE_SCHEME_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), GTK_TYPE_SOURCE_DEFAULT_STYLE_SCHEME, GtkSourceDefaultStyleSchemeClass))
-#define GTK_IS_SOURCE_DEFAULT_STYLE_SCHEME(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GTK_TYPE_SOURCE_DEFAULT_STYLE_SCHEME))
-#define GTK_IS_SOURCE_DEFAULT_STYLE_SCHEME_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), GTK_TYPE_SOURCE_DEFAULT_STYLE_SCHEME))
-#define GTK_SOURCE_DEFAULT_STYLE_SCHEME_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), GTK_TYPE_SOURCE_DEFAULT_STYLE_SCHEME, GtkSourceDefaultStyleSchemeClass))
-
-
-typedef struct _GtkSourceDefaultStyleScheme     	GtkSourceDefaultStyleScheme;
-typedef struct _GtkSourceDefaultStyleSchemeClass	GtkSourceDefaultStyleSchemeClass;
-
-struct _GtkSourceDefaultStyleScheme
-{
-	 GObject 	 parent_instance;
-
-	 GHashTable	*styles;
-};
-
-struct _GtkSourceDefaultStyleSchemeClass
-{
-	GObjectClass 	 parent_class;
-};
-
-static GObjectClass *parent_class = NULL;
-
-static GType  gtk_source_default_style_scheme_get_type		(void);
-
-static void   gtk_source_default_style_scheme_class_init	(GtkSourceDefaultStyleSchemeClass *klass);
-static void   gtk_source_default_style_scheme_IFace_init	(GtkSourceStyleSchemeClass     	 *iface);
-static void   gtk_source_default_style_scheme_init		(GtkSourceDefaultStyleScheme	 *scheme);
-static void   gtk_source_default_style_scheme_finalize		(GObject			 *object);
-
-static GtkSourceTagStyle *gtk_source_default_style_scheme_get_tag_style 
-								(GtkSourceStyleScheme *scheme,
-								 const gchar          *style_name);
-static const gchar *gtk_source_default_style_scheme_get_name 	(GtkSourceStyleScheme *scheme);
-static GSList *gtk_source_default_style_scheme_get_style_names  (GtkSourceStyleScheme *scheme);
-
-
-static GType
-gtk_source_default_style_scheme_get_type (void)
-{
-	static GType type = 0;
-
-	if (!type)
-	{
-		static const GTypeInfo info =
-      		{
-			sizeof (GtkSourceDefaultStyleSchemeClass),
-			NULL,		/* base_init */
-			NULL,		/* base_finalize */
-			(GClassInitFunc) gtk_source_default_style_scheme_class_init,
-			NULL,		/* class_finalize */
-			NULL,		/* class_data */
-			sizeof (GtkSourceDefaultStyleScheme),
-			0,		/* n_preallocs */
-			(GInstanceInitFunc) gtk_source_default_style_scheme_init,
-		};
-      
-		static const GInterfaceInfo iface_info =
-		{
-			(GInterfaceInitFunc) gtk_source_default_style_scheme_IFace_init, /* interface_init */
-			NULL,			                         /* interface_finalize */
-			NULL			                         /* interface_data */
-		};
-
-		type = g_type_register_static (G_TYPE_OBJECT, 
-					       "GtkSourceDefaultStyleScheme",
-					       &info, 
-					       0);
-
-		g_type_add_interface_static (type,
-					     GTK_TYPE_SOURCE_STYLE_SCHEME,
-					     &iface_info);
-	}
-	
-	return type;
+	if (scheme->priv->parent)
+		return gtk_source_style_scheme_get_style (scheme->priv->parent,
+							  style_name);
+	else
+		return NULL;
 }
 
 static void
-gtk_source_default_style_scheme_class_init (GtkSourceDefaultStyleSchemeClass *klass)
+add_style (GtkSourceStyleScheme *scheme,
+	   const char           *name,
+	   GtkSourceStyleMask    mask,
+	   const char           *foreground,
+	   const char           *background,
+	   gboolean              italic,
+	   gboolean              bold,
+	   gboolean              underline,
+	   gboolean              strikethrough)
 {
-	GObjectClass *gobject_class = G_OBJECT_CLASS (klass);
-	
-	parent_class = g_type_class_peek_parent (klass);
+	GtkSourceStyle *style;
 
-	gobject_class->finalize = gtk_source_default_style_scheme_finalize;
+	style = gtk_source_style_new (mask);
+
+	if (mask & GTK_SOURCE_STYLE_USE_FOREGROUND)
+		gdk_color_parse (foreground, &style->foreground);
+	if (mask & GTK_SOURCE_STYLE_USE_BACKGROUND)
+		gdk_color_parse (background, &style->background);
+
+	style->italic = italic;
+	style->bold = bold;
+	style->underline = underline;
+	style->strikethrough = strikethrough;
+
+	g_hash_table_insert (scheme->priv->styles, g_strdup (name), style);
 }
 
-static void   
-gtk_source_default_style_scheme_IFace_init (GtkSourceStyleSchemeClass *iface)
-{
-	iface->get_tag_style 	= gtk_source_default_style_scheme_get_tag_style;
-	iface->get_name		= gtk_source_default_style_scheme_get_name;
-	iface->get_style_names  = gtk_source_default_style_scheme_get_style_names;
-}
-
-static void
-insert_new_tag_style (GHashTable  *styles,
-		      const gchar *id,
-		      const gchar *foreground,
-		      const gchar *background,
-		      gboolean     bold,
-		      gboolean     italic,
-		      gboolean     underline)
-{
-	GtkSourceTagStyle *ts;
-
-	ts = gtk_source_tag_style_new ();
-
-	if (foreground != NULL)
-	{
-		gdk_color_parse (foreground, &ts->foreground);
-		ts->mask |= GTK_SOURCE_TAG_STYLE_USE_FOREGROUND;
-	}
-
-	if (background != NULL)
-	{
-		gdk_color_parse (background, &ts->background);
-		ts->mask |= GTK_SOURCE_TAG_STYLE_USE_BACKGROUND;
-	}
-
-	ts->italic= italic;
-	ts->bold= bold;
-	ts->underline = underline;
-	ts->is_default= TRUE;
-
-	g_hash_table_insert (styles, g_strdup (id), ts);
-}
-
-static void
-gtk_source_default_style_scheme_init (GtkSourceDefaultStyleScheme *scheme)
-{
-	scheme->styles = g_hash_table_new_full ((GHashFunc) g_str_hash,
-			(GEqualFunc) g_str_equal,
-			(GDestroyNotify) g_free,
-			(GDestroyNotify) gtk_source_tag_style_free);
-
-	insert_new_tag_style (scheme->styles, N_("Base-N Integer"), 
-			"#FF00FF", NULL, FALSE, FALSE, FALSE);
-	
-	insert_new_tag_style (scheme->styles, "def:base-n-integer", 
-			"#FF00FF", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, N_("Character"),
-			"#FF00FF", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, N_("def:character"),
-			"#FF00FF", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, N_("Comment"),
-			"#0000FF", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, "def:comment",
-			"#0000FF", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, N_("Data Type"),
-			"#2E8B57", NULL, TRUE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, "def:data-type",
-			"#2E8B57", NULL, TRUE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, N_("Function"),
-			"#008A8C", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, "def:function",
-			"#008A8C", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, N_("Decimal"),
-			"#FF00FF", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, "def:decimal",
-			"#FF00FF", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, N_("Floating Point"),
-			"#FF00FF", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, "def:floating-point",
-			"#FF00FF", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, N_("Keyword"),
-			"#A52A2A", NULL, TRUE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, "def:keyword",
-			"#A52A2A", NULL, TRUE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, N_("Preprocessor"),
-			"#A020F0", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, "def:preprocessor",
-			"#A020F0", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, N_("String"),
-			"#FF00FF", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, "def:string",
-			"#FF00FF", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, N_("Specials"),
-			"#FFFFFF", "#FF0000", FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, "def:specials",
-			"#FFFFFF", "#FF0000", FALSE, FALSE, FALSE);
-
-	/* "Others" is DEPRECATED, it has been replaced by "Data Type" */
-	insert_new_tag_style (scheme->styles, N_("Others"),
-			"#2E8B57", NULL, TRUE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, N_("def:others"),
-			"#2E8B57", NULL, TRUE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, N_("Others 2"),
-			"#008B8B", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, N_("def:others2"),
-			"#008B8B", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, N_("Others 3"),
-			"#6A5ACD", NULL, FALSE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, N_("def:others3"),
-			"#6A5ACD", NULL, FALSE, FALSE, FALSE);
-
-	/* Styles added for the context engine */
-	insert_new_tag_style (scheme->styles, "def:net-address",
-	                      "#0000FF", NULL, FALSE, TRUE, TRUE);
-
-	insert_new_tag_style (scheme->styles, "def:note",
-	                      "#0000FF", "#FFFF00", TRUE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, "def:error",
-	                      NULL, "#FF0000", TRUE, FALSE, FALSE);
-
-	insert_new_tag_style (scheme->styles, "def:package",
-	                      "#FF00FF", NULL, TRUE, FALSE, FALSE);
-	
-	insert_new_tag_style (scheme->styles, "def:escape",
-	                      "#9010D0", NULL, FALSE, FALSE, FALSE);
-}
-
-static void 
-gtk_source_default_style_scheme_finalize (GObject *object)
-{
-	GtkSourceDefaultStyleScheme *scheme = GTK_SOURCE_DEFAULT_STYLE_SCHEME (object);
-	
-	g_hash_table_destroy (scheme->styles);
-
-	G_OBJECT_CLASS (parent_class)->finalize (object);
-}
-
-
-static GtkSourceTagStyle *
-gtk_source_default_style_scheme_get_tag_style (GtkSourceStyleScheme *scheme,
-					       const gchar          *style_name)
-{
-	GtkSourceDefaultStyleScheme *ds;
-	const gpointer *style;
-
-	g_return_val_if_fail (GTK_IS_SOURCE_DEFAULT_STYLE_SCHEME (scheme), NULL);
-	g_return_val_if_fail (style_name != NULL, NULL);
-
-	ds = GTK_SOURCE_DEFAULT_STYLE_SCHEME (scheme);
-
-	style = g_hash_table_lookup (ds->styles, style_name);
-
-	return (style != NULL) ? gtk_source_tag_style_copy ((GtkSourceTagStyle *)style) : NULL;
-}
-
-static const gchar *
-gtk_source_default_style_scheme_get_name (GtkSourceStyleScheme *scheme)
-{
-	g_return_val_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme), NULL);
-
-	return _("Default");
-}
-
-static void
-add_style_name (gpointer key, gpointer value, gpointer user_data)
-{
-	GSList **l = user_data;
-
-	*l = g_slist_append (*l, g_strdup (key));
-}
-
-static GSList *
-gtk_source_default_style_scheme_get_style_names (GtkSourceStyleScheme *scheme)
-{
-	GtkSourceDefaultStyleScheme *ds;
-	GSList *l = NULL;
-
-	g_return_val_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme), NULL);
-
-	ds = GTK_SOURCE_DEFAULT_STYLE_SCHEME (scheme);
-
-	g_hash_table_foreach (ds->styles, add_style_name, &l);
-
-	return l;
-}
-
-/* Default style scheme */
-
-static GtkSourceStyleScheme* default_style_scheme = NULL;
-
-/**
- * gtk_source_style_scheme_get_default:
- *
- * Gets the default style scheme.
- *
- * Return value: a #GtkSourceStyleScheme.
- **/
 GtkSourceStyleScheme *
 gtk_source_style_scheme_get_default (void)
 {
-	if (default_style_scheme == NULL)
-	{
-		GtkSourceStyleScheme **ptr = &default_style_scheme;
-		
-		default_style_scheme = g_object_new (GTK_TYPE_SOURCE_DEFAULT_STYLE_SCHEME,
-						     NULL);
-		g_object_add_weak_pointer (G_OBJECT (default_style_scheme),
-					   (gpointer *) ptr);
-	}
-	else
-		g_object_ref (default_style_scheme);
+	if (default_scheme)
+		return g_object_ref (default_scheme);
 
-	return default_style_scheme;
+	default_scheme = gtk_source_style_scheme_new (NULL);
+	g_object_add_weak_pointer (G_OBJECT (default_scheme),
+				   (gpointer *) &default_scheme);
+
+#define ADD_FORE(name,color)					\
+	add_style (default_scheme, name,			\
+		   GTK_SOURCE_STYLE_USE_FOREGROUND,		\
+		   color, NULL, FALSE, FALSE, FALSE, FALSE)
+#define ADD_FORE_BOLD(name,color)				\
+	add_style (default_scheme, name,			\
+		   GTK_SOURCE_STYLE_USE_FOREGROUND |		\
+			GTK_SOURCE_STYLE_USE_BOLD,		\
+		   color, NULL, FALSE, TRUE, FALSE, FALSE)
+
+	ADD_FORE ("def:base-n-integer", "#FF00FF");
+	ADD_FORE ("def:character", "#FF00FF");
+	ADD_FORE ("def:comment", "#0000FF");
+	ADD_FORE_BOLD ("def:data-type", "#2E8B57");
+	ADD_FORE ("def:function", "#008A8C");
+	ADD_FORE ("def:decimal", "#FF00FF");
+	ADD_FORE ("def:floating-point", "#FF00FF");
+	ADD_FORE_BOLD ("def:keyword", "#A52A2A");
+	ADD_FORE ("def:preprocessor", "#A020F0");
+	ADD_FORE ("def:string", "#FF00FF");
+
+	add_style (default_scheme, "def:specials",
+		   GTK_SOURCE_STYLE_USE_FOREGROUND |
+			GTK_SOURCE_STYLE_USE_BACKGROUND,
+		   "#FFFFFF", "#FF0000", FALSE, FALSE, FALSE, FALSE);
+
+	ADD_FORE_BOLD ("def:others", "#2E8B57");
+	ADD_FORE ("def:others2", "#008B8B");
+	ADD_FORE ("def:others3", "#6A5ACD");
+
+	add_style (default_scheme, "def:net-address",
+		   GTK_SOURCE_STYLE_USE_FOREGROUND |
+			GTK_SOURCE_STYLE_USE_ITALIC |
+			GTK_SOURCE_STYLE_USE_UNDERLINE,
+		   "#0000FF", NULL, TRUE, FALSE, TRUE, FALSE);
+
+	add_style (default_scheme, "def:note",
+		   GTK_SOURCE_STYLE_USE_FOREGROUND |
+			GTK_SOURCE_STYLE_USE_BACKGROUND |
+			GTK_SOURCE_STYLE_USE_BOLD,
+		   "#0000FF", "#FFFF00", FALSE, TRUE, FALSE, FALSE);
+
+	add_style (default_scheme, "def:error",
+		   GTK_SOURCE_STYLE_USE_BACKGROUND |
+			GTK_SOURCE_STYLE_USE_BOLD,
+		   NULL, "#FF0000", FALSE, TRUE, FALSE, FALSE);
+
+	ADD_FORE_BOLD ("def:package", "#FF00FF");
+	ADD_FORE ("def:escape", "#9010D0");
+
+#undef ADD_FORE
+#undef ADD_FORE_BOLD
+
+	return default_scheme;
 }

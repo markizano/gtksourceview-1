@@ -1,9 +1,6 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- 
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*-
  *  gtksourcetag.h
  *
- *  Copyright (C) 2001
- *  Mikael Hermansson<tyan@linux.se>
- *  Chris Phelps <chicane@reninet.com>
  *  Copyright (C) 2003 - Paolo Maggi <paolo.maggi@polito.it>
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -25,7 +22,6 @@
 #define __GTK_SOURCE_TAG_H__
 
 #include <gtk/gtktexttag.h>
-#include <gtksourceview/gtksourcetagstyle.h>
 
 G_BEGIN_DECLS
 
@@ -36,23 +32,21 @@ G_BEGIN_DECLS
 #define GTK_IS_SOURCE_TAG_CLASS(klass)  (G_TYPE_CHECK_CLASS_TYPE ((klass), GTK_TYPE_SOURCE_TAG))
 #define GTK_SOURCE_TAG_GET_CLASS(obj)   (G_TYPE_INSTANCE_GET_CLASS ((obj), GTK_TYPE_SOURCE_TAG, GtkSourceTagClass))
 
-typedef struct _GtkSourceTag        GtkSourceTag;
-typedef struct _GtkSourceTagClass   GtkSourceTagClass;
+typedef struct _GtkSourceTag       GtkSourceTag;
+typedef struct _GtkSourceTagClass  GtkSourceTagClass;
 
-GType              gtk_source_tag_get_type            (void) G_GNUC_CONST;
+struct _GtkSourceTag
+{
+	GtkTextTag base;
+};
 
-GtkTextTag        *gtk_source_tag_new                 (const gchar               *id,
-						       const gchar               *name);
-gchar             *gtk_source_tag_get_translated_name (GtkSourceTag		 *tag);
-void               gtk_source_tag_set_translated_name (GtkSourceTag		 *tag,
-						       const gchar               *tr_name);
+struct _GtkSourceTagClass
+{
+	GtkTextTagClass base_class;
+};
 
-gchar              *gtk_source_tag_get_id	(GtkSourceTag		 *tag);
-
-GtkSourceTagStyle *gtk_source_tag_get_style           (GtkSourceTag              *tag);
-void               gtk_source_tag_set_style           (GtkSourceTag              *tag,
-						       const GtkSourceTagStyle   *style);
+GType gtk_source_tag_get_type (void) G_GNUC_CONST;
 
 G_END_DECLS
 
-#endif
+#endif  /* __GTK_SOURCE_TAG_H__ */

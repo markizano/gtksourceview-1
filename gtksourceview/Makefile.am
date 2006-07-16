@@ -10,6 +10,7 @@ INCLUDES = 				\
 	-DDATADIR=\""$(datadir)"\" 	\
 	-DG_LOG_DOMAIN=\"GtkSourceView\"\
 	-I$(top_srcdir) -I$(srcdir) 	\
+	-I$(srcdir)/libegg/regex 	\
 	$(DEPRECATED_FLAGS)		\
 	$(WARN_CFLAGS) 			\
 	$(DEP_CFLAGS)
@@ -30,17 +31,14 @@ libgtksourceview_headers =			\
 	gtksourceview.h				\
 	gtksourcelanguage.h			\
 	gtksourcelanguagesmanager.h		\
-	gtksourcetagstyle.h			\
-	gtksourcetagtable.h			\
+	gtksourcestyle.h			\
 	gtksourcestylescheme.h			\
-	gtksourcemarker.h			\
-	gtksourceengine.h
+	gtksourcemarker.h
 
 libgtksourceview_1_0_la_SOURCES = 	\
 	gtksourcebuffer.c 		\
 	gtksourceiter.c			\
 	gtksourcetag.c 			\
-	gtksourcetag-private.h 		\
 	gtksourceview.c 		\
 	gtksourceundomanager.h 		\
 	gtksourceundomanager.c 		\
@@ -49,16 +47,14 @@ libgtksourceview_1_0_la_SOURCES = 	\
 	gtksourcelanguage.c 		\
 	gtksourcelanguage-private.h 	\
 	gtksourcelanguagesmanager.c 	\
-	gtksourcelanguage-parser-1.c	\
 	gtksourcelanguage-parser-2.c	\
 	gtksourceview-i18n.h 		\
 	gtksourceview-i18n.c		\
-	gtksourcetagtable.c		\
+	gtksourcestyle.c		\
 	gtksourcestylescheme.c		\
 	gtksourcemarker.c		\
+	gtksourceengine.h		\
 	gtksourceengine.c		\
-	gtksourcesimpleengine.h		\
-	gtksourcesimpleengine.c		\
 	gtksourcecontextengine.h	\
 	gtksourcecontextengine.c	\
 	$(libgtksourceview_headers)	\
@@ -116,6 +112,13 @@ $(srcdir)/gtksourceview-typebuiltins.h: Makefile.am $(libgtksourceview_headers)
 	&& rm -f xgen-gth
 
 EXTRA_DIST = 				\
-	gtksourceview-marshal.list
+	gtksourceview-marshal.list	\
+	gtksourcetagstyle.h		\
+	gtksourcetagtable.h		\
+	gtksourcetagtable.c		\
+	gtksourcelanguage-parser-1.c	\
+	gtksourcetag-private.h 		\
+	gtksourcesimpleengine.h		\
+	gtksourcesimpleengine.c
 
 CLEANFILES = $(BUILT_SOURCES)
