@@ -1,5 +1,20 @@
 2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* configure.in:
+	* gtksourceview-1.0.pc.in: removed
+	* gtksourceview-2.0.pc.in: added
+	* gtksourceview-zip.in:
+	* Makefile.am:
+	* docs/reference/lang-reference.sgml:
+	* docs/reference/Makefile.am:
+	* gtksourceview/language-specs/Makefile.am:
+	* gtksourceview/gtksourcelanguagesmanager.c: use G_DEFINE_TYPE
+	* gtksourceview/Makefile.am:
+	* tests/Makefile.am:
+		Changed library version to 2.0.
+
+2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	New version of syntax highlighting, with modifications stored
 	in the tree.
 

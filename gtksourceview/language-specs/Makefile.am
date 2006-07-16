@@ -45,8 +45,8 @@ LANGUAGES =			\
 
 EXTRA_DIST = $(SCHEMAS) $(LANGUAGES)
 
-languagesdir = $(datadir)/gtksourceview-1.0/language-specs
+languagesdir = $(datadir)/gtksourceview-2.0/language-specs
 languages_DATA = $(LANGUAGES)
 
-schemasdir = $(datadir)/gtksourceview-1.0/schemas
+schemasdir = $(datadir)/gtksourceview-2.0/schemas
 schemas_DATA = $(SCHEMAS)

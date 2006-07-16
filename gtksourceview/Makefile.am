@@ -22,7 +22,7 @@ BUILT_SOURCES = 			\
 	gtksourceview-typebuiltins.h
 
 # libs
-lib_LTLIBRARIES = libgtksourceview-1.0.la
+lib_LTLIBRARIES = libgtksourceview-2.0.la
 
 libgtksourceview_headers =			\
 	gtksourcebuffer.h			\
@@ -35,7 +35,7 @@ libgtksourceview_headers =			\
 	gtksourcestylescheme.h			\
 	gtksourcemarker.h
 
-libgtksourceview_1_0_la_SOURCES = 	\
+libgtksourceview_2_0_la_SOURCES = 	\
 	gtksourcebuffer.c 		\
 	gtksourceiter.c			\
 	gtksourcetag.c 			\
@@ -61,13 +61,13 @@ libgtksourceview_1_0_la_SOURCES = 	\
 	$(BUILT_SOURCES)
 
 
-libgtksourceview_1_0_la_LIBADD = $(DEP_LIBS) $(EGGREGEX_LIBS)
+libgtksourceview_2_0_la_LIBADD = $(DEP_LIBS) $(EGGREGEX_LIBS)
 
-libgtksourceview_1_0_la_LDFLAGS = -no-undefined
+libgtksourceview_2_0_la_LDFLAGS = -no-undefined
 
-libgtksourceview_1_0_includedir = $(includedir)/gtksourceview-1.0/gtksourceview
+libgtksourceview_2_0_includedir = $(includedir)/gtksourceview-2.0/gtksourceview
 
-libgtksourceview_1_0_include_HEADERS =		\
+libgtksourceview_2_0_include_HEADERS =		\
 	$(libgtksourceview_headers)		\
 	gtksourceview-typebuiltins.h
 

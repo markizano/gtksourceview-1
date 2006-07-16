@@ -15,10 +15,10 @@ Reference to the GtkSourceView language definition file format
 <para>
 This is an overview of the Language Definition XML format, describing the
 meaning and usage of every element and attribute.  The formal definition is
-stored in the RelaxNG schema file <filename>language2.rng</filename> which 
-should be installed on your system in the directory 
-<filename>${PREFIX}/share/gtksourceview-1.0/schemas/</filename> (where 
-${PREFIX} can be <filename>/usr/</filename> or 
+stored in the RelaxNG schema file <filename>language2.rng</filename> which
+should be installed on your system in the directory
+<filename>${PREFIX}/share/gtksourceview-2.0/schemas/</filename> (where
+${PREFIX} can be <filename>/usr/</filename> or
 <filename>/usr/local/</filename> if you have installed from source.
 </para>
 </refsect1>
@@ -30,7 +30,7 @@ The root element for Language Definition files.
 </para>
 
 <para>
-Contained elements: 
+Contained elements:
 <simplelist type="inline">
 <member><code>&lt;metadata&gt;</code> (optional)</member>
 <member><code>&lt;styles&gt;</code> (optional)</member>
@@ -74,7 +74,7 @@ The version of the XML format (currently "2.0").
 <listitem><para>
 The translatable category in which the language has to be grouped when
 presented to the user. It can be marked for translation putting
-an underscore before the attribute name. Currently used categories in 
+an underscore before the attribute name. Currently used categories in
 GtkSourceView are "Sources", "Scripts",  "Markup" and "Others", but
 it is possible to use arbitrary categories (while usually discouraged).
 </para></listitem>
@@ -84,7 +84,7 @@ it is possible to use arbitrary categories (while usually discouraged).
 <term><code>mimetypes</code> (optional)</term>
 <listitem><para>
 The list of mimetypes associated to the language.
-Each mimetype has to be separated with a semicolon.	
+Each mimetype has to be separated with a semicolon.
 </para></listitem>
 </varlistentry>
 
@@ -110,12 +110,12 @@ different namespaces (e.g. Dublin Core metadata elements, etc.)
 <title>Tag <code>&lt;styles&gt;</code></title>
 
 <para>
-Contains the definitions of every style used in the current language and 
+Contains the definitions of every style used in the current language and
 their association with predefined styles in GtkSourceView.
 </para>
 
 <para>
-Contained elements: 
+Contained elements:
 <simplelist type="inline">
 <member><code>&lt;style&gt;</code> (one or more)</member>
 </simplelist>.
@@ -127,7 +127,7 @@ Contained elements:
 <title>Tag <code>&lt;style&gt;</code></title>
 
 <para>
-Defines a style, associating it's id with a user visible translatable 
+Defines a style, associating it's id with a user visible translatable
 name and a default style.
 </para>
 
@@ -142,8 +142,8 @@ Contained elements: none.
 <term><code>id</code> (mandatory)</term>
 <listitem><para>
 Identifier for the style. This is used in the current language
-to refer to this style and must be unique for the current document. 
-It can contain a string of letters, digits, 
+to refer to this style and must be unique for the current document.
+It can contain a string of letters, digits,
 hyphens ("<code>-</code>") and underscores ("<code>_</code>").
 </para></listitem>
 </varlistentry>
@@ -151,7 +151,7 @@ hyphens ("<code>-</code>") and underscores ("<code>_</code>").
 <varlistentry>
 <term><code>name</code> (mandatory)</term>
 <listitem><para>
-The user visible translatable name for the style. It has to be preceded 
+The user visible translatable name for the style. It has to be preceded
 with a underscore ("<code>_</code>") to be marked for translation.
 </para></listitem>
 </varlistentry>
@@ -178,7 +178,7 @@ style.
 <para>
 Contains a regex character class used to redefine the customizable
 word boundary delimiters "\%[" and "\%]". This class is the set of character
-that can be commonly found in a keyword. 
+that can be commonly found in a keyword.
 If the element is omitted the two delimiters default to "\b".
 </para>
 
@@ -192,7 +192,7 @@ Contained elements: none.
 <title>Tag <code>&lt;default-regex-options&gt;</code></title>
 
 <para>
-A string that will set the default regular expression options. 
+A string that will set the default regular expression options.
 Avaliable options are:
 </para>
 
@@ -231,10 +231,10 @@ Contained elements: none.
 <para>
 The element containing the real description of the syntax to be
 highlighted. It contains one or more <code>&lt;context&gt;</code> element and an
-arbitrary number of <code>&lt;define-regex&gt;</code> elements, interleaved. 
+arbitrary number of <code>&lt;define-regex&gt;</code> elements, interleaved.
 It has no attributes.
 Every contained element must have its <code>id</code> attribute set to an
-identifier unique for the document. Exactly one of the contained 
+identifier unique for the document. Exactly one of the contained
 <code>&lt;context&gt;</code> element must have
 the <code>id</code> attribute set to the <code>id</code> of the
 <code>&lt;language&gt;</code> root element,
@@ -243,7 +243,7 @@ enters at the beginning of the highlighted file.
 </para>
 
 <para>
-Contained elements: 
+Contained elements:
 <simplelist type="inline">
 <member><code>&lt;context&gt;</code> (one or more)</member>
 <member><code>&lt;define-regex&gt;</code> (zero or more)</member>
@@ -293,8 +293,8 @@ Contained elements: none.
 <term><code>id</code> (mandatory)</term>
 <listitem><para>
 Identifier for the regular expression. This is used
-for the inclusion of the defined regular expression and must be unique 
-for the current document. It can contain a string of letters, digits, 
+for the inclusion of the defined regular expression and must be unique
+for the current document. It can contain a string of letters, digits,
 hyphens ("<code>-</code>") and underscores ("<code>_</code>").
 </para></listitem>
 </varlistentry>
@@ -308,8 +308,8 @@ hyphens ("<code>-</code>") and underscores ("<code>_</code>").
 <para>
 This is the most important element when describing the syntax: the file to
 be highlighted is partitioned in contexts representing the portions to be
-colored differently. Contexts can also contain other contexts. 
-There are different kind of context elements: simple contexts, container 
+colored differently. Contexts can also contain other contexts.
+There are different kind of context elements: simple contexts, container
 contexts, sub-pattern contexts, reference contexts and keyword contexts.
 </para>
 
@@ -322,7 +322,7 @@ element. In the <code>&lt;include&gt;</code> element you
 can only put sub-pattern contexts.
 
 <para>
-Contained elements: 
+Contained elements:
 <simplelist type="inline">
 <member><code>&lt;match&gt;</code> (mandatory)</member>
 </simplelist>.
@@ -353,18 +353,18 @@ priority than the end of he parent. If not specified it defaults to
 
 <refsect2>
 <title>Container contexts</title>
-They contain a <code>&lt;start&gt;</code> element and an optional 
+They contain a <code>&lt;start&gt;</code> element and an optional
 <code>&lt;end&gt;</code>. They respectively contain the regular
 expression that makes the engine enter in the context and the terminating one.
 In the optional <code>&lt;include&gt;</code> element you can put contained
 contexts of every type (simple, container, sub-pattern or reference).
-If the <code>&lt;start&gt;</code> element is omitted, then the 
-<code>id</code> attribute and the <code>&lt;include&gt;</code> become 
-mandatory (the context can only be used as a container to include 
+If the <code>&lt;start&gt;</code> element is omitted, then the
+<code>id</code> attribute and the <code>&lt;include&gt;</code> become
+mandatory (the context can only be used as a container to include
 its children).
 
 <para>
-Contained elements: 
+Contained elements:
 <simplelist type="inline">
 <member><code>&lt;start&gt;</code> (optional)</member>
 <member><code>&lt;end&gt;</code> (optional)</member>
@@ -405,7 +405,7 @@ it defaults to <code>false</code>.
 <title>Sub-pattern contexts</title>
 
 <para>
-They refer to a group in a regular expression of the parent context, so it 
+They refer to a group in a regular expression of the parent context, so it
 is possible to highlight differently only a portion of the matched regular
 expression.
 </para>
@@ -421,7 +421,7 @@ Contained elements: none.
 <varlistentry>
 <term><code>id</code> (optional)</term>
 <listitem><para>
-A unique identifier for the context. It can contain a string of letters, 
+A unique identifier for the context. It can contain a string of letters,
 digits, hyphens ("<code>-</code>") and underscores ("<code>_</code>").
 </para></listitem></varlistentry>
 
@@ -436,8 +436,8 @@ also use the name.
 <varlistentry>
 <term><code>where</code> (mandatory only in container contexts)</term>
 <listitem><para>
-Can be "<code>start</code>" or "<code>end</code>". It has to be used 
-only if the parent is a container context to specify whether the 
+Can be "<code>start</code>" or "<code>end</code>". It has to be used
+only if the parent is a container context to specify whether the
 sub-pattern is in the regular
 expression of the <code>&lt;start&gt;</code> or the <code>&lt;end&gt;</code>
 element. In simple contexts it must be omitted.
@@ -479,11 +479,11 @@ external language.
 <para>
 They contain a list of <code>&lt;keyword&gt;</code> and matches every keyword
 listed. You can also put a <code>&lt;prefix&gt;</code> and/or a
-<code>&lt;suffix&gt;</code> common to every keyword. 
+<code>&lt;suffix&gt;</code> common to every keyword.
 </para>
 
 <para>
-Contained elements: 
+Contained elements:
 <simplelist type="inline">
 <member><code>&lt;prefix&gt;</code> (optional)</member>
 <member><code>&lt;suffix&gt;</code> (optional)</member>
@@ -507,7 +507,7 @@ Contains the list of context contained in the current
 </para>
 
 <para>
-Contained elements: 
+Contained elements:
 <simplelist type="inline">
 <member><code>&lt;context&gt;</code> (one or more)</member>
 <member><code>&lt;define-regex&gt;</code> (zero or more)</member>
@@ -536,7 +536,7 @@ Contained elements: none.
 <para>
 Contains the starting regular expression for the current container context.
 The expression is in the same form used in <code>&lt;define-regex&gt;</code>
-elements. 
+elements.
 </para>
 
 <para>
