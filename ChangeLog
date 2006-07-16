@@ -1,5 +1,12 @@
 2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourceundomanager.c: changed DEFAULT_MAX_UNDO_LEVELS
+        from 25 to -1; made it use G_DEFINE_TYPE.
+	* gtksourceview/gtksourceview.c: use G_DEFINE_TYPE.
+        (gtk_sourceview_expose): do not try to draw too many lines.
+
+2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/language-specs/def.lang: added C-like trailing
 	backslash "line-continue" context.
 	* gtksourceview/language-specs/c.lang: use it here.
