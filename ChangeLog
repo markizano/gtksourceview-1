@@ -1,5 +1,11 @@
 2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c: fixed update_syntax()
+	return value and invalidating end of batch in case when the batch
+	was not enough.
+
+2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcelanguage-parser-2.c:
 	* gtksourceview/gtksourcelanguage-private.h:
 	* gtksourceview/gtksourcelanguage.[ch]:

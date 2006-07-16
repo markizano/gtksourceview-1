@@ -3174,6 +3174,16 @@ segment_remove (GtkSourceContextEngine *ce,
 	else
 		segment->parent->children = segment->next;
 
+	if (ce->priv->hint == segment)
+	{
+		if (segment->next)
+			ce->priv->hint = segment->next;
+		else if (segment->prev)
+			ce->priv->hint = segment->prev;
+		else
+			ce->priv->hint = segment->parent;
+	}
+
 	segment_destroy (ce, segment);
 }
 
@@ -3598,7 +3608,6 @@ update_syntax (GtkSourceContextEngine *ce,
 	Segment *state = ce->priv->root_segment;
 	Segment *hint = ce->priv->hint;
 	GSList *invalid_lines; /* list of start offsets of lines containing invalid segments */
-	gboolean done = FALSE;
 
 	CHECK_TREE (ce);
 
@@ -3750,24 +3759,19 @@ update_syntax (GtkSourceContextEngine *ce,
 			segment_remove (ce, invalid);
 			CHECK_TREE (ce);
 		}
-
-		done = TRUE;
 	}
 	else if (invalid_lines)
 	{
 		invalid = segment_get_invalid (ce, end_offset);
 
-		if (!invalid)
-			done = TRUE;
-		else if (invalid->start_at > end_offset)
+		if (!invalid || invalid->start_at > end_offset)
 			text_inserted (ce, end_offset, 0);
 
 		CHECK_TREE (ce);
 	}
 
-	g_assert (g_slist_length (invalid_lines) <= 1);
 	g_slist_free (invalid_lines);
-	return done;
+	return !ce->priv->invalid;
 }
 
 
