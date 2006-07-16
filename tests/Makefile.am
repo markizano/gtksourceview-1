@@ -2,6 +2,7 @@ INCLUDES = 				\
 	-DDATADIR=\""$(datadir)"\" 	\
 	-DG_LOG_DOMAIN=\"GtkSourceView\"\
 	-I$(top_srcdir) -I$(srcdir) 	\
+	-DTOP_SRCDIR=\""$(top_srcdir)"\"\
 	$(DEPRECATED_FLAGS)		\
 	$(WARN_CFLAGS) 			\
 	$(DEP_CFLAGS)			\

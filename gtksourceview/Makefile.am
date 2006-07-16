@@ -3,7 +3,7 @@ SUBDIRS = language-specs libegg
 if BUILD_EGG_REGEX
 EGGREGEX_LIBS = libegg/regex/libeggregex.la
 else
-EGGREGEX_LIBS = 
+EGGREGEX_LIBS =
 endif
 
 INCLUDES = 				\
@@ -12,8 +12,7 @@ INCLUDES = 				\
 	-I$(top_srcdir) -I$(srcdir) 	\
 	$(DEPRECATED_FLAGS)		\
 	$(WARN_CFLAGS) 			\
-	$(DEP_CFLAGS)			\
-	$(GNOMEPRINT_CFLAGS)
+	$(DEP_CFLAGS)
 
 BUILT_SOURCES = 			\
 	gtksourceview-marshal.c 	\
@@ -66,13 +65,7 @@ libgtksourceview_1_0_la_SOURCES = 	\
 	$(BUILT_SOURCES)
 
 
-if HAVE_GNOMEPRINT
-libgtksourceview_headers += gtksourceprintjob.h
-libgtksourceview_1_0_la_SOURCES += gtksourceprintjob.c gtksourceprintjob.h
-endif
-
-
-libgtksourceview_1_0_la_LIBADD = $(DEP_LIBS) $(EGGREGEX_LIBS) $(GNOMEPRINT_LIBS)
+libgtksourceview_1_0_la_LIBADD = $(DEP_LIBS) $(EGGREGEX_LIBS)
 
 libgtksourceview_1_0_la_LDFLAGS = -no-undefined
 

@@ -3,6 +3,7 @@
 
 srcdir=`dirname $0`
 test -z "$srcdir" && srcdir=.
+srcdir=`cd $srcdir && pwd`
 
 PKG_NAME="gtksourceview"
 
@@ -25,4 +26,3 @@ USE_GNOME2_MACROS=1 NOCONFIGURE=1 . gnome-autogen.sh
 conf_flags="--enable-maintainer-mode --enable-gtk-doc"
 echo $srcdir/configure $conf_flags "$@"
 $srcdir/configure $conf_flags "$@"
-

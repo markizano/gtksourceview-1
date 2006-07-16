@@ -1,3 +1,13 @@
+2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	=== Started soc-2006 branch ===
+
+	* autogen.sh: use absolute path in srcdir to make test-widget
+	find gtksourceview/gtksourcebuffer.c.
+	* configure.in: removed gnomeprint and gnomevfs checks.
+	* tests/Makefile.am, tests/test-widget.c: added TOPSRCDIR
+	define, removed gnomeprint and gnomevfs.
+
 2006-02-03  Marco Barisione  <barisione@gmail.com>
 
 	* gtksourceview/gtksourcecontextengine.c: (context_new): end_at was
