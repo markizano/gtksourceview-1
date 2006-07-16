@@ -599,7 +599,7 @@ _gtk_source_language_create_engine (GtkSourceLanguage *language)
 		break;
 
 	case GTK_SOURCE_LANGUAGE_VERSION_2_0:
-		engine = gtk_source_context_engine_new (language);
+		engine = _gtk_source_context_engine_new (language);
 		if (!_gtk_source_language_file_parse_version2 (language,
 							       GTK_SOURCE_CONTEXT_ENGINE (engine)))
 		{

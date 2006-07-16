@@ -67,12 +67,6 @@ struct _GtkSourceBufferClass
 					 GtkTextIter     *where);
 
 	/* highlighting engines connect to these */
-	void (* text_inserted)          (GtkSourceBuffer   *buffer,
-					 gint               start_offset,
-					 gint               end_offset);
-	void (* text_deleted)           (GtkSourceBuffer   *buffer,
-					 gint               offset,
-					 gint               length);
 	void (* update_highlight)       (GtkSourceBuffer   *buffer,
 					 const GtkTextIter *start,
 					 const GtkTextIter *end,

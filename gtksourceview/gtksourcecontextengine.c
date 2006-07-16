@@ -25,6 +25,7 @@
 #include "gtksourcetag.h"
 #include "gtksourcestylescheme.h"
 #include "gtksourcelanguage-private.h"
+#include "gtksourcebuffer.h"
 #include "eggregex.h"
 #include <errno.h>
 #include <string.h>
@@ -924,12 +925,15 @@ text_inserted (GtkSourceContextEngine *ce,
 }
 
 static void
-text_inserted_cb (GtkSourceContextEngine *ce,
-		  gint                    start_offset,
-		  gint                    end_offset)
+gtk_source_context_engine_text_inserted (GtkSourceEngine *engine,
+					 gint             start_offset,
+					 gint             end_offset)
 {
 	g_return_if_fail (start_offset < end_offset);
-	text_inserted (ce, start_offset, end_offset - start_offset);
+
+	text_inserted (GTK_SOURCE_CONTEXT_ENGINE (engine),
+		       start_offset,
+		       end_offset - start_offset);
 }
 
 static inline gint
@@ -986,12 +990,15 @@ text_deleted (GtkSourceContextEngine *ce,
 };
 
 static void
-text_deleted_cb (GtkSourceContextEngine *ce,
-		 gint                    offset,
-		 gint                    length)
+gtk_source_context_engine_text_deleted (GtkSourceEngine *engine,
+					gint             offset,
+					gint             length)
 {
 	g_return_if_fail (length > 0);
-	text_deleted (ce, offset, offset + length);
+
+	text_deleted (GTK_SOURCE_CONTEXT_ENGINE (engine),
+		      offset,
+		      offset + length);
 }
 
 /**
@@ -1152,7 +1159,7 @@ install_idle_worker (GtkSourceContextEngine *ce)
 
 /* GtkSourceContextEngine class ------------------------------------------- */
 
-G_DEFINE_TYPE (GtkSourceContextEngine, gtk_source_context_engine, GTK_TYPE_SOURCE_ENGINE)
+G_DEFINE_TYPE (GtkSourceContextEngine, _gtk_source_context_engine, GTK_TYPE_SOURCE_ENGINE)
 
 static GQuark
 gtk_source_context_engine_error_quark (void)
@@ -1201,12 +1208,6 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 	{
 		enable_highlight (ce, FALSE);
 
-		g_signal_handlers_disconnect_by_func (ce->priv->buffer,
-						      (gpointer) text_inserted_cb,
-						      ce);
-		g_signal_handlers_disconnect_by_func (ce->priv->buffer,
-						      (gpointer) text_deleted_cb,
-						      ce);
 		g_signal_handlers_disconnect_by_func (ce->priv->buffer,
 						      (gpointer) update_highlight_cb,
 						      ce);
@@ -1275,10 +1276,6 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 		ce->priv->highlight_requests = gtk_text_region_new (buffer);
 		ce->priv->worker_batch_size = INITIAL_WORKER_BATCH;
 
-		g_signal_connect_swapped (buffer, "text_inserted",
-					  G_CALLBACK (text_inserted_cb), ce);
-		g_signal_connect_swapped (buffer, "text_deleted",
-					  G_CALLBACK (text_deleted_cb), ce);
 		g_signal_connect_swapped (buffer, "update_highlight",
 					  G_CALLBACK (update_highlight_cb), ce);
 		g_signal_connect_swapped (buffer, "notify::highlight",
@@ -1287,8 +1284,7 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 					  G_CALLBACK (debug_cb), ce);
 
 		if (gtk_text_buffer_get_char_count (buffer))
-			text_inserted_cb (ce, 0,
-					  gtk_text_buffer_get_char_count (buffer));
+			text_inserted (ce, 0, gtk_text_buffer_get_char_count (buffer));
 	}
 }
 
@@ -1297,9 +1293,13 @@ gtk_source_context_engine_finalize (GObject *object)
 {
 	GtkSourceContextEngine *ce = GTK_SOURCE_CONTEXT_ENGINE (object);
 
-	/* Disconnect the buffer (if there is one), which destroys almost
-	 * everything. */
-	gtk_source_context_engine_attach_buffer (GTK_SOURCE_ENGINE (ce), NULL);
+	if (ce->priv->buffer != NULL)
+	{
+		g_critical ("finalizing engine with attached buffer");
+		/* Disconnect the buffer (if there is one), which destroys almost
+		 * everything. */
+		gtk_source_context_engine_attach_buffer (GTK_SOURCE_ENGINE (ce), NULL);
+	}
 
 	g_assert (!ce->priv->tags);
 	g_assert (!ce->priv->root_context);
@@ -1310,23 +1310,26 @@ gtk_source_context_engine_finalize (GObject *object)
 	g_free (ce->priv->id);
 	g_object_unref (ce->priv->style_scheme);
 
-	G_OBJECT_CLASS (gtk_source_context_engine_parent_class)->finalize (object);
+	G_OBJECT_CLASS (_gtk_source_context_engine_parent_class)->finalize (object);
 }
 
 static void
-gtk_source_context_engine_class_init (GtkSourceContextEngineClass *klass)
+_gtk_source_context_engine_class_init (GtkSourceContextEngineClass *klass)
 {
 	GObjectClass *object_class = G_OBJECT_CLASS (klass);
 	GtkSourceEngineClass *engine_class = GTK_SOURCE_ENGINE_CLASS (klass);
 
 	object_class->finalize = gtk_source_context_engine_finalize;
+
 	engine_class->attach_buffer = gtk_source_context_engine_attach_buffer;
+	engine_class->text_inserted = gtk_source_context_engine_text_inserted;
+	engine_class->text_deleted = gtk_source_context_engine_text_deleted;
 
 	g_type_class_add_private (object_class, sizeof (GtkSourceContextEnginePrivate));
 }
 
 static void
-gtk_source_context_engine_init (GtkSourceContextEngine *ce)
+_gtk_source_context_engine_init (GtkSourceContextEngine *ce)
 {
 	ce->priv = G_TYPE_INSTANCE_GET_PRIVATE (ce, GTK_TYPE_SOURCE_CONTEXT_ENGINE,
 						GtkSourceContextEnginePrivate);
@@ -1336,7 +1339,7 @@ gtk_source_context_engine_init (GtkSourceContextEngine *ce)
 }
 
 GtkSourceEngine	*
-gtk_source_context_engine_new (GtkSourceLanguage *lang)
+_gtk_source_context_engine_new (GtkSourceLanguage *lang)
 {
 	GtkSourceContextEngine *ce;
 
@@ -3266,12 +3269,13 @@ segment_erase_middle_ (GtkSourceContextEngine *ce,
 
 		if (sp->start_at < start)
 		{
-			g_assert (sp->end_at <= start);
+			sp->end_at = MIN (sp->end_at, start);
 			append_to = segment;
 		}
 		else
 		{
-			g_assert (sp->start_at >= end);
+			g_assert (sp->end_at > end);
+			sp->start_at = MAX (sp->start_at, end);
 			append_to = new_segment;
 		}
 
@@ -3999,16 +4003,16 @@ definition_child_new (ContextDefinition *definition,
 }
 
 gboolean
-gtk_source_context_engine_define_context (GtkSourceContextEngine  *ce,
-					  gchar                   *id,
-					  gchar                   *parent_id,
-					  gchar                   *match_regex,
-					  gchar                   *start_regex,
-					  gchar                   *end_regex,
-					  gchar                   *style,
-					  gboolean                 extend_parent,
-					  gboolean                 end_at_line_end,
-					  GError                 **error)
+_gtk_source_context_engine_define_context (GtkSourceContextEngine  *ce,
+					   gchar                   *id,
+					   gchar                   *parent_id,
+					   gchar                   *match_regex,
+					   gchar                   *start_regex,
+					   gchar                   *end_regex,
+					   gchar                   *style,
+					   gboolean                 extend_parent,
+					   gboolean                 end_at_line_end,
+					   GError                 **error)
 {
 	ContextDefinition *definition, *parent = NULL;
 	ContextType type;
@@ -4084,13 +4088,13 @@ gtk_source_context_engine_define_context (GtkSourceContextEngine  *ce,
 }
 
 gboolean
-gtk_source_context_engine_add_sub_pattern (GtkSourceContextEngine  *ce,
-					   gchar                   *id,
-					   gchar                   *parent_id,
-					   gchar                   *name,
-					   gchar                   *where,
-					   gchar                   *style,
-					   GError                 **error)
+_gtk_source_context_engine_add_sub_pattern (GtkSourceContextEngine  *ce,
+					    gchar                   *id,
+					    gchar                   *parent_id,
+					    gchar                   *name,
+					    gchar                   *where,
+					    gchar                   *style,
+					    GError                 **error)
 {
 	ContextDefinition *parent;
 	SubPatternDefinition *sp_def;
@@ -4167,11 +4171,11 @@ gtk_source_context_engine_add_sub_pattern (GtkSourceContextEngine  *ce,
 }
 
 gboolean
-gtk_source_context_engine_add_ref (GtkSourceContextEngine  *ce,
-				   gchar                   *parent_id,
-				   gchar                   *ref_id,
-				   gboolean                 all,
-				   GError                 **error)
+_gtk_source_context_engine_add_ref (GtkSourceContextEngine  *ce,
+				    gchar                   *parent_id,
+				    gchar                   *ref_id,
+				    gboolean                 all,
+				    GError                 **error)
 {
 	ContextDefinition *parent;
 	ContextDefinition *ref;

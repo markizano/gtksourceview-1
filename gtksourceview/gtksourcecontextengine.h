@@ -27,7 +27,7 @@
 
 G_BEGIN_DECLS
 
-#define GTK_TYPE_SOURCE_CONTEXT_ENGINE            (gtk_source_context_engine_get_type ())
+#define GTK_TYPE_SOURCE_CONTEXT_ENGINE            (_gtk_source_context_engine_get_type ())
 #define GTK_SOURCE_CONTEXT_ENGINE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), GTK_TYPE_SOURCE_CONTEXT_ENGINE, GtkSourceContextEngine))
 #define GTK_SOURCE_CONTEXT_ENGINE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), GTK_TYPE_SOURCE_CONTEXT_ENGINE, GtkSourceContextEngineClass))
 #define GTK_IS_SOURCE_CONTEXT_ENGINE(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GTK_TYPE_SOURCE_CONTEXT_ENGINE))
@@ -51,11 +51,11 @@ struct _GtkSourceContextEngineClass
 	GtkSourceEngineClass parent_class;
 };
 
-GType		 gtk_source_context_engine_get_type	(void) G_GNUC_CONST;
+GType		 _gtk_source_context_engine_get_type	(void) G_GNUC_CONST;
 
-GtkSourceEngine	*gtk_source_context_engine_new		(GtkSourceLanguage	*lang);
+GtkSourceEngine	*_gtk_source_context_engine_new		(GtkSourceLanguage	*lang);
 
-gboolean	 gtk_source_context_engine_define_context
+gboolean	 _gtk_source_context_engine_define_context
 							(GtkSourceContextEngine	 *ce,
 							 gchar			 *id,
 							 gchar			 *parent_id,
@@ -67,7 +67,7 @@ gboolean	 gtk_source_context_engine_define_context
 							 gboolean		  end_at_line_end,
 							 GError			**error);
 
-gboolean	 gtk_source_context_engine_add_sub_pattern
+gboolean	 _gtk_source_context_engine_add_sub_pattern
 							(GtkSourceContextEngine	 *ce,
 							 gchar			 *id,
 							 gchar			 *parent_id,
@@ -76,7 +76,7 @@ gboolean	 gtk_source_context_engine_add_sub_pattern
 							 gchar			 *style,
 							 GError			**error);
 
-gboolean	 gtk_source_context_engine_add_ref 	(GtkSourceContextEngine	 *ce,
+gboolean	 _gtk_source_context_engine_add_ref 	(GtkSourceContextEngine	 *ce,
 							 gchar			 *parent_id,
 							 gchar			 *ref_id,
 							 gboolean		  all,

@@ -1,5 +1,17 @@
 2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcebuffer.[ch]: removed "text-inserted"
+	and "text-deleted" signals, they are GtkSourceEngine methods
+	now.
+	* gtksourceview/gtksourceengine.[ch]: added text_inserted and
+	text_deleted methods, prefixed exported functions with underscore.
+	* gtksourceview/gtksourcecontextengine.[ch]: ditto.
+	* gtksourceview/gtksourcelanguage.c:
+	* gtksourceview/gtksourcelanguage-parser-2.c: use underscore-prefixed
+	GtkSourceContextEngine methods.
+
+2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourceundomanager.c: changed DEFAULT_MAX_UNDO_LEVELS
         from 25 to -1; made it use G_DEFINE_TYPE.
 	* gtksourceview/gtksourceview.c: use G_DEFINE_TYPE.

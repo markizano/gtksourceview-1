@@ -22,11 +22,11 @@
 #ifndef __GTK_SOURCE_ENGINE_H__
 #define __GTK_SOURCE_ENGINE_H__
 
-#include <glib-object.h>
+#include <gtk/gtktextbuffer.h>
 
 G_BEGIN_DECLS
 
-#define GTK_TYPE_SOURCE_ENGINE            (gtk_source_engine_get_type ())
+#define GTK_TYPE_SOURCE_ENGINE            (_gtk_source_engine_get_type ())
 #define GTK_SOURCE_ENGINE(obj)            (G_TYPE_CHECK_INSTANCE_CAST ((obj), GTK_TYPE_SOURCE_ENGINE, GtkSourceEngine))
 #define GTK_SOURCE_ENGINE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), GTK_TYPE_SOURCE_ENGINE, GtkSourceEngineClass))
 #define GTK_IS_SOURCE_ENGINE(obj)         (G_TYPE_CHECK_INSTANCE_TYPE ((obj), GTK_TYPE_SOURCE_ENGINE))
@@ -41,24 +41,30 @@ struct _GtkSourceEngine
 	GObject g_object;
 };
 
-G_END_DECLS
-/* FIXME */
-#include <gtksourceview/gtksourcebuffer.h>
-G_BEGIN_DECLS
-
 struct _GtkSourceEngineClass
 {
 	GObjectClass parent_class;
 
 	void     (* attach_buffer)    (GtkSourceEngine *engine,
 				       GtkTextBuffer   *buffer);
+	void     (* text_inserted)    (GtkSourceEngine *engine,
+				       gint             start_offset,
+				       gint             end_offset);
+	void     (* text_deleted)     (GtkSourceEngine *engine,
+				       gint             offset,
+				       gint             length);
 };
 
-GType       gtk_source_engine_get_type 	       (void) G_GNUC_CONST;
+GType       _gtk_source_engine_get_type        (void) G_GNUC_CONST;
 
-void        gtk_source_engine_attach_buffer    (GtkSourceEngine *engine,
+void        _gtk_source_engine_attach_buffer   (GtkSourceEngine *engine,
 						GtkTextBuffer   *buffer);
-
+void        _gtk_source_engine_text_inserted   (GtkSourceEngine *engine,
+						gint             start_offset,
+						gint             end_offset);
+void        _gtk_source_engine_text_deleted    (GtkSourceEngine *engine,
+						gint             offset,
+						gint             length);
 
 G_END_DECLS
 

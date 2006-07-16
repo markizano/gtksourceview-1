@@ -65,8 +65,6 @@ enum {
 	CAN_REDO,
 	HIGHLIGHT_UPDATED,
 	MARKER_UPDATED,
-	TEXT_INSERTED,
-	TEXT_DELETED,
 	UPDATE_HIGHLIGHT,
 	DEBUG,
 	LAST_SIGNAL
@@ -162,8 +160,6 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 	klass->can_redo 	 = NULL;
 	klass->highlight_updated = NULL;
 	klass->marker_updated    = NULL;
-	klass->text_inserted     = NULL;
-	klass->text_deleted      = NULL;
 	klass->update_highlight  = NULL;
 
 	/* Do not set these signals handlers directly on the parent_class since
@@ -253,30 +249,6 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 			  G_TYPE_NONE,
 			  1,
 			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE);
-
-	buffer_signals[TEXT_INSERTED] =
-	    g_signal_new ("text_inserted",
-			  G_OBJECT_CLASS_TYPE (object_class),
-			  G_SIGNAL_RUN_LAST,
-			  G_STRUCT_OFFSET (GtkSourceBufferClass, text_inserted),
-			  NULL, NULL,
-			  gtksourceview_marshal_VOID__INT_INT,
-			  G_TYPE_NONE,
-			  2,
-			  G_TYPE_INT,
-			  G_TYPE_INT);
-
-	buffer_signals[TEXT_DELETED] =
-	    g_signal_new ("text_deleted",
-			  G_OBJECT_CLASS_TYPE (object_class),
-			  G_SIGNAL_RUN_LAST,
-			  G_STRUCT_OFFSET (GtkSourceBufferClass, text_deleted),
-			  NULL, NULL,
-			  gtksourceview_marshal_VOID__INT_INT,
-			  G_TYPE_NONE,
-			  2,
-			  G_TYPE_INT,
-			  G_TYPE_INT);
 
 	buffer_signals[UPDATE_HIGHLIGHT] =
 	    g_signal_new ("update_highlight",
@@ -407,7 +379,7 @@ gtk_source_buffer_dispose (GObject *object)
 
 	if (buffer->priv->highlight_engine != NULL)
 	{
-		gtk_source_engine_attach_buffer (buffer->priv->highlight_engine, NULL);
+		_gtk_source_engine_attach_buffer (buffer->priv->highlight_engine, NULL);
 		g_object_unref (buffer->priv->highlight_engine);
 		buffer->priv->highlight_engine = NULL;
 	}
@@ -633,6 +605,7 @@ gtk_source_buffer_real_insert_text (GtkTextBuffer *buffer,
 				    gint           len)
 {
 	gint start_offset, end_offset;
+	GtkSourceBuffer *source_buffer = GTK_SOURCE_BUFFER (buffer);
 
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 	g_return_if_fail (iter != NULL);
@@ -655,7 +628,11 @@ gtk_source_buffer_real_insert_text (GtkTextBuffer *buffer,
 				       NULL);
 
 	end_offset = gtk_text_iter_get_offset (iter);
-	g_signal_emit (buffer, buffer_signals[TEXT_INSERTED], 0, start_offset, end_offset);
+
+	if (source_buffer->priv->highlight_engine != NULL)
+		_gtk_source_engine_text_inserted (source_buffer->priv->highlight_engine,
+						  start_offset,
+						  end_offset);
 }
 
 static void
@@ -667,6 +644,7 @@ gtk_source_buffer_real_delete_range (GtkTextBuffer *buffer,
 	GtkTextMark *mark;
 	GtkTextIter iter;
 	GSList *markers;
+	GtkSourceBuffer *source_buffer = GTK_SOURCE_BUFFER (buffer);
 
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 	g_return_if_fail (start != NULL);
@@ -720,7 +698,10 @@ gtk_source_buffer_real_delete_range (GtkTextBuffer *buffer,
 	}
 
 	/* emit text deleted for engines */
-	g_signal_emit (buffer, buffer_signals[TEXT_DELETED], 0, offset, length);
+	if (source_buffer->priv->highlight_engine != NULL)
+		_gtk_source_engine_text_deleted (source_buffer->priv->highlight_engine,
+						 offset,
+						 length);
 }
 
 /* FIXME: this can't be here, but it's now needed for bracket matching */
@@ -1204,7 +1185,7 @@ gtk_source_buffer_set_language (GtkSourceBuffer   *buffer,
 	if (buffer->priv->highlight_engine != NULL)
 	{
 		/* disconnect the old engine */
-		gtk_source_engine_attach_buffer (buffer->priv->highlight_engine, NULL);
+		_gtk_source_engine_attach_buffer (buffer->priv->highlight_engine, NULL);
 		g_object_unref (buffer->priv->highlight_engine);
 		buffer->priv->highlight_engine = NULL;
 	}
@@ -1220,8 +1201,8 @@ gtk_source_buffer_set_language (GtkSourceBuffer   *buffer,
 		/* get a new engine */
 		buffer->priv->highlight_engine = _gtk_source_language_create_engine (language);
 		if (buffer->priv->highlight_engine)
-			gtk_source_engine_attach_buffer (buffer->priv->highlight_engine,
-							 GTK_TEXT_BUFFER (buffer));
+			_gtk_source_engine_attach_buffer (buffer->priv->highlight_engine,
+							  GTK_TEXT_BUFFER (buffer));
 	}
 
 	g_object_notify (G_OBJECT (buffer), "language");

@@ -27,28 +27,53 @@
 #include "gtksourceengine.h"
 
 
-G_DEFINE_TYPE (GtkSourceEngine, gtk_source_engine, G_TYPE_OBJECT)
+G_DEFINE_TYPE (GtkSourceEngine, _gtk_source_engine, G_TYPE_OBJECT)
 
 
 static void
-gtk_source_engine_class_init (GtkSourceEngineClass *klass)
+_gtk_source_engine_class_init (GtkSourceEngineClass *klass)
 {
 	klass->attach_buffer = NULL;
 }
 
 
 static void
-gtk_source_engine_init (GtkSourceEngine *engine)
+_gtk_source_engine_init (GtkSourceEngine *engine)
 {
 }
 
-
 void
-gtk_source_engine_attach_buffer (GtkSourceEngine *engine,
+_gtk_source_engine_attach_buffer (GtkSourceEngine *engine,
 				 GtkTextBuffer   *buffer)
 {
 	g_return_if_fail (GTK_IS_SOURCE_ENGINE (engine));
-	g_return_if_fail (GTK_SOURCE_ENGINE_GET_CLASS (engine)->attach_buffer);
+	g_return_if_fail (GTK_SOURCE_ENGINE_GET_CLASS (engine)->attach_buffer != NULL);
 
 	GTK_SOURCE_ENGINE_GET_CLASS (engine)->attach_buffer (engine, buffer);
+}
+
+void
+_gtk_source_engine_text_inserted (GtkSourceEngine *engine,
+				  gint             start_offset,
+				  gint             end_offset)
+{
+	g_return_if_fail (GTK_IS_SOURCE_ENGINE (engine));
+	g_return_if_fail (GTK_SOURCE_ENGINE_GET_CLASS (engine)->text_inserted != NULL);
+
+	GTK_SOURCE_ENGINE_GET_CLASS (engine)->text_inserted (engine,
+							     start_offset,
+							     end_offset);
+}
+
+void
+_gtk_source_engine_text_deleted (GtkSourceEngine *engine,
+				 gint             offset,
+				 gint             length)
+{
+	g_return_if_fail (GTK_IS_SOURCE_ENGINE (engine));
+	g_return_if_fail (GTK_SOURCE_ENGINE_GET_CLASS (engine)->text_deleted != NULL);
+
+	GTK_SOURCE_ENGINE_GET_CLASS (engine)->text_deleted (engine,
+							    offset,
+							    length);
 }

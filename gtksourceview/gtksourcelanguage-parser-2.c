@@ -505,13 +505,16 @@ create_definition (ParserState *parser_state,
 	}
 
 	if (tmp_error == NULL)
-	{
-		gtk_source_context_engine_define_context (
-				parser_state->engine, id, parent_id,
-				match, start, end, style,
-				extend_parent, end_at_line_end,
-				&tmp_error);
-	}
+		_gtk_source_context_engine_define_context (parser_state->engine,
+							   id,
+							   parent_id,
+							   match,
+							   start,
+							   end,
+							   style,
+							   extend_parent,
+							   end_at_line_end,
+							   &tmp_error);
 
 	g_free (match);
 	g_free (start);
@@ -591,8 +594,11 @@ add_ref (ParserState *parser_state, gchar *ref, GError **error)
 		/* If the document is validated container_id is never NULL */
 		g_assert (container_id);
 
-		gtk_source_context_engine_add_ref (parser_state->engine,
-				container_id, ref_id, all, &tmp_error);
+		_gtk_source_context_engine_add_ref (parser_state->engine,
+						    container_id,
+						    ref_id,
+						    all,
+						    &tmp_error);
 
 		DEBUG (g_message ("appended %s in %s", ref_id, container_id));
 	}
@@ -629,9 +635,13 @@ create_sub_pattern (ParserState *parser_state,
 
 	where = xmlTextReaderGetAttribute (parser_state->reader, BAD_CAST "where");
 
-	gtk_source_context_engine_add_sub_pattern (parser_state->engine,
-			id, container_id, sub_pattern, (gchar *)where, style,
-			&tmp_error);
+	_gtk_source_context_engine_add_sub_pattern (parser_state->engine,
+						    id,
+						    container_id,
+						    sub_pattern,
+						    (gchar*) where,
+						    style,
+						    &tmp_error);
 
 	xmlFree (where);
 
