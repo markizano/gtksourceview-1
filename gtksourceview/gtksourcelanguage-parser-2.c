@@ -552,8 +552,7 @@ add_ref (ParserState *parser_state, gchar *ref, GError **error)
 		if (!lang_id_is_already_loaded (parser_state, lang_id))
 		{
 			lm = _gtk_source_language_get_languages_manager (parser_state->language);
-			imported_language = gtk_source_languages_manager_get_language_from_id (
-					lm, lang_id);
+			imported_language = gtk_source_languages_manager_get_language_by_id (lm, lang_id);
 
 			if (imported_language == NULL)
 			{
@@ -1365,7 +1364,7 @@ parse_language_with_id (ParserState *parser_state,
 	GError *tmp_error = NULL;
 
 	lm = _gtk_source_language_get_languages_manager (parser_state->language);
-	imported_language = gtk_source_languages_manager_get_language_from_id (lm, lang_id);
+	imported_language = gtk_source_languages_manager_get_language_by_id (lm, lang_id);
 
 	if (imported_language == NULL)
 	{

@@ -17,7 +17,11 @@
             <attribute name="section"/>
             <attribute name="_section"/>
         </choice>
-        <attribute name="mimetypes"/>
+
+        <optional>
+            <attribute name="mimetypes"/>
+            <attribute name="globs"/>
+        </optional>
 
         <optional>
             <ref name="metadata"/>
@@ -26,7 +30,7 @@
         <optional>
             <ref name="styles" />
         </optional>
-        
+
         <optional>
             <element name="default-regex-options">
                 <text/>
@@ -47,7 +51,7 @@
 
 <define name="id-type">
     <data type="string">
-        <!-- FIXME: Why it doesn't work? 
+        <!-- FIXME: Why it doesn't work?
              It seems that [a-z-] is unsupported -->
         <!--
         <param name="pattern">([a-zA-Z0-9_-]+:)?[a-zA-Z0-9_-]+</param>
@@ -58,14 +62,14 @@
 
 <define name="ref-type">
     <data type="string">
-        <!-- FIXME: Why it doesn't work? 
+        <!-- FIXME: Why it doesn't work?
              It seems that [a-z-] is unsupported -->
         <!--
         <param name="pattern">([a-zA-Z0-9_-]+:)?[a-zA-Z0-9_-]+(:\*)?</param>
         -->
         <param name="pattern">(([a-zA-Z0-9_]|-)+:)?([a-zA-Z0-9_]|-)+(:\*)?</param>
     </data>
-</define> 
+</define>
 
 <define name="boolean-value">
     <choice>

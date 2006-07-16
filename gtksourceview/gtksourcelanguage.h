@@ -1,4 +1,5 @@
-/*  gtksourcelanguage.h
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*-
+ *  gtksourcelanguage.h
  *
  *  Copyright (C) 2003 - Paolo Maggi <paolo.maggi@polito.it>
  *
@@ -63,8 +64,8 @@ gint			 gtk_source_language_get_version		(GtkSourceLanguage       *language);
 
 /* Should free the list (and free each string in it also). */
 GSList			*gtk_source_language_get_mime_types		(GtkSourceLanguage       *language);
-void			 gtk_source_language_set_mime_types		(GtkSourceLanguage       *language,
-								 	 const GSList		 *mime_types);
+/* Should free the list (and free each string in it also). */
+GSList			*gtk_source_language_get_globs			(GtkSourceLanguage       *language);
 
 G_END_DECLS
 

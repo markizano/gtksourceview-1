@@ -289,31 +289,31 @@ remove_all_markers (GtkSourceBuffer *buffer)
 // 	g_slist_free (tags);
 // }
 
-static GtkSourceLanguage *
-get_language_for_file (GtkSourceLanguagesManager *manager,
-		       const gchar 		 *filename)
-{
-	guint i;
-	const gchar *ext_c[] = {".c", ".h"};
-	const gchar *ext_xml[] = {".xml", ".lang", ".rng"};
-	const gchar *ext_html[] = {".htm", ".html"};
-
-	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGES_MANAGER (manager), NULL);
-	g_return_val_if_fail (filename != NULL, NULL);
-
-#define CHECK_EXT(lang)										\
-	for (i = 0; i < G_N_ELEMENTS (ext_##lang); ++i)						\
-		if (g_str_has_suffix (filename, ext_##lang[i]))					\
-			return gtk_source_languages_manager_get_language_from_id (manager, #lang);
-
-	CHECK_EXT (c);
-	CHECK_EXT (xml);
-	CHECK_EXT (html);
-
-#undef CHECK_EXT
-
-	return NULL;
-}
+// static GtkSourceLanguage *
+// get_language_for_file (GtkSourceLanguagesManager *manager,
+// 		       const gchar 		 *filename)
+// {
+// 	guint i;
+// 	const gchar *ext_c[] = {".c", ".h"};
+// 	const gchar *ext_xml[] = {".xml", ".lang", ".rng"};
+// 	const gchar *ext_html[] = {".htm", ".html"};
+//
+// 	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGES_MANAGER (manager), NULL);
+// 	g_return_val_if_fail (filename != NULL, NULL);
+//
+// #define CHECK_EXT(lang)										\
+// 	for (i = 0; i < G_N_ELEMENTS (ext_##lang); ++i)						\
+// 		if (g_str_has_suffix (filename, ext_##lang[i]))					\
+// 			return gtk_source_languages_manager_get_language_by_id (manager, #lang);
+//
+// 	CHECK_EXT (c);
+// 	CHECK_EXT (xml);
+// 	CHECK_EXT (html);
+//
+// #undef CHECK_EXT
+//
+// 	return NULL;
+// }
 
 static gboolean
 open_file (GtkSourceBuffer *buffer, const gchar *filename)
@@ -340,9 +340,12 @@ open_file (GtkSourceBuffer *buffer, const gchar *filename)
 	if (!success)
 		goto out;
 
-	language = get_language_for_file (manager, filename);
+	language = gtk_source_languages_manager_get_language_for_filename (manager, filename);
 
-	if (!language)
+// 	if (language == NULL)
+// 		language = get_language_for_file (manager, filename);
+
+	if (language == NULL)
 	{
 		g_print ("No language found for file `%s'\n", filename);
 		g_object_set (G_OBJECT (buffer), "highlight", FALSE, NULL);
@@ -351,7 +354,6 @@ open_file (GtkSourceBuffer *buffer, const gchar *filename)
 	{
 		g_object_set (G_OBJECT (buffer), "highlight", TRUE, NULL);
 		gtk_source_buffer_set_language (buffer, language);
-// 		print_tags (language);
 	}
 
 	g_object_set_data_full (G_OBJECT (buffer),

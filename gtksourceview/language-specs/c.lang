@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<language id="c" _name="C" version="2.0" _section="Sources" mimetypes="text/x-c;text/x-chdr;text/x-csrc">
+<language id="c" _name="C" version="2.0" _section="Sources"
+          mimetypes="text/x-c;text/x-chdr;text/x-csrc"
+          globs="*.c;*.h">
     <styles>
         <style id="comment"           _name="Comment"
                                       map-to="def:comment"/>

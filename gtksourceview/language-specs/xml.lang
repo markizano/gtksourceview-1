@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<language id="xml" _name="XML" version="2.0" _section="Markup" mimetypes="application/xml;text/xml;image/svg+xml,text/rdf">
+<language id="xml" _name="XML" version="2.0" _section="Markup"
+          mimetypes="application/xml;text/xml;image/svg+xml,text/rdf"
+          globs="*.xml;*.rdf;*.svg;*.rng;*.lang">
     <styles>
         <style id="comment"           _name="Comment"
                                       map-to="def:comment"/>
@@ -27,7 +29,7 @@
         <define-regex id="prefix">
             [a-zA-Z_][a-zA-Z0-9._-]*
         </define-regex>
-        
+
         <define-regex id="name">
             [a-zA-Z_][a-zA-Z0-9.:_-]*
         </define-regex>
@@ -66,7 +68,7 @@
             <start>&lt;!DOCTYPE</start>
             <end>&gt;</end>
         </context>
-        
+
         <context id="cdata">
             <start>&lt;!\[CDATA\[</start>
             <end>\]\]&gt;</end>
@@ -75,7 +77,7 @@
                 <context sub-pattern="0" where="end" style-ref="cdata-delim"/>
             </include>
         </context>
-        
+
         <context id="prolog">
             <start>&lt;\?xml</start>
             <end>\?&gt;</end>
@@ -98,8 +100,8 @@
            -               |________|                 attributes
            -->
         <context id="tag">
-            <!-- This matches the external portion 
-               -  <tag  [...]  tag>  
+            <!-- This matches the external portion
+               -  <tag  [...]  tag>
                -->
             <start>&lt;\s*(\%{prefix}:)?\%{name}</start>
             <end>\/\s*((\%{prefix}:)?\%{name}\s*&gt;)|/&gt;</end>
@@ -112,8 +114,8 @@
                 <context ref="attribute" />
 
                 <context id="tag-internal">
-                <!-- This matches the internal portion 
-                   -  >  [...]  <  
+                <!-- This matches the internal portion
+                   -  >  [...]  <
                    -->
                     <start>&gt;</start>
                     <end>&lt;(?=/)</end>
@@ -128,7 +130,7 @@
                         <context ref="unallowed-chars"/>
                     </include>
                 </context>
-                
+
                 <context style-ref="error" extend-parent="false">
                     <match>\S</match>
                 </context>

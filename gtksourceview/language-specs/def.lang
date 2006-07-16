@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<language id="def" _name="Defaults" version="2.0" section="" mimetypes="FIXME">
+<language id="def" _name="Defaults" version="2.0" section="FIXME">
     <styles>
         <style id="decimal"        _name="Decimal"/>
         <style id="base-n-integer" _name="Base-N Integer"/>

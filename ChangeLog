@@ -1,5 +1,30 @@
 2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcelanguage-parser-2.c:
+	* gtksourceview/gtksourcelanguage-private.h:
+	* gtksourceview/gtksourcelanguage.[ch]:
+	Added "globs" attribute to lang files, added globs
+	to GtkSourceLanguage. Removed gtk_source_language_set_mime_types
+	for now, added gtk_source_language_get_globs.
+	Made "mimetypes" and "globs" attributes optional.
+	* gtksourceview/gtksourcelanguagesmanager.[ch]: renamed
+	gtk_source_languages_manager_get_language_from_id to
+	gtk_source_languages_manager_get_language_by_id;
+	gtk_source_languages_manager_get_language_from_mime_type to
+	gtk_source_languages_manager_get_language_for_mime_type;
+	added gtk_source_languages_manager_get_language_for_filename.
+	* gtksourceview/language-specs/c.lang:
+	* gtksourceview/language-specs/def.lang:
+	* gtksourceview/language-specs/html.lang:
+	* gtksourceview/language-specs/xml.lang:
+	Added globs.
+	* gtksourceview/language-specs/language2.rng:
+	Added "globs" attribute; made "globs" and "mimetypes" attributes
+	optional.
+	* tests/test-widget.c: use gtk_source_languages_manager_get_language_for_filename.
+
+2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcebuffer.[ch]: removed "text-inserted"
 	and "text-deleted" signals, they are GtkSourceEngine methods
 	now.

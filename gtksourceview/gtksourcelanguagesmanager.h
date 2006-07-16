@@ -1,4 +1,5 @@
-/*  gtksourcelanguagesmanager.h
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*-
+ *  gtksourcelanguagesmanager.h
  *
  *  Copyright (C) 2003 - Paolo Maggi <paolo.maggi@polito.it>
  *
@@ -38,14 +39,14 @@ typedef struct _GtkSourceLanguagesManagerClass		GtkSourceLanguagesManagerClass;
 
 typedef struct _GtkSourceLanguagesManagerPrivate	GtkSourceLanguagesManagerPrivate;
 
-struct _GtkSourceLanguagesManager 
+struct _GtkSourceLanguagesManager
 {
 	GObject                   parent;
 
 	GtkSourceLanguagesManagerPrivate *priv;
 };
 
-struct _GtkSourceLanguagesManagerClass 
+struct _GtkSourceLanguagesManagerClass
 {
 	GObjectClass              parent_class;
 
@@ -63,16 +64,19 @@ GtkSourceLanguagesManager *gtk_source_languages_manager_new		      (void);
 const GSList	*gtk_source_languages_manager_get_available_languages (GtkSourceLanguagesManager *lm);
 
 
-GtkSourceLanguage *gtk_source_languages_manager_get_language_from_mime_type 
+GtkSourceLanguage *gtk_source_languages_manager_get_language_by_id    (GtkSourceLanguagesManager *lm,
+							  	       const gchar               *id);
+GtkSourceLanguage *gtk_source_languages_manager_get_language_for_mime_type
 								      (GtkSourceLanguagesManager *lm,
 							  	       const gchar               *mime_type);
-GtkSourceLanguage *gtk_source_languages_manager_get_language_from_id  (GtkSourceLanguagesManager *lm,
-							  	       const gchar               *id);
+GtkSourceLanguage *gtk_source_languages_manager_get_language_for_filename
+								      (GtkSourceLanguagesManager *lm,
+							  	       const gchar               *filename);
 
 /* Property */
 const GSList	*gtk_source_languages_manager_get_lang_files_dirs     (GtkSourceLanguagesManager *lm);
 
-G_END_DECLS				
+G_END_DECLS
 
 #endif /* __GTK_SOURCE_LANGUAGES_MANAGER_H__ */
 

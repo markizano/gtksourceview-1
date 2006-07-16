@@ -47,6 +47,7 @@ struct _GtkSourceLanguagePrivate
 	gint                     version;
 
 	GSList			*mime_types;
+	GSList			*globs;
 
 	GtkSourceLanguagesManager *languages_manager;
 };

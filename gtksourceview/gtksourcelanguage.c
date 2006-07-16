@@ -44,7 +44,6 @@ static void		  gtk_source_language_finalize 		(GObject 			*object);
 
 static GtkSourceLanguage *process_language_node 		(xmlTextReaderPtr 		 reader,
 								 const gchar 			*filename);
-static GSList 		 *get_mime_types_from_file 		(GtkSourceLanguage 		*language);
 
 /* Signals */
 enum {
@@ -53,6 +52,17 @@ enum {
 
 // static guint 	 signals[LAST_SIGNAL] = { 0 };
 
+
+static GSList *
+slist_deep_copy (GSList *list)
+{
+	GSList *l, *copy = NULL;
+
+	for (l = list; l != NULL; l = l->next)
+		copy = g_slist_prepend (copy, g_strdup (l->data));
+
+	return g_slist_reverse (copy);
+}
 
 static void
 slist_deep_free (GSList *list)
@@ -160,6 +170,7 @@ gtk_source_language_finalize (GObject *object)
 		xmlFree (lang->priv->id);
 
 		slist_deep_free (lang->priv->mime_types);
+		slist_deep_free (lang->priv->globs);
 		g_hash_table_destroy (lang->priv->styles);
 
 		g_free (lang->priv);
@@ -198,13 +209,38 @@ _gtk_source_language_strconvescape (gchar *source)
 	return source;
 }
 
+static GSList *
+parse_mime_types_or_globs (xmlTextReaderPtr reader,
+			   const char      *attr_name)
+{
+	xmlChar *attr;
+	gchar **mtl;
+	gint i;
+	GSList *list = NULL;
+
+	attr = xmlTextReaderGetAttribute (reader, BAD_CAST attr_name);
+	if (attr == NULL)
+		return NULL;
+
+	mtl = g_strsplit ((gchar*) attr, ";", 0);
+
+	for (i = 0; mtl[i] != NULL; i++)
+	{
+		/* steal the strings from the array */
+		list = g_slist_prepend (list, mtl[i]);
+
+	}
+
+	g_free (mtl);
+	xmlFree (attr);
+
+	return g_slist_reverse (list);
+}
+
 static GtkSourceLanguage *
 process_language_node (xmlTextReaderPtr reader, const gchar *filename)
 {
 	xmlChar *version;
-	xmlChar *mimetypes;
-	gchar** mtl;
-	int i;
 	xmlChar *tmp;
 	xmlChar *untranslated_name;
 	GtkSourceLanguage *lang;
@@ -213,22 +249,23 @@ process_language_node (xmlTextReaderPtr reader, const gchar *filename)
 
 	lang->priv->lang_file_name = g_strdup (filename);
 
-	lang->priv->translation_domain = (gchar *) xmlTextReaderGetAttribute (
-			reader, BAD_CAST "translation-domain");
+	lang->priv->translation_domain =
+		(gchar*) xmlTextReaderGetAttribute (reader,
+						   BAD_CAST "translation-domain");
 	if (lang->priv->translation_domain == NULL)
 	{
 		/* if the attribute "translation-domain" exists then
 		 * lang->priv->translation_domain is a xmlChar so it must always
 		 * be a xmlChar, this is why xmlStrdup() is used instead of
 		 * g_strdup() */
-		lang->priv->translation_domain = (gchar *)xmlStrdup (BAD_CAST GETTEXT_PACKAGE);
+		lang->priv->translation_domain = (gchar*) xmlStrdup (BAD_CAST GETTEXT_PACKAGE);
 	}
 
 	tmp = xmlTextReaderGetAttribute (reader, BAD_CAST "_name");
 	if (tmp == NULL)
 	{
-		lang->priv->name = (gchar *)xmlTextReaderGetAttribute (reader,
-					BAD_CAST "name");
+		lang->priv->name = (gchar*) xmlTextReaderGetAttribute (reader,
+								       BAD_CAST "name");
 		untranslated_name = xmlStrdup (BAD_CAST lang->priv->name);
 		if (lang->priv->name == NULL)
 		{
@@ -245,26 +282,26 @@ process_language_node (xmlTextReaderPtr reader, const gchar *filename)
 		/* if tmp is NULL then lang->priv->name is a xmlChar so it must
 		 * always be a xmlChar, this is why xmlStrdup() is used instead
 		 * of g_strdup() */
-		lang->priv->name = (gchar *)xmlStrdup (BAD_CAST dgettext (
-					lang->priv->translation_domain,
-					(gchar *)tmp));
+		lang->priv->name = (gchar*) xmlStrdup (BAD_CAST dgettext (lang->priv->translation_domain,
+									  (gchar*) tmp));
 	}
 
 	tmp = xmlTextReaderGetAttribute (reader, BAD_CAST "id");
 	if (tmp != NULL)
 	{
-		lang->priv->id = (gchar *) tmp;
+		lang->priv->id = (gchar*) tmp;
 		xmlFree (untranslated_name);
 	}
 	else
 	{
-		lang->priv->id = (gchar *) untranslated_name;
+		lang->priv->id = (gchar*) untranslated_name;
 	}
 
 	tmp = xmlTextReaderGetAttribute (reader, BAD_CAST "_section");
 	if (tmp == NULL)
 	{
-		lang->priv->section = (gchar *)xmlTextReaderGetAttribute (reader, BAD_CAST "section");
+		/* FIXME put langs without section into Others or something */
+		lang->priv->section = (gchar*) xmlTextReaderGetAttribute (reader, BAD_CAST "section");
 		if (lang->priv->section == NULL)
 		{
 			g_warning ("Impossible to get language section from file '%s'",
@@ -279,9 +316,8 @@ process_language_node (xmlTextReaderPtr reader, const gchar *filename)
 		/* if tmp is NULL then lang->priv->section is a xmlChar so it
 		 * must always be a xmlChar, this is why xmlStrdup() is used
 		 * instead of g_strdup() */
-		lang->priv->section = (gchar *)xmlStrdup (BAD_CAST dgettext (
-					lang->priv->translation_domain,
-					(gchar *)tmp));
+		lang->priv->section = (gchar*) xmlStrdup (BAD_CAST dgettext (lang->priv->translation_domain,
+									     (gchar*) tmp));
 		xmlFree (tmp);
 	}
 
@@ -307,7 +343,7 @@ process_language_node (xmlTextReaderPtr reader, const gchar *filename)
 		else
 		{
 			g_warning ("Usupported language spec version '%s' in file '%s'",
-				   (gchar *)version, filename);
+				   (gchar*) version, filename);
 
 			xmlFree (version);
 
@@ -318,30 +354,8 @@ process_language_node (xmlTextReaderPtr reader, const gchar *filename)
 		xmlFree (version);
 	}
 
-	mimetypes = xmlTextReaderGetAttribute (reader, BAD_CAST "mimetypes");
-	if (mimetypes == NULL)
-	{
-		g_warning ("Impossible to get mimetypes from file '%s'",
-			   filename);
-
-		g_object_unref (lang);
-		return NULL;
-	}
-
-	mtl = g_strsplit ((gchar *)mimetypes, ";", 0);
-
-	for (i = 0; mtl[i] != NULL; i++)
-	{
-		/* steal the strings from the array */
-		lang->priv->mime_types = g_slist_prepend (lang->priv->mime_types,
-				g_strdup (mtl[i]));
-
-	}
-
-	g_free (mtl);
-	xmlFree (mimetypes);
-
-	lang->priv->mime_types = g_slist_reverse (lang->priv->mime_types);
+	lang->priv->mime_types = parse_mime_types_or_globs (reader, "mimetypes");
+	lang->priv->globs = parse_mime_types_or_globs (reader, "globs");
 
 	return lang;
 }
@@ -419,25 +433,26 @@ gtk_source_language_get_version (GtkSourceLanguage *language)
 GSList *
 gtk_source_language_get_mime_types (GtkSourceLanguage *language)
 {
-	const GSList *l;
-	GSList *mime_types = NULL;
-
 	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
-	g_return_val_if_fail (language->priv->mime_types != NULL, NULL);
 
-	/* Dup mime_types */
+	return slist_deep_copy (language->priv->mime_types);
+}
 
-	l = language->priv->mime_types;
+/**
+ * gtk_source_language_get_globs:
+ * @language: a #GtkSourceLanguage.
+ *
+ * Returns a list of globs for the given @language.  After usage you should
+ * free each element of the list as well as the list itself.
+ *
+ * Return value: a list of globs (strings).
+ **/
+GSList *
+gtk_source_language_get_globs (GtkSourceLanguage *language)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
 
-	while (l != NULL)
-	{
-		mime_types = g_slist_prepend (mime_types, g_strdup ((const gchar*)l->data));
-		l = g_slist_next (l);
-	}
-
-	mime_types = g_slist_reverse (mime_types);
-
-	return mime_types;
+	return slist_deep_copy (language->priv->globs);
 }
 
 /**
@@ -457,133 +472,89 @@ _gtk_source_language_get_languages_manager (GtkSourceLanguage *language)
 	return language->priv->languages_manager;
 }
 
-static GSList *
-get_mime_types_from_file (GtkSourceLanguage *language)
-{
-	xmlTextReaderPtr reader = NULL;
-	gint ret;
-	GSList *mime_types = NULL;
-	int fd;
-
-	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
-	g_return_val_if_fail (language->priv->lang_file_name != NULL, NULL);
-
-	/*
-	 * Use fd instead of filename so that it's utf8 safe on w32.
-	 */
-	fd = g_open (language->priv->lang_file_name, O_RDONLY, 0);
-	if (fd != -1)
-		reader = xmlReaderForFd (fd, language->priv->lang_file_name, NULL, 0);
-
-	if (reader != NULL)
-	{
-        	ret = xmlTextReaderRead (reader);
-
-        	while (ret == 1)
-		{
-			if (xmlTextReaderNodeType (reader) == 1)
-			{
-				xmlChar *name;
-
-				name = xmlTextReaderName (reader);
-
-				if (xmlStrcmp (name, BAD_CAST "language") == 0)
-				{
-					gchar *mimetypes;
-
-					mimetypes = (gchar *)xmlTextReaderGetAttribute (reader,
-							BAD_CAST "mimetypes");
-
-					if (mimetypes == NULL)
-					{
-						g_warning ("Impossible to get mimetypes from file '%s'",
-			   				   language->priv->lang_file_name);
-
-						ret = 0;
-					}
-					else
-					{
-						gchar **mtl;
-						gint i;
-
-						mtl = g_strsplit (mimetypes, ";", 0);
-
-						for (i = 0; mtl[i] != NULL; i++)
-						{
-							/* steal the strings from the array */
-							mime_types = g_slist_prepend (mime_types,
-										      mtl[i]);
-						}
-
-						g_free (mtl);
-						xmlFree (mimetypes);
-
-						ret = 0;
-					}
-				}
-
-				xmlFree (name);
-			}
-
-			if (ret != 0)
-				ret = xmlTextReaderRead (reader);
-		}
-
-		xmlFreeTextReader (reader);
-		close (fd);
-
-		if (ret != 0)
-		{
-	            g_warning("Failed to parse '%s'", language->priv->lang_file_name);
-		    return NULL;
-		}
-        }
-	else
-	{
-		g_warning("Unable to open '%s'", language->priv->lang_file_name);
-
-    	}
-
-	return mime_types;
-}
-
-/**
- * gtk_source_language_set_mime_types:
- * @language: a #GtkSourceLanguage
- * @mime_types: a list of mime types (strings).
- *
- * Sets a list of @mime_types for the given @language.
- * If @mime_types is %NULL this function will use the default mime
- * types from the language file.
- **/
-void
-gtk_source_language_set_mime_types (GtkSourceLanguage	*language,
-				    const GSList	*mime_types)
-{
-	g_return_if_fail (GTK_IS_SOURCE_LANGUAGE (language));
-	g_return_if_fail (language->priv->mime_types != NULL);
-
-	slist_deep_free (language->priv->mime_types);
-	language->priv->mime_types = NULL;
-
-	if (mime_types != NULL)
-	{
-		const GSList *l;
-
-		/* Dup mime_types */
-		l = mime_types;
-		while (l != NULL)
-		{
-			language->priv->mime_types = g_slist_prepend (language->priv->mime_types,
-							      g_strdup ((const gchar*)l->data));
-			l = g_slist_next (l);
-		}
-
-		language->priv->mime_types = g_slist_reverse (language->priv->mime_types);
-	}
-	else
-		language->priv->mime_types = get_mime_types_from_file (language);
-}
+// static GSList *
+// get_mime_types_or_extensions_from_file (GtkSourceLanguage *language,
+// 					const char        *what)
+// {
+// 	xmlTextReaderPtr reader = NULL;
+// 	gint ret;
+// 	GSList *list = NULL;
+// 	int fd;
+//
+// 	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
+// 	g_return_val_if_fail (language->priv->lang_file_name != NULL, NULL);
+//
+// 	/*
+// 	 * Use fd instead of filename so that it's utf8 safe on w32.
+// 	 */
+// 	fd = g_open (language->priv->lang_file_name, O_RDONLY, 0);
+// 	if (fd != -1)
+// 		reader = xmlReaderForFd (fd, language->priv->lang_file_name, NULL, 0);
+//
+// 	if (reader != NULL)
+// 	{
+//         	ret = xmlTextReaderRead (reader);
+//
+//         	while (ret == 1)
+// 		{
+// 			if (xmlTextReaderNodeType (reader) == 1)
+// 			{
+// 				xmlChar *name;
+//
+// 				name = xmlTextReaderName (reader);
+//
+// 				if (xmlStrcmp (name, BAD_CAST "language") == 0)
+// 				{
+// 					gchar *attr;
+//
+// 					attr = (gchar*) xmlTextReaderGetAttribute (reader,
+// 										   BAD_CAST what);
+// 					ret = 0;
+//
+// 					if (attr != NULL)
+// 					{
+// 						gchar **mtl;
+// 						gint i;
+//
+// 						mtl = g_strsplit (attr, ";", 0);
+//
+// 						for (i = 0; mtl[i] != NULL; i++)
+// 						{
+// 							/* steal the strings from the array */
+// 							list = g_slist_prepend (list, mtl[i]);
+// 						}
+//
+// 						g_free (mtl);
+// 						xmlFree (attr);
+//
+// 						ret = 0;
+// 					}
+// 				}
+//
+// 				xmlFree (name);
+// 			}
+//
+// 			if (ret != 0)
+// 				ret = xmlTextReaderRead (reader);
+// 		}
+//
+// 		xmlFreeTextReader (reader);
+// 		close (fd);
+//
+// 		if (ret != 0)
+// 		{
+// 	            g_warning("Failed to parse '%s'", language->priv->lang_file_name);
+// 		    return NULL;
+// 		}
+//         }
+// 	else
+// 	{
+// 		g_warning("Unable to open '%s'", language->priv->lang_file_name);
+//
+//     	}
+//
+// 	return list;
+// }
 
 /* Highlighting engine creation ------------------------------------------ */
 
