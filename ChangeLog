@@ -1,5 +1,10 @@
 2006-07-17  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c: corrected assert in check_segment
+	so it works with ENABLE_CHECK_TREE.
+
+2006-07-17  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c: (text_inserted and friends):
 	handle insertion into simple contexts properly.
 

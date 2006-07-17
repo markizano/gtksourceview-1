@@ -28,4 +28,5 @@ gtksourceview.diff
 install-sh
 missing
 build
-gtksourceview.mprj
+*gtksourceview.mprj*
+*.kdev*

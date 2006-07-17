@@ -719,14 +719,6 @@ refresh_range (GtkSourceContextEngine *ce,
 	g_signal_emit_by_name (ce->priv->buffer, "highlight_updated", start, end);
 }
 
-static gint
-segment_cmp (Segment *s1,
-	     Segment *s2)
-{
-	return s1->start_at < s2->start_at ? -1 :
-		(s1->start_at == s2->start_at ? 0 : 1);
-}
-
 static void
 add_invalid (GtkSourceContextEngine *ce,
 	     Segment                *segment)
@@ -1136,6 +1128,8 @@ text_inserted (GtkSourceContextEngine *ce,
 
 	if (length != 0)
 	{
+		/* now fix offsets in all the segments "to the right"
+		 * of segment. */
 		while (segment)
 		{
 			Segment *tmp;
@@ -1487,6 +1481,14 @@ remove_tags_hash_cb (G_GNUC_UNUSED gpointer style,
 		g_object_unref (tags->data);
 		tags = tags->next;
 	}
+}
+
+static gint
+segment_cmp (Segment *s1,
+	     Segment *s2)
+{
+	return s1->start_at < s2->start_at ? -1 :
+		(s1->start_at == s2->start_at ? 0 : 1);
 }
 
 /**
@@ -4563,7 +4565,7 @@ check_segment (GtkSourceContextEngine *ce,
 	if (SEGMENT_IS_INVALID (segment))
 		g_assert (g_tree_lookup (ce->priv->invalid, segment) != NULL);
 	else
-		g_assert (g_tree_lookup (ce->priv->invalid, segment) == NULL);
+		g_assert (g_tree_lookup (ce->priv->invalid, segment) != segment);
 
 	if (segment->children)
 		g_assert (!SEGMENT_IS_INVALID (segment) && SEGMENT_IS_CONTAINER (segment));
