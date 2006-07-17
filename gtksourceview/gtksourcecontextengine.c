@@ -349,6 +349,12 @@ static GSList	       *erase_segments		(GtkSourceContextEngine *ce,
 						 gint                    end,
 						 gboolean                collect_contexts,
 						 Segment                *hint);
+static void		find_insertion_place	(Segment		*segment,
+						 gint			 offset,
+						 Segment	       **parent,
+						 Segment	       **prev,
+						 Segment	       **next,
+						 Segment		*hint);
 static void		segment_destroy		(GtkSourceContextEngine	*ce,
 						 Segment		*segment);
 static void		context_definition_free	(ContextDefinition	*definition);
@@ -770,36 +776,21 @@ fix_offsets_insert_ (Segment *segment,
 }
 
 static void
-find_insertion_place (Segment  *segment,
-		      gint      offset,
-		      Segment **parent,
-		      Segment **prev,
-		      Segment **next)
+find_insertion_place_forward_ (Segment  *segment,
+			       gint      offset,
+			       Segment  *start,
+			       Segment **parent,
+			       Segment **prev,
+			       Segment **next)
 {
 	Segment *child;
 
-	g_assert (segment->start_at <= offset && segment->end_at >= offset);
+	g_assert (start->end_at < offset);
 
-	*prev = NULL;
-	*next = NULL;
-
-	if (SEGMENT_IS_INVALID (segment) || segment->children == NULL)
-	{
-		*parent = segment;
-		return;
-	}
-
-	if (segment->start_at == offset)
-	{
-		*parent = segment;
-		*next = segment->children;
-		return;
-	}
-
-	for (child = segment->children; child != NULL; child = child->next)
+	for (child = start; child != NULL; child = child->next)
 	{
 		if (child->start_at <= offset && child->end_at >= offset)
-			return find_insertion_place (child, offset, parent, prev, next);
+			return find_insertion_place (child, offset, parent, prev, next, NULL);
 
 		if (child->end_at == offset)
 		{
@@ -838,6 +829,99 @@ find_insertion_place (Segment  *segment,
 }
 
 static void
+find_insertion_place_backward_ (Segment  *segment,
+				gint      offset,
+				Segment  *start,
+				Segment **parent,
+				Segment **prev,
+				Segment **next)
+{
+	Segment *child;
+
+	g_assert (start->end_at >= offset);
+
+	for (child = start; child != NULL; child = child->prev)
+	{
+		if (child->start_at <= offset && child->end_at >= offset)
+			return find_insertion_place (child, offset, parent, prev, next, NULL);
+
+		if (child->end_at == offset)
+		{
+			if (SEGMENT_IS_INVALID (child))
+			{
+				*parent = child;
+				*prev = NULL;
+				*next = NULL;
+			}
+			else
+			{
+				*prev = child;
+				*next = child->next;
+				*parent = segment;
+			}
+
+			return;
+		}
+
+		if (child->end_at < offset)
+		{
+			*prev = child;
+			*next = child->next;
+			break;
+		}
+
+		if (child->start_at > offset)
+		{
+			*next = child;
+			continue;
+		}
+
+		g_assert_not_reached ();
+	}
+
+	*parent = segment;
+}
+
+static void
+find_insertion_place (Segment  *segment,
+		      gint      offset,
+		      Segment **parent,
+		      Segment **prev,
+		      Segment **next,
+		      Segment  *hint)
+{
+	g_assert (segment->start_at <= offset && segment->end_at >= offset);
+
+	*prev = NULL;
+	*next = NULL;
+
+	if (SEGMENT_IS_INVALID (segment) || segment->children == NULL)
+	{
+		*parent = segment;
+		return;
+	}
+
+	if (segment->start_at == offset)
+	{
+		*parent = segment;
+		*next = segment->children;
+		return;
+	}
+
+	if (hint)
+		while (hint && hint->parent != segment)
+			hint = hint->parent;
+
+	if (!hint)
+		hint = segment->children;
+
+	if (hint->end_at < offset)
+		find_insertion_place_forward_ (segment, offset, hint, parent, prev, next);
+	else
+		find_insertion_place_backward_ (segment, offset, hint, parent, prev, next);
+}
+
+static void
 segment_make_invalid (GtkSourceContextEngine *ce,
 		      Segment                *segment)
 {
@@ -858,7 +942,9 @@ text_inserted (GtkSourceContextEngine *ce,
 	Segment *parent, *prev, *next, *new_segment;
 	Segment *segment;
 
-	find_insertion_place (ce->priv->root_segment, offset, &parent, &prev, &next);
+	find_insertion_place (ce->priv->root_segment, offset,
+			      &parent, &prev, &next,
+			      ce->priv->hint);
 
 	g_assert (parent->start_at <= offset);
 	g_assert (parent->end_at >= offset);
@@ -962,8 +1048,9 @@ fix_offsets_delete_ (Segment *segment,
 	Segment *child;
 	SubPattern *sp;
 
-	if (segment->end_at <= offset)
-		return;
+	g_return_if_fail (segment->end_at > offset);
+// 	if (segment->end_at <= offset)
+// 		return;
 
 	if (hint)
 		while (hint && hint->parent != segment)
