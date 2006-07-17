@@ -305,7 +305,7 @@ struct _GtkSourceContextEnginePrivate
 	/* Tree of contexts. */
 	Context			*root_context;
 	Segment			*root_segment;
-	GList			*invalid;
+	GTree			*invalid;
 	Segment			*hint;
 
 	gint			 worker_batch_size;
@@ -731,22 +731,21 @@ static void
 add_invalid (GtkSourceContextEngine *ce,
 	     Segment                *segment)
 {
-	g_assert (SEGMENT_IS_INVALID (segment));
-
-#ifdef ENABLE_DEBUG
-	g_assert (!g_list_find (ce->priv->invalid, segment));
+#ifdef ENABLE_CHECK_TREE
+	{
+		Segment *old = g_tree_lookup (ce->priv->invalid, segment);
+		g_assert (old == NULL);
+	}
 #endif
-
-	ce->priv->invalid = g_list_insert_sorted (ce->priv->invalid,
-						  segment,
-						  (GCompareFunc) segment_cmp);
+	g_assert (SEGMENT_IS_INVALID (segment));
+	g_tree_insert (ce->priv->invalid, segment, segment);
 }
 
 static void
 remove_invalid (GtkSourceContextEngine *ce,
 		Segment                *segment)
 {
-	ce->priv->invalid = g_list_remove (ce->priv->invalid, segment);
+	g_tree_remove (ce->priv->invalid, segment);
 }
 
 static void
@@ -901,10 +900,20 @@ find_insertion_place (Segment  *segment,
 		return;
 	}
 
+	/* XXX grand child might be invalid, so we still can get two
+	 * adjacent zero-length segments, and crash */
 	if (segment->start_at == offset)
 	{
-		*parent = segment;
-		*next = segment->children;
+		if (SEGMENT_IS_INVALID (segment->children))
+		{
+			*parent = segment->children;
+		}
+		else
+		{
+			*parent = segment;
+			*next = segment->children;
+		}
+
 		return;
 	}
 
@@ -1083,6 +1092,30 @@ fix_offsets_delete_ (Segment *segment,
 	segment->end_at = fix_offset_delete_ (segment->end_at, offset, length);
 }
 
+static gint
+get_invalid_at_search_func (Segment *segment,
+			    gpointer offset)
+{
+	if (segment->start_at > GPOINTER_TO_INT (offset))
+		return -1;
+	else if (segment->end_at < GPOINTER_TO_INT (offset))
+		return 1;
+	else
+		return 0;
+}
+
+static Segment *
+get_invalid_at_ (GtkSourceContextEngine *ce,
+		 gint                    offset)
+{
+	if (!g_tree_nnodes (ce->priv->invalid))
+		return NULL;
+
+	return g_tree_search (ce->priv->invalid,
+			      (GCompareFunc) get_invalid_at_search_func,
+			      GINT_TO_POINTER (offset));
+}
+
 static void
 text_deleted (GtkSourceContextEngine *ce,
 	      gint                    start,
@@ -1092,7 +1125,9 @@ text_deleted (GtkSourceContextEngine *ce,
 
 	erase_segments (ce, start, end, FALSE, NULL);
 	fix_offsets_delete_ (ce->priv->root_segment, start, end - start, ce->priv->hint);
-	ce->priv->hint = create_segment (ce, ce->priv->root_segment, NULL, start, start, NULL);
+
+	if (!get_invalid_at_ (ce, start))
+		ce->priv->hint = create_segment (ce, ce->priv->root_segment, NULL, start, start, NULL);
 
 	CHECK_TREE (ce);
 	install_idle_worker (ce);
@@ -1110,8 +1145,58 @@ gtk_source_context_engine_text_deleted (GtkSourceEngine *engine,
 		      offset + length);
 }
 
+static gboolean
+traverse_func_get_first_invalid (Segment  *segment,
+				 gpointer  value,
+				 Segment **result)
+{
+	g_assert (segment == value);
+	*result = segment;
+	return TRUE;
+}
+
 /**
- * segment_get_invalid:
+ * get_invalid_first:
+ *
+ * @ce: a #GtkSourceContextEngine.
+ *
+ * Returns first invalid segment, or NULL.
+ */
+static Segment *
+get_invalid_first (GtkSourceContextEngine *ce)
+{
+	Segment *result = NULL;
+
+	g_tree_foreach (ce->priv->invalid,
+			(GTraverseFunc) traverse_func_get_first_invalid,
+			&result);
+
+	return result;
+}
+
+static gboolean
+traverse_func_get_invalid_after (Segment  *segment,
+				 gpointer  value,
+				 gpointer  user_data)
+{
+	struct {
+		Segment *result;
+		gint start;
+	} *data = user_data;
+
+	g_assert (segment == value);
+
+	if (segment->start_at >= data->start)
+	{
+		data->result = segment;
+		return TRUE;
+	}
+
+	return FALSE;
+}
+
+/**
+ * get_invalid_after:
  *
  * @ce: a #GtkSourceContextEngine.
  * @start: the offset.
@@ -1120,29 +1205,22 @@ gtk_source_context_engine_text_deleted (GtkSourceEngine *engine,
  * or NULL.
  */
 static Segment *
-segment_get_invalid (GtkSourceContextEngine *ce,
-		     gint                    start)
+get_invalid_after (GtkSourceContextEngine *ce,
+		   gint                    start)
 {
-	GList *list = ce->priv->invalid;
+	struct {
+		Segment *result;
+		gint start;
+	} data;
 
-	if (!list)
-		return NULL;
+	data.result = NULL;
+	data.start = start;
 
-	if (start == 0)
-		return list->data;
+	g_tree_foreach (ce->priv->invalid,
+			(GTraverseFunc) traverse_func_get_invalid_after,
+			&data);
 
-	/* XXX */
-	while (list)
-	{
-		Segment *s = list->data;
-
-		if (s->start_at >= start)
-			return s;
-
-		list = list->next;
-	}
-
-	return NULL;
+	return data.result;
 }
 
 static void
@@ -1156,7 +1234,7 @@ update_highlight_cb (GtkSourceContextEngine *ce,
 	if (!ce->priv->highlight)
 		return;
 
-	invalid = segment_get_invalid (ce, 0);
+	invalid = get_invalid_first (ce);
 
 	if (!invalid || invalid->start_at >= gtk_text_iter_get_offset (end))
 	{
@@ -1335,7 +1413,7 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 
 		segment_destroy (ce, ce->priv->root_segment);
 		context_unref (ce->priv->root_context);
-		g_list_free (ce->priv->invalid);
+		g_tree_destroy (ce->priv->invalid);
 		ce->priv->root_segment = NULL;
 		ce->priv->root_context = NULL;
 		ce->priv->invalid = NULL;
@@ -1376,6 +1454,7 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 
 		ce->priv->root_context = context_new (NULL, main_definition, NULL);
 		ce->priv->root_segment = create_segment (ce, NULL, ce->priv->root_context, 0, 0, NULL);
+		ce->priv->invalid = g_tree_new ((GCompareFunc) segment_cmp);
 
 		ce->priv->tags = g_hash_table_new_full (g_str_hash, g_str_equal, g_free,
 							(GDestroyNotify) g_slist_free);
@@ -2461,7 +2540,7 @@ segment_destroy (GtkSourceContextEngine *ce,
 	context_unref (segment->context);
 
 #ifdef ENABLE_DEBUG
-	g_assert (!g_list_find (ce->priv->invalid, segment));
+	g_assert (!g_tree_lookup (ce->priv->invalid, segment));
 	memset (segment, 0, sizeof (Segment));
 #else
 	g_free (segment);
@@ -3748,7 +3827,7 @@ update_syntax (GtkSourceContextEngine *ce,
 		return TRUE;
 	}
 
-	invalid = segment_get_invalid (ce, 0);
+	invalid = get_invalid_first (ce);
 
 	if (!invalid)
 		return TRUE;
@@ -3786,7 +3865,7 @@ update_syntax (GtkSourceContextEngine *ce,
 	if (start_offset == end_offset)
 	{
 		g_assert (end_offset == gtk_text_buffer_get_char_count (buffer));
-		g_assert (ce->priv->invalid && !ce->priv->invalid->next);
+		g_assert (g_tree_nnodes (ce->priv->invalid) == 1);
 		segment_remove (ce, invalid);
 		CHECK_TREE (ce);
 		return TRUE;
@@ -3799,7 +3878,7 @@ update_syntax (GtkSourceContextEngine *ce,
 	{
 		if (!gtk_text_iter_forward_line (&line_start))
 			break;
-		invalid = segment_get_invalid (ce, gtk_text_iter_get_offset (&line_start));
+		invalid = get_invalid_after (ce, gtk_text_iter_get_offset (&line_start));
 		if (!invalid || invalid->start_at >= end_offset)
 			break;
 		gtk_text_iter_set_offset (&line_start, invalid->start_at);
@@ -3883,18 +3962,18 @@ update_syntax (GtkSourceContextEngine *ce,
 
 	if (end_offset == gtk_text_buffer_get_char_count (buffer))
 	{
-		g_assert (!ce->priv->invalid || !ce->priv->invalid->next);
+		g_assert (g_tree_nnodes (ce->priv->invalid) <= 1);
 
-		if (ce->priv->invalid)
+		if (g_tree_nnodes (ce->priv->invalid))
 		{
-			invalid = ce->priv->invalid->data;
+			invalid = get_invalid_first (ce);
 			segment_remove (ce, invalid);
 			CHECK_TREE (ce);
 		}
 	}
 	else if (invalid_lines)
 	{
-		invalid = segment_get_invalid (ce, end_offset);
+		invalid = get_invalid_after (ce, end_offset);
 
 		if (!invalid || invalid->start_at > end_offset)
 			text_inserted (ce, end_offset, 0);
@@ -3903,7 +3982,7 @@ update_syntax (GtkSourceContextEngine *ce,
 	}
 
 	g_slist_free (invalid_lines);
-	return !ce->priv->invalid;
+	return g_tree_nnodes (ce->priv->invalid) == 0;
 }
 
 
@@ -4378,9 +4457,9 @@ check_segment (GtkSourceContextEngine *ce,
 	g_assert (!segment->next || segment->next->start_at >= segment->end_at);
 
 	if (SEGMENT_IS_INVALID (segment))
-		g_assert (g_list_find (ce->priv->invalid, segment) != NULL);
+		g_assert (g_tree_lookup (ce->priv->invalid, segment) != NULL);
 	else
-		g_assert (g_list_find (ce->priv->invalid, segment) == NULL);
+		g_assert (g_tree_lookup (ce->priv->invalid, segment) == NULL);
 
 	if (segment->children)
 		g_assert (!SEGMENT_IS_INVALID (segment) && SEGMENT_IS_CONTAINER (segment));
