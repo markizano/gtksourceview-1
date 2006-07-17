@@ -1,5 +1,9 @@
 2006-07-17  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* stamp-h.in: removed, it's garbage.
+
+2006-07-17  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c: corrected assert in check_segment
 	so it works with ENABLE_CHECK_TREE.
 
