@@ -930,17 +930,136 @@ find_insertion_place (Segment  *segment,
 		find_insertion_place_backward_ (segment, offset, hint, parent, prev, next);
 }
 
-static void
-segment_make_invalid (GtkSourceContextEngine *ce,
-		      Segment                *segment)
+static gint
+get_invalid_at_search_func (Segment *segment,
+			    gpointer offset)
 {
-	if (!SEGMENT_IS_INVALID (segment))
+	if (segment->start_at > GPOINTER_TO_INT (offset))
+		return -1;
+	else if (segment->end_at < GPOINTER_TO_INT (offset))
+		return 1;
+	else
+		return 0;
+}
+
+static Segment *
+get_invalid_at_ (GtkSourceContextEngine *ce,
+		 gint                    offset)
+{
+	if (!g_tree_nnodes (ce->priv->invalid))
+		return NULL;
+
+	return g_tree_search (ce->priv->invalid,
+			      (GCompareFunc) get_invalid_at_search_func,
+			      GINT_TO_POINTER (offset));
+}
+
+static void
+segment_add_subpattern (Segment    *state,
+			SubPattern *sp)
+{
+	sp->next = state->sub_patterns;
+	state->sub_patterns = sp;
+}
+
+static SubPattern *
+sub_pattern_new (Segment              *segment,
+		 gint                  start_at,
+		 gint                  end_at,
+		 SubPatternDefinition *sp_def)
+{
+	SubPattern *sp;
+
+	sp = g_new0 (SubPattern, 1);
+	sp->start_at = start_at;
+	sp->end_at = end_at;
+	sp->definition = sp_def;
+
+	segment_add_subpattern (segment, sp);
+
+	return sp;
+}
+
+static inline void
+sub_pattern_free (SubPattern *sp)
+{
+	g_free (sp);
+}
+
+static void
+segment_make_invalid_ (GtkSourceContextEngine *ce,
+		       Segment                *segment)
+{
+	Context *ctx;
+	SubPattern *sp;
+
+	g_assert (!SEGMENT_IS_INVALID (segment));
+
+	sp = segment->sub_patterns;
+	segment->sub_patterns = NULL;
+
+	while (sp)
 	{
-		Context *ctx = segment->context;
-		segment->context = NULL;
-		add_invalid (ce, segment);
-		context_unref (ctx);
+		SubPattern *next = sp->next;
+		sub_pattern_free (sp);
+		sp = next;
 	}
+
+	ctx = segment->context;
+	segment->context = NULL;
+	add_invalid (ce, segment);
+	context_unref (ctx);
+}
+
+static Segment *
+simple_segment_split_ (GtkSourceContextEngine *ce,
+		       Segment                *segment,
+		       gint                    offset)
+{
+	SubPattern *subpatterns, *sp;
+	Segment *new_segment, *invalid;
+	gint end_at = segment->end_at;
+
+	g_assert (SEGMENT_IS_SIMPLE (segment));
+	g_assert (segment->start_at < offset && offset < segment->end_at);
+
+	subpatterns = segment->sub_patterns;
+	segment->sub_patterns = NULL;
+	segment->end_at = offset;
+
+	invalid = create_segment (ce, segment->parent, NULL, offset, offset, segment);
+	new_segment = create_segment (ce, segment->parent, segment->context, offset, end_at, invalid);
+
+	sp = subpatterns;
+	while (sp != NULL)
+	{
+		Segment *append_to = NULL;
+		SubPattern *next = sp->next;
+
+		if (sp->end_at <= offset)
+		{
+			append_to = segment;
+		}
+		else if (sp->start_at >= offset)
+		{
+			append_to = new_segment;
+		}
+		else
+		{
+			sub_pattern_new (new_segment,
+					 offset,
+					 sp->end_at,
+					 sp->definition);
+			sp->end_at = offset;
+			append_to = segment;
+		}
+
+		segment_add_subpattern (append_to, sp);
+
+		sp = next;
+	}
+
+	return invalid;
 }
 
 static void
@@ -948,12 +1067,16 @@ text_inserted (GtkSourceContextEngine *ce,
 	       gint                    offset,
 	       gint                    length)
 {
-	Segment *parent, *prev, *next, *new_segment;
+	Segment *parent, *prev = NULL, *next = NULL, *new_segment;
 	Segment *segment;
 
-	find_insertion_place (ce->priv->root_segment, offset,
-			      &parent, &prev, &next,
-			      ce->priv->hint);
+	/* If there is an invalid segment adjacent to offset, use it.
+	 * Otherwise, find the deepest segment to split and insert
+	 * dummy segment in there. */
+	if (!(parent = get_invalid_at_ (ce, offset)))
+		find_insertion_place (ce->priv->root_segment, offset,
+				      &parent, &prev, &next,
+				      ce->priv->hint);
 
 	g_assert (parent->start_at <= offset);
 	g_assert (parent->end_at >= offset);
@@ -962,19 +1085,35 @@ text_inserted (GtkSourceContextEngine *ce,
 	g_assert (!prev || prev->next == next);
 	g_assert (!next || next->prev == prev);
 
-	if (SEGMENT_IS_INVALID (parent) || SEGMENT_IS_SIMPLE (parent))
+	if (SEGMENT_IS_INVALID (parent))
 	{
-		if (parent->start_at == parent->end_at && !length)
-		{
-			g_assert (SEGMENT_IS_INVALID (parent)); /* XXX */
+		/* If length is zero, and we already have an invalid segment there,
+		 * do nothing. */
+		if (!length)
 			return;
-		}
 
 		segment = parent;
-		segment_make_invalid (ce, segment);
+	}
+	else if (SEGMENT_IS_SIMPLE (parent))
+	{
+		/* If it's a simple context, then:
+		 * if one of its ends is offset, then we just invalidate it;
+		 * otherwise, we split it into two, and insert zero-lentgh
+		 * invalid segment in the middle. */
+		if (parent->start_at < offset && parent->end_at > offset)
+		{
+			segment = simple_segment_split_ (ce, parent, offset);
+		}
+		else
+		{
+			segment_make_invalid_ (ce, parent);
+			segment = parent;
+		}
 	}
 	else
 	{
+		/* Just insert new zero-length invalid segment. */
+
 		new_segment = segment_new (ce, parent, NULL, offset, offset);
 
 		new_segment->next = next;
@@ -995,25 +1134,28 @@ text_inserted (GtkSourceContextEngine *ce,
 
 	g_assert (!segment->children);
 
-	while (segment)
+	if (length != 0)
 	{
-		Segment *tmp;
-		SubPattern *sp;
-
-		for (tmp = segment->next; tmp != NULL; tmp = tmp->next)
-			fix_offsets_insert_ (tmp, offset, length);
-
-		segment->end_at += length;
-
-		for (sp = segment->sub_patterns; sp != NULL; sp = sp->next)
+		while (segment)
 		{
-			if (sp->start_at > offset)
-				sp->start_at += length;
-			if (sp->end_at > offset)
-				sp->end_at += length;
-		}
+			Segment *tmp;
+			SubPattern *sp;
 
-		segment = segment->parent;
+			for (tmp = segment->next; tmp != NULL; tmp = tmp->next)
+				fix_offsets_insert_ (tmp, offset, length);
+
+			segment->end_at += length;
+
+			for (sp = segment->sub_patterns; sp != NULL; sp = sp->next)
+			{
+				if (sp->start_at > offset)
+					sp->start_at += length;
+				if (sp->end_at > offset)
+					sp->end_at += length;
+			}
+
+			segment = segment->parent;
+		}
 	}
 
 	CHECK_TREE (ce);
@@ -1092,30 +1234,6 @@ fix_offsets_delete_ (Segment *segment,
 	segment->end_at = fix_offset_delete_ (segment->end_at, offset, length);
 }
 
-static gint
-get_invalid_at_search_func (Segment *segment,
-			    gpointer offset)
-{
-	if (segment->start_at > GPOINTER_TO_INT (offset))
-		return -1;
-	else if (segment->end_at < GPOINTER_TO_INT (offset))
-		return 1;
-	else
-		return 0;
-}
-
-static Segment *
-get_invalid_at_ (GtkSourceContextEngine *ce,
-		 gint                    offset)
-{
-	if (!g_tree_nnodes (ce->priv->invalid))
-		return NULL;
-
-	return g_tree_search (ce->priv->invalid,
-			      (GCompareFunc) get_invalid_at_search_func,
-			      GINT_TO_POINTER (offset));
-}
-
 static void
 text_deleted (GtkSourceContextEngine *ce,
 	      gint                    start,
@@ -1123,6 +1241,7 @@ text_deleted (GtkSourceContextEngine *ce,
 {
 	g_return_if_fail (start < end);
 
+	/* XXX it may make two invalid segments adjacent, and we can get crash */
 	erase_segments (ce, start, end, FALSE, NULL);
 	fix_offsets_delete_ (ce->priv->root_segment, start, end - start, ce->priv->hint);
 
@@ -1804,14 +1923,6 @@ regex_get_pattern (Regex *regex)
 
 /* SYNTAX TREE ------------------------------------------------------------ */
 
-static void
-segment_add_subpattern (Segment    *state,
-			SubPattern *sp)
-{
-	sp->next = state->sub_patterns;
-	state->sub_patterns = sp;
-}
-
 /**
  * apply_sub_patterns:
  *
@@ -1857,11 +1968,10 @@ apply_sub_patterns (Segment         *state,
 
 			if (start_pos >= 0 && start_pos != end_pos)
 			{
-				SubPattern *sp = g_new0 (SubPattern, 1);
-				sp->start_at = line->start_at + start_pos;
-				sp->end_at = line->start_at + end_pos;
-				sp->definition = sp_def;
-				segment_add_subpattern (state, sp);
+				sub_pattern_new (state,
+						 line->start_at + start_pos,
+						 line->start_at + end_pos,
+						 sp_def);
 			}
 		}
 
@@ -2487,12 +2597,6 @@ segment_extend (Segment *state,
 		state = state->parent;
 	}
 	CHECK_SEGMENT_LIST (state->parent);
-}
-
-static inline void
-sub_pattern_free (SubPattern *sp)
-{
-	g_free (sp);
 }
 
 static void

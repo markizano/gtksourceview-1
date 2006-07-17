@@ -1,5 +1,10 @@
 2006-07-17  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c: (text_inserted and friends):
+	handle insertion into simple contexts properly.
+
+2006-07-17  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c: store invalid segments
 	in a GTree.
 
