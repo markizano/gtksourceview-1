@@ -1,3 +1,7 @@
+2006-07-17  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* tests/test-widget.c: added Search and Replace.
+
 2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcecontextengine.c: fixed update_syntax()

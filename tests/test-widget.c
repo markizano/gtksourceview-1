@@ -58,6 +58,8 @@ static void       debug_thing_cb                 (GtkAction       *action,
 						  gpointer         user_data);
 static void       debug_thing_2_cb		 (GtkAction       *action,
 						  gpointer         user_data);
+static void       debug_thing_3_cb		 (GtkAction       *action,
+						  gpointer         user_data);
 
 static void       new_view_cb                    (GtkAction       *action,
 						  gpointer         user_data);
@@ -100,6 +102,8 @@ static GtkActionEntry view_action_entries[] = {
 	{ "NewView", GTK_STOCK_NEW, "_New View", NULL,
 	  "Create a new view of the file", G_CALLBACK (new_view_cb) },
 	{ "TabsWidth", NULL, "_Tabs Width" },
+	{ "DebugThing3", GTK_STOCK_FIND_AND_REPLACE, "Search and _Replace", "<control>R",
+	  "Search and Replace", G_CALLBACK (debug_thing_3_cb) },
 };
 
 static GtkToggleActionEntry toggle_entries[] = {
@@ -168,6 +172,7 @@ static const gchar *buffer_ui_description =
 "      <menuitem action=\"Open\"/>"
 "      <menuitem action=\"DebugThing\"/>"
 "      <menuitem action=\"DebugThing2\"/>"
+"      <menuitem action=\"DebugThing3\"/>"
 "      <separator/>"
 "      <menuitem action=\"Quit\"/>"
 "    </menu>"
@@ -475,6 +480,98 @@ debug_thing_2_cb (GtkAction *action,
 		  gpointer   user_data)
 {
 	g_signal_emit_by_name (user_data, "debug");
+}
+
+static gboolean
+replace_dialog (GtkWidget *widget,
+		char     **what_p,
+		char     **replacement_p)
+{
+	GtkWidget *dialog;
+	GtkEntry *entry1, *entry2;
+	static char *what, *replacement;
+
+	if (!what)
+		what = g_strdup ("gtk");
+	if (!replacement)
+		replacement = g_strdup ("boo");
+
+	dialog = gtk_dialog_new_with_buttons ("Replace",
+					      GTK_WINDOW (gtk_widget_get_toplevel (widget)),
+					      GTK_DIALOG_MODAL,
+					      GTK_STOCK_CANCEL,
+					      GTK_RESPONSE_CANCEL,
+					      GTK_STOCK_OK,
+					      GTK_RESPONSE_OK,
+					      NULL);
+	gtk_dialog_set_default_response (GTK_DIALOG (dialog), GTK_RESPONSE_OK);
+
+	entry1 = g_object_new (GTK_TYPE_ENTRY,
+			       "visible", TRUE,
+			       "text", what ? what : "",
+			       "activates-default", TRUE,
+			       NULL);
+	gtk_box_pack_start_defaults (GTK_BOX (GTK_DIALOG (dialog)->vbox),
+				     GTK_WIDGET (entry1));
+	entry2 = g_object_new (GTK_TYPE_ENTRY,
+			       "visible", TRUE,
+			       "text", replacement ? replacement : "",
+			       "activates-default", TRUE,
+			       NULL);
+	gtk_box_pack_start_defaults (GTK_BOX (GTK_DIALOG (dialog)->vbox),
+				     GTK_WIDGET (entry2));
+
+	while (TRUE)
+	{
+		if (gtk_dialog_run (GTK_DIALOG (dialog)) != GTK_RESPONSE_OK)
+		{
+			gtk_widget_destroy (dialog);
+			return FALSE;
+		}
+
+		if (*gtk_entry_get_text (entry1))
+			break;
+	}
+
+	g_free (what);
+	*what_p = what = g_strdup (gtk_entry_get_text (entry1));
+	g_free (replacement);
+	*replacement_p = replacement = g_strdup (gtk_entry_get_text (entry2));
+
+	gtk_widget_destroy (dialog);
+	return TRUE;
+}
+
+static void
+debug_thing_3_cb (GtkAction *action,
+		  gpointer   user_data)
+{
+	GtkTextView *view = user_data;
+	GtkTextBuffer *buffer = gtk_text_view_get_buffer (view);
+	GtkTextIter iter;
+	char *what, *replacement;
+
+	if (!replace_dialog (GTK_WIDGET (view), &what, &replacement))
+		return;
+
+	gtk_text_buffer_get_iter_at_offset (buffer, &iter, 0);
+
+	while (TRUE)
+	{
+		GtkTextIter match_start, match_end;
+
+		if (!gtk_text_iter_forward_search (&iter, what, 0,
+						   &match_start,
+						   &match_end,
+						   NULL))
+		{
+			break;
+		}
+
+		gtk_text_buffer_delete (buffer, &match_start, &match_end);
+		gtk_text_buffer_insert (buffer, &match_start, replacement, -1);
+		iter = match_start;
+	}
 }
 
 static void
