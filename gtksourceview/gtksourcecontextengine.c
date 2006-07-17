@@ -344,10 +344,11 @@ static Context	       *context_new		(Context		*parent,
 						 ContextDefinition	*definition,
 						 const gchar		*line_text);
 static void		context_unref		(Context		*context);
-static void		segment_erase_range	(GtkSourceContextEngine *ce,
-						 Segment                *segment,
+static GSList	       *erase_segments		(GtkSourceContextEngine *ce,
 						 gint                    start,
-						 gint                    end);
+						 gint                    end,
+						 gboolean                collect_contexts,
+						 Segment                *hint);
 static void		segment_destroy		(GtkSourceContextEngine	*ce,
 						 Segment		*segment);
 static void		context_definition_free	(ContextDefinition	*definition);
@@ -955,7 +956,8 @@ fix_offset_delete_ (gint offset,
 static void
 fix_offsets_delete_ (Segment *segment,
 		     gint     offset,
-		     gint     length)
+		     gint     length,
+		     Segment *hint)
 {
 	Segment *child;
 	SubPattern *sp;
@@ -963,8 +965,26 @@ fix_offsets_delete_ (Segment *segment,
 	if (segment->end_at <= offset)
 		return;
 
-	for (child = segment->children; child != NULL; child = child->next)
-		fix_offsets_delete_ (child, offset, length);
+	if (hint)
+		while (hint && hint->parent != segment)
+			hint = hint->parent;
+
+	if (!hint)
+		hint = segment->children;
+
+	for (child = hint; child != NULL; child = child->next)
+	{
+		if (child->end_at <= offset)
+			continue;
+		fix_offsets_delete_ (child, offset, length, NULL);
+	}
+
+	for (child = hint ? hint->prev : NULL; child != NULL; child = child->prev)
+	{
+		if (child->end_at <= offset)
+			break;
+		fix_offsets_delete_ (child, offset, length, NULL);
+	}
 
 	for (sp = segment->sub_patterns; sp != NULL; sp = sp->next)
 	{
@@ -982,9 +1002,11 @@ text_deleted (GtkSourceContextEngine *ce,
 	      gint                    end)
 {
 	g_return_if_fail (start < end);
-	segment_erase_range (ce, ce->priv->root_segment, start, end);
-	fix_offsets_delete_ (ce->priv->root_segment, start, end - start);
-	create_segment (ce, ce->priv->root_segment, NULL, start, start, NULL);
+
+	erase_segments (ce, start, end, FALSE, NULL);
+	fix_offsets_delete_ (ce->priv->root_segment, start, end - start, ce->priv->hint);
+	ce->priv->hint = create_segment (ce, ce->priv->root_segment, NULL, start, start, NULL);
+
 	CHECK_TREE (ce);
 	install_idle_worker (ce);
 };
@@ -2254,6 +2276,13 @@ create_segment (GtkSourceContextEngine *ce,
 	{
 		Segment *prev, *next;
 
+		if (!hint)
+		{
+			hint = ce->priv->hint;
+			while (hint && hint->parent != parent)
+				hint = hint->parent;
+		}
+
 		find_segment_position (parent, hint,
 				       start_at, end_at,
 				       &prev, &next);
@@ -2334,6 +2363,8 @@ segment_destroy (GtkSourceContextEngine *ce,
 
 	segment_destroy_children (ce, segment);
 
+	/* segment neighbours and parent may be invalid here,
+	 * so we only can unset the hint */
 	if (ce->priv->hint == segment)
 		ce->priv->hint = NULL;
 
@@ -3174,6 +3205,8 @@ segment_remove (GtkSourceContextEngine *ce,
 	else
 		segment->parent->children = segment->next;
 
+	/* if ce->priv->hint is being deleted, set it to some
+	 * neighbour segment */
 	if (ce->priv->hint == segment)
 	{
 		if (segment->next)
@@ -3299,7 +3332,7 @@ segment_erase_middle_ (GtkSourceContextEngine *ce,
 }
 
 /**
- * segment_erase_range:
+ * segment_erase_range_:
  *
  * @ce: #GtkSourceContextEngine.
  * @segment: the segment.
@@ -3315,10 +3348,10 @@ segment_erase_middle_ (GtkSourceContextEngine *ce,
  * split into two if it completely contains the range.
  */
 static void
-segment_erase_range (GtkSourceContextEngine *ce,
-		     Segment                *segment,
-		     gint                    start,
-		     gint                    end)
+segment_erase_range_ (GtkSourceContextEngine *ce,
+		      Segment                *segment,
+		      gint                    start,
+		      gint                    end)
 {
 	Segment *child;
 
@@ -3343,7 +3376,7 @@ segment_erase_range (GtkSourceContextEngine *ce,
 	for (child = segment->children; child != NULL; )
 	{
 		Segment *next = child->next;
-		segment_erase_range (ce, child, start, end);
+		segment_erase_range_ (ce, child, start, end);
 		child = next;
 	}
 
@@ -3482,21 +3515,23 @@ segment_merge (GtkSourceContextEngine *ce,
  * @ce: #GtkSourceContextEngine.
  * @start: start offset of region to erase.
  * @end: end offset of region to erase.
+ * @collect_contexts: whether it should collect list of contexts
+ * in removed segments.
  * @hint: segment around @start to make it faster.
  *
  * Erases all non-toplevel segments in the interval
  * [@start, @end]. Its action on the tree is roughly
- * equivalent to segment_erase_range(ce->priv->root_segment, start, end)
+ * equivalent to segment_erase_range_(ce->priv->root_segment, start, end)
  * (but that does not accept toplevel segment).
  *
- * Returns: list of contexts in deleted segments. The contexts
- * are referenced with context_unref() to avoid freeing and recreating
- * them after reanalyzing line.
+ * Returns: list of contexts in deleted segments if @collect_contexts is TRUE
+ * or NULL. The caller must free the list and context_unref() its elements.
  */
 static GSList *
 erase_segments (GtkSourceContextEngine *ce,
 		gint                    start,
 		gint                    end,
+		gboolean                collect_contexts,
 		Segment                *hint)
 {
 	Segment *root = ce->priv->root_segment;
@@ -3505,6 +3540,9 @@ erase_segments (GtkSourceContextEngine *ce,
 
 	if (!root->children)
 		return NULL;
+
+	if (!hint)
+		hint = ce->priv->hint;
 
 	if (hint)
 		while (hint && hint->parent != ce->priv->root_segment)
@@ -3537,11 +3575,14 @@ erase_segments (GtkSourceContextEngine *ce,
 			break;
 		}
 
-		contexts_here = get_contexts_in_segment (child);
-		g_slist_foreach (contexts_here, (GFunc) context_ref, NULL);
-		contexts = g_slist_concat (contexts_here, contexts);
+		if (collect_contexts)
+		{
+			contexts_here = get_contexts_in_segment (child);
+			g_slist_foreach (contexts_here, (GFunc) context_ref, NULL);
+			contexts = g_slist_concat (contexts_here, contexts);
+		}
 
-		segment_erase_range (ce, child, start, end);
+		segment_erase_range_ (ce, child, start, end);
 		child = next;
 	}
 
@@ -3567,11 +3608,14 @@ erase_segments (GtkSourceContextEngine *ce,
 			break;
 		}
 
-		contexts_here = get_contexts_in_segment (child);
-		g_slist_foreach (contexts_here, (GFunc) context_ref, NULL);
-		contexts = g_slist_concat (contexts_here, contexts);
+		if (collect_contexts)
+		{
+			contexts_here = get_contexts_in_segment (child);
+			g_slist_foreach (contexts_here, (GFunc) context_ref, NULL);
+			contexts = g_slist_concat (contexts_here, contexts);
+		}
 
-		segment_erase_range (ce, child, start, end);
+		segment_erase_range_ (ce, child, start, end);
 		child = prev;
 	}
 
@@ -3703,6 +3747,7 @@ update_syntax (GtkSourceContextEngine *ce,
 		old_contexts = erase_segments (ce,
 					       line_start_offset,
 					       line_end_offset,
+					       TRUE,
 					       ce->priv->hint);
                 get_line_info (buffer, &line_start, &line_end, &line);
 

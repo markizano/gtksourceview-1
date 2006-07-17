@@ -3,6 +3,8 @@
 	* gtksourceview/gtksourcecontextengine.c: fixed update_syntax()
 	return value and invalidating end of batch in case when the batch
 	was not enough.
+	Made text_inserted and text_deleted use hint better, and set/unset it
+	as appropriate.
 
 2006-07-16  Yevgen Muntyan  <muntyan@tamu.edu>
 
