@@ -1,3 +1,11 @@
+2006-07-18  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcecontextengine.c: (text_inserted),
+	(text_deleted): invalidate tail of buffer after modification
+	offset if there are too many invalid segments already, to
+	avoid calling fix_offsets_* repeatedly in long sequences
+	of modifications.
+
 2006-07-17  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* stamp-h.in: removed, it's garbage.

@@ -61,6 +61,8 @@
 #define INITIAL_WORKER_BATCH	8192
 #define MINIMUM_WORKER_BATCH	1024
 
+#define MANY_INVALID_SEGMENTS	4
+
 #define GTK_SOURCE_CONTEXT_ENGINE_ERROR (gtk_source_context_engine_error_quark ())
 
 /* Returns the definition corrsponding to the specified id. */
@@ -305,6 +307,9 @@ struct _GtkSourceContextEnginePrivate
 	/* Tree of contexts. */
 	Context			*root_context;
 	Segment			*root_segment;
+	/* XXX if it can't have many elements, then GSList will
+	 * do just fine here. GTree is only needed for many
+	 * modifications. */
 	GTree			*invalid;
 	Segment			*hint;
 
@@ -1055,12 +1060,40 @@ simple_segment_split_ (GtkSourceContextEngine *ce,
 }
 
 static void
+invalidate_tail (GtkSourceContextEngine *ce,
+		 gint                    offset,
+		 gint                    length)
+{
+	erase_segments (ce,
+			offset,
+			ce->priv->root_segment->end_at,
+			FALSE,
+			NULL);
+
+	ce->priv->root_segment->end_at += length;
+
+	if (!get_invalid_at_ (ce, offset))
+		create_segment (ce,
+				ce->priv->root_segment,
+				NULL,
+				offset,
+				ce->priv->root_segment->end_at,
+				NULL);
+
+	CHECK_TREE (ce);
+	install_idle_worker (ce);
+}
+
+static void
 text_inserted (GtkSourceContextEngine *ce,
 	       gint                    offset,
 	       gint                    length)
 {
 	Segment *parent, *prev = NULL, *next = NULL, *new_segment;
 	Segment *segment;
+
+	if (g_tree_nnodes (ce->priv->invalid) > MANY_INVALID_SEGMENTS)
+		return invalidate_tail (ce, offset, length);
 
 	/* If there is an invalid segment adjacent to offset, use it.
 	 * Otherwise, find the deepest segment to split and insert
@@ -1234,6 +1267,9 @@ text_deleted (GtkSourceContextEngine *ce,
 	      gint                    end)
 {
 	g_return_if_fail (start < end);
+
+	if (g_tree_nnodes (ce->priv->invalid) > MANY_INVALID_SEGMENTS)
+		return invalidate_tail (ce, start, start - end);
 
 	/* XXX it may make two invalid segments adjacent, and we can get crash */
 	erase_segments (ce, start, end, FALSE, NULL);
