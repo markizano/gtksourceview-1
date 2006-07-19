@@ -1,5 +1,11 @@
 2006-07-19  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* autogen.sh: don't use --enable-gtk-doc by default.
+	* gtksourceview/gtksourcecontextengine.c: keep an invalid region
+	instead of invalidating tail of buffer.
+
+2006-07-19  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c: (invalidate_tail):
 	made it actually work.
 
