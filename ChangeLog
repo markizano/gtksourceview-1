@@ -1,5 +1,10 @@
 2006-07-19  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c: (regex_new):
+	prevent using \C (single byte match) in patterns.
+
+2006-07-19  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c: added a timer to
 	update_syntax().
 

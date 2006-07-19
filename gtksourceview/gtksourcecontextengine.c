@@ -100,6 +100,7 @@ typedef enum {
 	GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_REF,
 	GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_WHERE,
 	GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_START_REF,
+	GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_REGEX
 } GtkSourceContextEngineError;
 
 typedef enum {
@@ -1949,6 +1950,37 @@ regex_unref (Regex *regex)
 	}
 }
 
+static gboolean
+find_single_byte_escape (const gchar *string)
+{
+	const char *p = string;
+
+	while ((p = strstr (p, "\\C")))
+	{
+		const char *slash;
+		gboolean found;
+
+		if (p == string)
+			return TRUE;
+
+		found = TRUE;
+		slash = p - 1;
+
+		while (slash >= string && *slash == '\\')
+		{
+			found = !found;
+			slash--;
+		}
+
+		if (found)
+			return TRUE;
+
+		p += 2;
+	}
+
+	return FALSE;
+}
+
 /**
  * regex_new:
  *
@@ -1967,6 +1999,14 @@ regex_new (const gchar           *pattern,
 {
 	EggRegex *start_ref;
 	Regex *regex;
+
+	if (find_single_byte_escape (pattern))
+	{
+		g_set_error (error, GTK_SOURCE_CONTEXT_ENGINE_ERROR,
+			     GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_REGEX,
+			     "using \\C is not supported");
+		return NULL;
+	}
 
 	start_ref = egg_regex_new (START_REF_REGEX, 0, 0, NULL);
 	regex = g_new0 (Regex, 1);
@@ -5098,9 +5138,29 @@ check_context (Context *context)
 }
 
 static void
+check_regex (void)
+{
+	static gboolean done;
+
+	if (!done)
+	{
+		g_assert (!find_single_byte_escape ("gfregerg"));
+		g_assert (!find_single_byte_escape ("\\\\C"));
+		g_assert (find_single_byte_escape ("\\C"));
+		g_assert (find_single_byte_escape ("ewfwefwefwef\\Cwefwefwefwe"));
+		g_assert (find_single_byte_escape ("ewfwefwefwef\\\\Cwefw\\Cefwefwe"));
+		g_assert (!find_single_byte_escape ("ewfwefwefwef\\\\Cwefw\\\\Cefwefwe"));
+
+		done = TRUE;
+	}
+}
+
+static void
 CHECK_TREE (GtkSourceContextEngine *ce)
 {
 	Segment *root = ce->priv->root_segment;
+
+	check_regex ();
 
 	g_assert (root->start_at == 0);
 
