@@ -2545,7 +2545,7 @@ context_unref (Context *context)
 	if (!context || --context->ref_count)
 		return;
 
-	g_print ("destroying context %s\n", context->definition->id);
+	DEBUG (g_print ("destroying context %s\n", context->definition->id));
 
 	children = context->children;
 	context->children = NULL;
@@ -2639,7 +2639,7 @@ create_child_context (Context           *parent,
 	else
 		g_hash_table_insert (ptr->u.hash, match, context);
 
-	return context_ref (context);
+	return context;
 };
 
 static Segment *

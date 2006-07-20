@@ -1,4 +1,11 @@
-2006-07-19  Yevgen Muntyan  <muntyan@tamu.edu>
+2006-07-20  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcecontextengine.c: 
+	(create_child_context): do not add extra reference to context,
+	so the parent does not own a reference to it and it is actually
+	freed when no segments are using it.
+
+2006-07-20  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourceview.c:
 	* gtksourceview/gtksourceengine.[ch]:
