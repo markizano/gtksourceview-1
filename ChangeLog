@@ -1,5 +1,11 @@
 2006-07-20  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcelanguage-parser-1.c:
+	(engine_add_syntax_pattern): do free "freeme" string;
+	(build_keyword_list): increased keywords number limit to 1000.
+
+2006-07-20  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* configure.in: 
 	* tests/Makefile.am: 
 	* tests/test-widget.c: 

@@ -112,6 +112,7 @@ engine_add_syntax_pattern (GtkSourceContextEngine *ce,
 
 	g_free (real_id);
 	g_free (root_id);
+	g_free (freeme);
 
 	return result;
 }
@@ -152,8 +153,8 @@ build_keyword_list (const gchar  *id,
 		 * list.  This is a temporary solution, as the correct
 		 * approach would be to generate multiple keyword
 		 * lists.  (See bug #110991) */
-
-#define KEYWORD_LIMIT 250
+		/* we are using pcre now, and it can handle more */
+#define KEYWORD_LIMIT 1000
 
 		while (keywords != NULL && keyword_count < KEYWORD_LIMIT)
 		{
