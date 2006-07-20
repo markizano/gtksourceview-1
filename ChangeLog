@@ -1,5 +1,24 @@
 2006-07-19  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourceview.c:
+	* gtksourceview/gtksourceengine.[ch]:
+	* gtksourceview/gtksourcebuffer.[ch]: replaced 
+	GtkSourceBuffer::update-highlight" signal with 
+	_gtk_source_buffer_update_highlight() function,
+	and added GtkSourceEngine.update_highlight method.
+	* gtksourceview/gtksourceview-marshal.list:
+	removed VOID:BOXED,BOXED,BOOLEAN which is not needed anymore.
+	* gtksourceview/gtksourcecontextengine.c: 
+	(regex_match_simple): new function;
+	(regex_new), (context_definition_new): use it here.
+	Refactored code so that text_inserted and text_deleted
+	only update invalid region, and update_syntax then uses
+	it to modify the tree.
+	* tests/test-widget.c: unset language when language is not
+	found for opened file.
+
+2006-07-19  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c: (regex_new):
 	prevent using \C (single byte match) in patterns.
 

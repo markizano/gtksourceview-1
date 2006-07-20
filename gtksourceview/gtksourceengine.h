@@ -45,26 +45,34 @@ struct _GtkSourceEngineClass
 {
 	GObjectClass parent_class;
 
-	void     (* attach_buffer)    (GtkSourceEngine *engine,
-				       GtkTextBuffer   *buffer);
-	void     (* text_inserted)    (GtkSourceEngine *engine,
-				       gint             start_offset,
-				       gint             end_offset);
-	void     (* text_deleted)     (GtkSourceEngine *engine,
-				       gint             offset,
-				       gint             length);
+	void     (* attach_buffer)    (GtkSourceEngine   *engine,
+				       GtkTextBuffer     *buffer);
+	void     (* text_inserted)    (GtkSourceEngine   *engine,
+				       gint               start_offset,
+				       gint               end_offset);
+	void     (* text_deleted)     (GtkSourceEngine   *engine,
+				       gint               offset,
+				       gint               length);
+	void     (* update_highlight) (GtkSourceEngine   *engine,
+				       const GtkTextIter *start,
+				       const GtkTextIter *end,
+				       gboolean           synchronous);
 };
 
-GType       _gtk_source_engine_get_type        (void) G_GNUC_CONST;
+GType       _gtk_source_engine_get_type		(void) G_GNUC_CONST;
 
-void        _gtk_source_engine_attach_buffer   (GtkSourceEngine *engine,
-						GtkTextBuffer   *buffer);
-void        _gtk_source_engine_text_inserted   (GtkSourceEngine *engine,
-						gint             start_offset,
-						gint             end_offset);
-void        _gtk_source_engine_text_deleted    (GtkSourceEngine *engine,
-						gint             offset,
-						gint             length);
+void        _gtk_source_engine_attach_buffer	(GtkSourceEngine   *engine,
+						 GtkTextBuffer     *buffer);
+void        _gtk_source_engine_text_inserted	(GtkSourceEngine   *engine,
+						 gint               start_offset,
+						 gint               end_offset);
+void        _gtk_source_engine_text_deleted	(GtkSourceEngine   *engine,
+						 gint               offset,
+						 gint               length);
+void        _gtk_source_engine_update_highlight	(GtkSourceEngine   *engine,
+						 const GtkTextIter *start,
+						 const GtkTextIter *end,
+						 gboolean           synchronous);
 
 G_END_DECLS
 

@@ -1312,14 +1312,16 @@ gtk_source_view_expose (GtkWidget      *widget,
 					     + visible_rect.height, NULL);
 		gtk_text_iter_forward_line (&iter2);
 
+		/* FIXME: is "It generates new expose event" part true? */
 		/* Sometimes, until lines in GtkTextView are calculated, get_visible_rect
 		   returns whole buffer. It generates new expose event after it recalculates
-		   lines, so there is no point in emitting update-highlight now. */
+		   lines, so there is no point in emitting update-highlight now.
+		   To see this, open a big file, and scroll down. It will freeze for a while. */
 #define MANY_LINES 300
 		if (gtk_text_iter_get_line (&iter2) - gtk_text_iter_get_line (&iter1) < MANY_LINES)
-			g_signal_emit_by_name (view->priv->source_buffer,
-					       "update_highlight",
-					       &iter1, &iter2, FALSE);
+			_gtk_source_buffer_update_highlight (view->priv->source_buffer,
+							     &iter1, &iter2, FALSE);
+#undef MANY_LINES
 	}
 
 	/* now check for the left window, which contains the margin */

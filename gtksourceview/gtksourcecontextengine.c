@@ -56,11 +56,6 @@
 
 /* In milliseconds. */
 #define WORKER_TIME_SLICE	30
-/* The batch size is modified at runtime. */
-#define INITIAL_WORKER_BATCH	8192
-#define MINIMUM_WORKER_BATCH	1024
-
-#define MANY_INVALID_SEGMENTS	0
 
 #define GTK_SOURCE_CONTEXT_ENGINE_ERROR (gtk_source_context_engine_error_quark ())
 
@@ -90,7 +85,6 @@ typedef struct _ContextDefinition ContextDefinition;
 typedef struct _DefinitionChild DefinitionChild;
 typedef struct _DefinitionsIter DefinitionsIter;
 typedef struct _LineInfo LineInfo;
-typedef struct _SegmentList SegmentList;
 typedef struct _InvalidRegion InvalidRegion;
 
 typedef enum {
@@ -286,12 +280,6 @@ struct _LineInfo
 	gint			 eol_length;
 };
 
-struct _SegmentList
-{
-	GSList			*list;
-	gint			 length;
-};
-
 struct _InvalidRegion
 {
 	gboolean		 empty;
@@ -325,11 +313,11 @@ struct _GtkSourceContextEnginePrivate
 	/* Tree of contexts. */
 	Context			*root_context;
 	Segment			*root_segment;
-	SegmentList		 invalid;
 	Segment			*hint;
+	/* list of Segment* */
+	GSList			*invalid;
 	InvalidRegion		 invalid_region;
 
-	gint			 worker_batch_size;
 	guint			 worker_handler;
 
 	/* Views highlight requests. */
@@ -676,7 +664,16 @@ highlight_region (GtkSourceContextEngine *ce,
 		  GtkTextIter            *end)
 {
 #ifdef ENABLE_PROFILE
-	GTimer *timer = g_timer_new ();
+	GTimer *timer;
+#endif
+
+	if (gtk_text_iter_starts_line (end))
+		gtk_text_iter_backward_char (end);
+	if (gtk_text_iter_compare (start, end) >= 0)
+		return;
+
+#ifdef ENABLE_PROFILE
+	timer = g_timer_new ();
 #endif
 
 	/* First we need to delete tags in the regions. */
@@ -695,6 +692,19 @@ highlight_region (GtkSourceContextEngine *ce,
 #endif
 }
 
+/**
+ * ensure_highlighted:
+ *
+ * @ce: a #GtkSourceContextEngine.
+ * @start: the beginning of the region to highlight.
+ * @end: the end of the region to highlight.
+ *
+ * Updates text tags in reanalyzed parts of given area.
+ * It applies tags according to whatever is in the syntax
+ * tree currently, so highlighting may not be correct
+ * (gtk_source_context_engine_update_highlight is the method
+ * that actually ensures correct highlighting).
+ */
 static void
 ensure_highlighted (GtkSourceContextEngine *ce,
 		    const GtkTextIter      *start,
@@ -702,8 +712,6 @@ ensure_highlighted (GtkSourceContextEngine *ce,
 {
 	GtkTextRegion *region;
 	GtkTextRegionIterator reg_iter;
-
-	/* Assumes the entire region to highlight has already been analyzed. */
 
 	/* Get the subregions not yet highlighted. */
 	region = gtk_text_region_intersect (ce->priv->refresh_region, start, end);
@@ -729,16 +737,37 @@ ensure_highlighted (GtkSourceContextEngine *ce,
 	gtk_text_region_subtract (ce->priv->refresh_region, start, end);
 }
 
+/**
+ * refresh_range:
+ *
+ * @ce: a #GtkSourceContextEngine.
+ * @start: the beginning of updated area.
+ * @end: the end of updated area.
+ *
+ * Marks the area as updated - adds it to refresh_region
+ * and notifies view about it.
+ */
 static void
 refresh_range (GtkSourceContextEngine *ce,
-	       GtkTextIter            *start,
-	       GtkTextIter            *end)
+	       const GtkTextIter      *start,
+	       const GtkTextIter      *end)
 {
-	/* Add this region to the refresh region. */
+	GtkTextIter real_end;
+
+	g_return_if_fail (!gtk_text_iter_equal (start, end));
+
 	gtk_text_region_add (ce->priv->refresh_region, start, end);
 
-	/* Notify views of the updated highlight region */
-	g_signal_emit_by_name (ce->priv->buffer, "highlight_updated", start, end);
+	/* Here we need to make sure we do not make it redraw next line */
+	real_end = *end;
+	if (gtk_text_iter_starts_line (&real_end))
+		/* XXX if it's in the middle of \r\n, what line is it? */
+		gtk_text_iter_backward_char (&real_end);
+
+	g_signal_emit_by_name (ce->priv->buffer,
+			       "highlight_updated",
+			       start,
+			       &real_end);
 }
 
 static gint
@@ -765,25 +794,23 @@ add_invalid (GtkSourceContextEngine *ce,
 	     Segment                *segment)
 {
 #ifdef ENABLE_CHECK_TREE
-	g_assert (!g_slist_find (ce->priv->invalid.list, segment));
+	g_assert (!g_slist_find (ce->priv->invalid, segment));
 #endif
 	g_assert (SEGMENT_IS_INVALID (segment));
 
-	ce->priv->invalid.list = g_slist_insert_sorted (ce->priv->invalid.list,
-							segment,
-							(GCompareFunc) segment_cmp);
-	ce->priv->invalid.length++;
+	ce->priv->invalid = g_slist_insert_sorted (ce->priv->invalid,
+						   segment,
+						   (GCompareFunc) segment_cmp);
 
-	DEBUG (g_print ("%d invalid\n", ce->priv->invalid.length));
+	DEBUG (g_print ("%d invalid\n", g_slist_length (ce->priv->invalid)));
 }
 
 static void
 remove_invalid (GtkSourceContextEngine *ce,
 		Segment                *segment)
 {
-	g_assert (g_slist_find (ce->priv->invalid.list, segment) != NULL);
-	ce->priv->invalid.list = g_slist_remove (ce->priv->invalid.list, segment);
-	ce->priv->invalid.length--;
+	g_assert (g_slist_find (ce->priv->invalid, segment) != NULL);
+	ce->priv->invalid = g_slist_remove (ce->priv->invalid, segment);
 }
 
 static void
@@ -968,23 +995,11 @@ find_insertion_place (Segment  *segment,
 		find_insertion_place_backward_ (segment, offset, hint, parent, prev, next);
 }
 
-// static gint
-// get_invalid_at_search_func (Segment *segment,
-// 			    gpointer offset)
-// {
-// 	if (segment->start_at > GPOINTER_TO_INT (offset))
-// 		return -1;
-// 	else if (segment->end_at < GPOINTER_TO_INT (offset))
-// 		return 1;
-// 	else
-// 		return 0;
-// }
-
 static Segment *
 get_invalid_at_ (GtkSourceContextEngine *ce,
 		 gint                    offset)
 {
-	GSList *link = ce->priv->invalid.list;
+	GSList *link = ce->priv->invalid;
 
 	while (link)
 	{
@@ -1112,77 +1127,6 @@ simple_segment_split_ (GtkSourceContextEngine *ce,
 	return invalid;
 }
 
-// static void
-// invalidate_tail (GtkSourceContextEngine *ce,
-// 		 gint                    offset,
-// 		 gint                    length)
-// {
-// 	Segment *invalid, *root;
-//
-// // 	g_print ("invalidate_tail\n");
-//
-// 	ce->priv->invalidate_tail = TRUE;
-// 	root = ce->priv->root_segment;
-//
-// 	if ((invalid = root->last_child) &&
-// 	    SEGMENT_IS_INVALID (invalid) &&
-// 	    invalid->start_at != invalid->end_at)
-// 	{
-// 		if (invalid->end_at < root->end_at)
-// 			erase_segments (ce,
-// 					invalid->end_at,
-// 					root->end_at,
-// 					FALSE,
-// 					invalid);
-// 		if (invalid->start_at > offset)
-// 			erase_segments (ce,
-// 					offset,
-// 					invalid->start_at,
-// 					FALSE,
-// 					invalid);
-//
-// 		root->end_at += length;
-// 		invalid->start_at = offset;
-// 		invalid->end_at = root->end_at;
-// 	}
-// 	else if ((invalid = get_invalid_at_ (ce, offset)) &&
-// 		 invalid->parent == root)
-// 	{
-// 		if (invalid->end_at < root->end_at)
-// 		{
-// 			erase_segments (ce,
-// 					invalid->end_at,
-// 					ce->priv->root_segment->end_at,
-// 					FALSE,
-// 					invalid);
-// 			invalid->end_at = root->end_at;
-// 		}
-//
-// 		root->end_at += length;
-// 		invalid->end_at += length;
-// 	}
-// 	else
-// 	{
-// 		erase_segments (ce,
-// 				offset,
-// 				root->end_at,
-// 				FALSE,
-// 				NULL);
-//
-// 		root->end_at += length;
-//
-// 		create_segment (ce,
-// 				root,
-// 				NULL,
-// 				offset,
-// 				root->end_at,
-// 				NULL);
-// 	}
-//
-// 	CHECK_TREE (ce);
-// 	install_idle_worker (ce);
-// }
-
 static gboolean
 invalidate_region (GtkSourceContextEngine *ce,
 		   gint                    offset,
@@ -1192,9 +1136,6 @@ invalidate_region (GtkSourceContextEngine *ce,
 	GtkTextBuffer *buffer = ce->priv->buffer;
 	GtkTextIter iter;
 	gint end_offset;
-
-	if (region->empty && ce->priv->invalid.length < MANY_INVALID_SEGMENTS)
-		return FALSE;
 
 	end_offset = length >= 0 ? offset + length : offset;
 
@@ -1247,16 +1188,12 @@ invalidate_region (GtkSourceContextEngine *ce,
 }
 
 static void
-text_inserted (GtkSourceContextEngine *ce,
-	       gint                    offset,
-	       gint                    length,
-	       gboolean                check_invalid_region)
+insert_range (GtkSourceContextEngine *ce,
+	      gint                    offset,
+	      gint                    length)
 {
 	Segment *parent, *prev = NULL, *next = NULL, *new_segment;
 	Segment *segment;
-
-	if (check_invalid_region && invalidate_region (ce, offset, length))
-		return;
 
 	/* If there is an invalid segment adjacent to offset, use it.
 	 * Otherwise, find the deepest segment to split and insert
@@ -1349,7 +1286,6 @@ text_inserted (GtkSourceContextEngine *ce,
 	}
 
 	CHECK_TREE (ce);
-	install_idle_worker (ce);
 }
 
 static void
@@ -1358,11 +1294,9 @@ gtk_source_context_engine_text_inserted (GtkSourceEngine *engine,
 					 gint             end_offset)
 {
 	g_return_if_fail (start_offset < end_offset);
-
-	text_inserted (GTK_SOURCE_CONTEXT_ENGINE (engine),
-		       start_offset,
-		       end_offset - start_offset,
-		       TRUE);
+	invalidate_region (GTK_SOURCE_CONTEXT_ENGINE (engine),
+			   start_offset,
+			   end_offset - start_offset);
 }
 
 static inline gint
@@ -1391,8 +1325,6 @@ fix_offsets_delete_ (Segment *segment,
 	SubPattern *sp;
 
 	g_return_if_fail (segment->end_at > offset);
-// 	if (segment->end_at <= offset)
-// 		return;
 
 	if (hint)
 		while (hint && hint->parent != segment)
@@ -1426,15 +1358,11 @@ fix_offsets_delete_ (Segment *segment,
 }
 
 static void
-text_deleted (GtkSourceContextEngine *ce,
+delete_range (GtkSourceContextEngine *ce,
 	      gint                    start,
-	      gint                    end,
-	      gboolean                check_invalid_region)
+	      gint                    end)
 {
 	g_return_if_fail (start < end);
-
-	if (check_invalid_region && invalidate_region (ce, start, start - end))
-		return;
 
 	/* XXX it may make two invalid segments adjacent, and we can get crash */
 	erase_segments (ce, start, end, FALSE, NULL);
@@ -1444,7 +1372,6 @@ text_deleted (GtkSourceContextEngine *ce,
 		ce->priv->hint = create_segment (ce, ce->priv->root_segment, NULL, start, start, NULL);
 
 	CHECK_TREE (ce);
-	install_idle_worker (ce);
 };
 
 static void
@@ -1453,95 +1380,81 @@ gtk_source_context_engine_text_deleted (GtkSourceEngine *engine,
 					gint             length)
 {
 	g_return_if_fail (length > 0);
-
-	text_deleted (GTK_SOURCE_CONTEXT_ENGINE (engine),
-		      offset,
-		      offset + length,
-		      TRUE);
+	invalidate_region (GTK_SOURCE_CONTEXT_ENGINE (engine),
+			   offset,
+			   - length);
 }
 
-// static gboolean
-// traverse_func_get_first_invalid (Segment  *segment,
-// 				 gpointer  value,
-// 				 Segment **result)
-// {
-// 	g_assert (segment == value);
-// 	*result = segment;
-// 	return TRUE;
-// }
-
 /**
- * get_invalid_first:
+ * get_invalid_segment:
  *
  * @ce: a #GtkSourceContextEngine.
  *
  * Returns first invalid segment, or NULL.
  */
 static Segment *
-get_invalid_first (GtkSourceContextEngine *ce)
+get_invalid_segment (GtkSourceContextEngine *ce)
 {
 	g_return_val_if_fail (ce->priv->invalid_region.empty, NULL);
-	return ce->priv->invalid.list ? ce->priv->invalid.list->data : NULL;
+	return ce->priv->invalid ? ce->priv->invalid->data : NULL;
 }
-
-// static gboolean
-// traverse_func_get_invalid_after (Segment  *segment,
-// 				 gpointer  value,
-// 				 gpointer  user_data)
-// {
-// 	struct {
-// 		Segment *result;
-// 		gint start;
-// 	} *data = user_data;
-//
-// 	g_assert (segment == value);
-//
-// 	if (segment->start_at >= data->start)
-// 	{
-// 		data->result = segment;
-// 		return TRUE;
-// 	}
-//
-// 	return FALSE;
-// }
 
 /**
- * get_invalid_after:
+ * get_invalid_line:
  *
  * @ce: a #GtkSourceContextEngine.
- * @start: the offset.
  *
- * Returns first invalid segment which starts at or after @start,
- * or NULL.
+ * Returns first invalid line, or -1.
  */
-static Segment *
-get_invalid_after (GtkSourceContextEngine *ce,
-		   gint                    start)
+static gint
+get_invalid_line (GtkSourceContextEngine *ce)
 {
-	GSList *link = ce->priv->invalid.list;
+	GtkTextIter iter;
+	gint offset = G_MAXINT;
 
-	while (link)
+	if (!ce->priv->invalid_region.empty)
 	{
-		Segment *segment = link->data;
-
-		if (segment->start_at >= start)
-			return segment;
-
-		link = link->next;
+		gint tmp;
+		gtk_text_buffer_get_iter_at_mark (ce->priv->buffer,
+						  &iter,
+						  ce->priv->invalid_region.start);
+		tmp = gtk_text_iter_get_offset (&iter);
+		offset = MIN (offset, tmp);
 	}
 
-	return NULL;
+	if (ce->priv->invalid)
+	{
+		Segment *segment = ce->priv->invalid->data;
+		offset = MIN (offset, segment->start_at);
+	}
+
+	if (offset == G_MAXINT)
+		return -1;
+
+	gtk_text_buffer_get_iter_at_offset (ce->priv->buffer, &iter, offset);
+	return gtk_text_iter_get_line (&iter);
 }
 
-static void
-fix_invalid_region (GtkSourceContextEngine *ce)
+/**
+ * update_tree:
+ *
+ * @ce: a #GtkSourceContextEngine.
+ *
+ * Modifies syntax tree according to data in invalid_region.
+ *
+ * Returns: list of contexts in invalidates region. Caller must
+ * free the list and context_unref() its elements.
+ */
+static GSList *
+update_tree (GtkSourceContextEngine *ce)
 {
 	InvalidRegion *region = &ce->priv->invalid_region;
 	gint start_offset, end_offset;
 	GtkTextIter iter;
+	GSList *contexts = NULL;
 
 	if (region->empty)
-		return;
+		return NULL;
 
 	gtk_text_buffer_get_iter_at_mark (ce->priv->buffer, &iter, region->start);
 	start_offset = gtk_text_iter_get_offset (&iter);
@@ -1552,16 +1465,15 @@ fix_invalid_region (GtkSourceContextEngine *ce)
 	g_assert (start_offset <= end_offset - region->delta);
 
 	if (start_offset < end_offset - region->delta)
-		erase_segments (ce,
-				start_offset,
-				end_offset - region->delta,
-				FALSE,
-				NULL);
+		contexts = erase_segments (ce,
+					   start_offset,
+					   end_offset - region->delta,
+					   TRUE,
+					   NULL);
 	else
-		text_inserted (ce,
-			       start_offset,
-			       0,
-			       FALSE);
+		insert_range (ce,
+			      start_offset,
+			      0);
 
 	if (!get_invalid_at_ (ce, start_offset))
 		create_segment (ce,
@@ -1572,35 +1484,44 @@ fix_invalid_region (GtkSourceContextEngine *ce)
 				NULL);
 
 	if (region->delta >= 0)
-		text_inserted (ce,
-			       end_offset - region->delta,
-			       region->delta,
-			       FALSE);
-	else
-		text_deleted (ce,
-			      end_offset,
+		insert_range (ce,
 			      end_offset - region->delta,
-			      FALSE);
+			      region->delta);
+	else
+		delete_range (ce,
+			      end_offset,
+			      end_offset - region->delta);
 
 	region->empty = TRUE;
 	CHECK_TREE (ce);
+
+	return contexts;
 }
 
+/* XXX make sure regions requested and highlighted are the same,
+   so we don't install an idle just because a view gave us a
+   start iter of the line it doesn't care about (and vice versa
+   in update_syntax) */
 static void
-update_highlight_cb (GtkSourceContextEngine *ce,
-		     const GtkTextIter      *start,
-		     const GtkTextIter      *end,
-		     gboolean                synchronous)
+gtk_source_context_engine_update_highlight (GtkSourceEngine *engine,
+					    const GtkTextIter      *start,
+					    const GtkTextIter      *end,
+					    gboolean                synchronous)
 {
-	Segment *invalid;
+	gint invalid_line;
+	gint end_line;
+	GtkSourceContextEngine *ce = GTK_SOURCE_CONTEXT_ENGINE (engine);
 
 	if (!ce->priv->highlight)
 		return;
 
-	fix_invalid_region (ce);
-	invalid = get_invalid_first (ce);
+	invalid_line = get_invalid_line (ce);
+	end_line = gtk_text_iter_get_line (end);
 
-	if (!invalid || invalid->start_at >= gtk_text_iter_get_offset (end))
+	if (gtk_text_iter_starts_line (end) && end_line > 0)
+		end_line -= 1;
+
+	if (invalid_line < 0 || invalid_line > end_line)
 	{
 		ensure_highlighted (ce, start, end);
 	}
@@ -1639,7 +1560,8 @@ enable_highlight (GtkSourceContextEngine *ce,
 static void
 buffer_notify_highlight_cb (GtkSourceContextEngine *ce)
 {
-	gboolean highlight = gtk_source_buffer_get_highlight (GTK_SOURCE_BUFFER (ce->priv->buffer));
+	gboolean highlight;
+	g_object_get (ce->priv->buffer, "highlight", &highlight, NULL);
 	enable_highlight (ce, highlight);
 }
 
@@ -1649,7 +1571,7 @@ buffer_notify_highlight_cb (GtkSourceContextEngine *ce)
 static gboolean
 all_analyzed (GtkSourceContextEngine *ce)
 {
-	return ce->priv->invalid.length == 0 && ce->priv->invalid_region.empty;
+	return ce->priv->invalid == NULL && ce->priv->invalid_region.empty;
 }
 
 /**
@@ -1735,14 +1657,6 @@ remove_tags_hash_cb (G_GNUC_UNUSED gpointer style,
 	}
 }
 
-static void
-clear_invalid_list (GtkSourceContextEngine *ce)
-{
-	g_slist_free (ce->priv->invalid.list);
-	ce->priv->invalid.list = NULL;
-	ce->priv->invalid.length = 0;
-}
-
 /**
  * gtk_source_context_engine_attach_buffer:
  *
@@ -1769,9 +1683,6 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 		enable_highlight (ce, FALSE);
 
 		g_signal_handlers_disconnect_by_func (ce->priv->buffer,
-						      (gpointer) update_highlight_cb,
-						      ce);
-		g_signal_handlers_disconnect_by_func (ce->priv->buffer,
 						      (gpointer) buffer_notify_highlight_cb,
 						      ce);
 		g_signal_handlers_disconnect_by_func (ce->priv->buffer,
@@ -1786,9 +1697,10 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 
 		segment_destroy (ce, ce->priv->root_segment);
 		context_unref (ce->priv->root_context);
-		clear_invalid_list (ce);
+		g_slist_free (ce->priv->invalid);
 		ce->priv->root_segment = NULL;
 		ce->priv->root_context = NULL;
+		ce->priv->invalid = NULL;
 
 		gtk_text_buffer_delete_mark (ce->priv->buffer,
 					     ce->priv->invalid_region.start);
@@ -1846,13 +1758,10 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 		ce->priv->invalid_region.empty = FALSE;
 		ce->priv->invalid_region.delta = gtk_text_buffer_get_char_count (buffer);
 
-		ce->priv->highlight = gtk_source_buffer_get_highlight (GTK_SOURCE_BUFFER (buffer));
+		g_object_get (ce->priv->buffer, "highlight", &ce->priv->highlight, NULL);
 		ce->priv->refresh_region = gtk_text_region_new (buffer);
 		ce->priv->highlight_requests = gtk_text_region_new (buffer);
-		ce->priv->worker_batch_size = INITIAL_WORKER_BATCH;
 
-		g_signal_connect_swapped (buffer, "update_highlight",
-					  G_CALLBACK (update_highlight_cb), ce);
 		g_signal_connect_swapped (buffer, "notify::highlight",
 					  G_CALLBACK (buffer_notify_highlight_cb), ce);
 		g_signal_connect_swapped (buffer, "debug",
@@ -1898,6 +1807,7 @@ _gtk_source_context_engine_class_init (GtkSourceContextEngineClass *klass)
 	engine_class->attach_buffer = gtk_source_context_engine_attach_buffer;
 	engine_class->text_inserted = gtk_source_context_engine_text_inserted;
 	engine_class->text_deleted = gtk_source_context_engine_text_deleted;
+	engine_class->update_highlight = gtk_source_context_engine_update_highlight;
 
 	g_type_class_add_private (object_class, sizeof (GtkSourceContextEnginePrivate));
 }
@@ -1981,6 +1891,25 @@ find_single_byte_escape (const gchar *string)
 	return FALSE;
 }
 
+static gboolean
+regex_match_simple (const gchar *pattern,
+		    const gchar *string)
+{
+	EggRegex *regex;
+	gboolean result;
+
+	g_return_val_if_fail (pattern != NULL, FALSE);
+	g_return_val_if_fail (string != NULL, FALSE);
+
+	regex = egg_regex_new (pattern, 0, 0, NULL);
+	g_return_val_if_fail (regex != NULL, FALSE);
+
+	result = egg_regex_match (regex, string, 0);
+
+	egg_regex_free (regex);
+	return result;
+}
+
 /**
  * regex_new:
  *
@@ -1997,7 +1926,6 @@ regex_new (const gchar           *pattern,
 	   EggRegexCompileFlags   flags,
 	   GError               **error)
 {
-	EggRegex *start_ref;
 	Regex *regex;
 
 	if (find_single_byte_escape (pattern))
@@ -2008,11 +1936,10 @@ regex_new (const gchar           *pattern,
 		return NULL;
 	}
 
-	start_ref = egg_regex_new (START_REF_REGEX, 0, 0, NULL);
 	regex = g_new0 (Regex, 1);
 	regex->ref_count = 1;
 
-	if (egg_regex_match (start_ref, pattern, 0))
+	if (regex_match_simple (START_REF_REGEX, pattern))
 	{
 		regex->resolved = FALSE;
 		regex->u.info.pattern = g_strdup (pattern);
@@ -2034,7 +1961,6 @@ regex_new (const gchar           *pattern,
 		}
 	}
 
-	egg_regex_free (start_ref);
 	return regex;
 }
 
@@ -2619,6 +2545,8 @@ context_unref (Context *context)
 	if (!context || --context->ref_count)
 		return;
 
+	g_print ("destroying context %s\n", context->definition->id);
+
 	children = context->children;
 	context->children = NULL;
 
@@ -2950,7 +2878,7 @@ segment_destroy (GtkSourceContextEngine *ce,
 	context_unref (segment->context);
 
 #ifdef ENABLE_DEBUG
-	g_assert (!g_slist_find (ce->priv->invalid.list, segment));
+	g_assert (!g_slist_find (ce->priv->invalid, segment));
 	memset (segment, 0, sizeof (Segment));
 #else
 	g_free (segment);
@@ -4214,6 +4142,9 @@ erase_segments (GtkSourceContextEngine *ce,
  * when time elapsed is greater than %time, so analyzed region is
  * not necessarily what's requested (unless %time is 0).
  */
+/* XXX it needs to be refactored. I'm not doing it now because it's
+ * not clear whether it does the right thing (it was rewritten two times
+ * already). */
 static void
 update_syntax (GtkSourceContextEngine *ce,
 	       const GtkTextIter      *end,
@@ -4229,23 +4160,23 @@ update_syntax (GtkSourceContextEngine *ce,
 	Segment *state = ce->priv->root_segment;
 	Segment *hint = ce->priv->hint;
 	GTimer *timer;
+	GSList *invalid_region_contexts;
 
-	fix_invalid_region (ce);
-	CHECK_TREE (ce);
+	invalid_region_contexts = update_tree (ce);
 
 	if (!gtk_text_buffer_get_char_count (buffer))
 	{
 		segment_tree_zero_len (ce);
-		return;
+		goto out;
 	}
 
-	invalid = get_invalid_first (ce);
+	invalid = get_invalid_segment (ce);
 
 	if (!invalid)
-		return;
+		goto out;
 
 	if (end && invalid->start_at >= gtk_text_iter_get_offset (end))
-		return;
+		goto out;
 
 	if (end)
 	{
@@ -4277,10 +4208,10 @@ update_syntax (GtkSourceContextEngine *ce,
 	if (start_offset == end_offset)
 	{
 		g_assert (end_offset == gtk_text_buffer_get_char_count (buffer));
-		g_assert (ce->priv->invalid.length == 1);
+		g_assert (g_slist_length (ce->priv->invalid) == 1);
 		segment_remove (ce, invalid);
 		CHECK_TREE (ce);
-		return;
+		goto out;
 	}
 
 
@@ -4345,7 +4276,7 @@ update_syntax (GtkSourceContextEngine *ce,
 		gtk_text_region_add (ce->priv->refresh_region, &line_start, &line_end);
 		analyzed_end = line_end_offset;
 
-		if ((invalid = get_invalid_first (ce)))
+		if ((invalid = get_invalid_segment (ce)))
 		{
 			GtkTextIter iter;
 
@@ -4363,7 +4294,7 @@ update_syntax (GtkSourceContextEngine *ce,
 			hint = ce->priv->hint ? ce->priv->hint : state;
 			old_state = get_segment_at_offset (ce, hint, line_end_offset);
 
-			if (old_state != state)
+			if (old_state->context != state->context)
 			{
 				need_invalidate_next = TRUE;
 				next_line_invalid = TRUE;
@@ -4380,7 +4311,7 @@ update_syntax (GtkSourceContextEngine *ce,
 		    (!invalid && !next_line_invalid))
 		{
 			if (need_invalidate_next)
-				text_inserted (ce, line_end_offset, 0, FALSE);
+				insert_range (ce, line_end_offset, 0);
 			break;
 		}
 
@@ -4403,11 +4334,11 @@ update_syntax (GtkSourceContextEngine *ce,
 
 	if (analyzed_end == gtk_text_buffer_get_char_count (buffer))
 	{
-		g_assert (ce->priv->invalid.length <= 1);
+		g_assert (g_slist_length (ce->priv->invalid) <= 1);
 
-		if (ce->priv->invalid.length)
+		if (ce->priv->invalid != NULL)
 		{
-			invalid = get_invalid_first (ce);
+			invalid = get_invalid_segment (ce);
 			segment_remove (ce, invalid);
 			CHECK_TREE (ce);
 		}
@@ -4424,186 +4355,11 @@ update_syntax (GtkSourceContextEngine *ce,
 			  g_timer_elapsed (timer, NULL) * 1000));
 
 	g_timer_destroy (timer);
-}
 
-// {
-// 	Segment *invalid;
-// 	GtkTextIter start_iter, end_iter;
-// 	GtkTextIter line_start, line_end;
-// 	gint start_offset, end_offset;
-// 	GtkTextBuffer *buffer = ce->priv->buffer;
-// 	Segment *state = ce->priv->root_segment;
-// 	Segment *hint = ce->priv->hint;
-// 	GSList *invalid_lines; /* list of start offsets of lines containing invalid segments */
-// 	GTimer *timer;
-//
-// 	CHECK_TREE (ce);
-//
-// 	fix_invalid_region (ce);
-//
-// 	if (!gtk_text_buffer_get_char_count (buffer))
-// 	{
-// 		segment_tree_zero_len (ce);
-// 		return TRUE;
-// 	}
-//
-// 	invalid = get_invalid_first (ce);
-//
-// 	if (!invalid)
-// 		return TRUE;
-//
-// 	if (end && invalid->start_at >= gtk_text_iter_get_offset (end))
-// 		return FALSE;
-//
-// 	if (end)
-// 	{
-// 		end_offset = gtk_text_iter_get_offset (end);
-// 		start_offset = MIN (end_offset, invalid->start_at);
-// 	}
-// 	else
-// 	{
-// 		start_offset = invalid->start_at;
-// 		end_offset = start_offset + ce->priv->worker_batch_size;
-// 	}
-//
-// 	gtk_text_buffer_get_iter_at_offset (buffer, &start_iter, start_offset);
-// 	gtk_text_buffer_get_iter_at_offset (buffer, &end_iter, end_offset);
-//
-// 	if (!gtk_text_iter_starts_line (&start_iter))
-// 	{
-// 		gtk_text_iter_set_line_offset (&start_iter, 0);
-// 		start_offset = gtk_text_iter_get_offset (&start_iter);
-// 	}
-//
-// 	if (!gtk_text_iter_starts_line (&end_iter))
-// 	{
-// 		gtk_text_iter_forward_line (&end_iter);
-// 		end_offset = gtk_text_iter_get_offset (&end_iter);
-// 	}
-//
-// 	/* XXX This happens after deleting all text on last line. */
-// 	if (start_offset == end_offset)
-// 	{
-// 		g_assert (end_offset == gtk_text_buffer_get_char_count (buffer));
-// 		g_assert (ce->priv->invalid.length == 1);
-// 		segment_remove (ce, invalid);
-// 		CHECK_TREE (ce);
-// 		return TRUE;
-// 	}
-//
-// 	/* Collect list of invalid lines */
-// 	invalid_lines = g_slist_prepend (NULL, GINT_TO_POINTER (start_offset));
-// 	line_start = start_iter;
-// 	while (TRUE)
-// 	{
-// 		if (!gtk_text_iter_forward_line (&line_start))
-// 			break;
-// 		invalid = get_invalid_after (ce, gtk_text_iter_get_offset (&line_start));
-// 		if (!invalid || invalid->start_at >= end_offset)
-// 			break;
-// 		gtk_text_iter_set_offset (&line_start, invalid->start_at);
-// 		gtk_text_iter_set_line_offset (&line_start, 0);
-// 		invalid_lines = g_slist_prepend (invalid_lines,
-// 						 GINT_TO_POINTER (gtk_text_iter_get_offset (&line_start)));
-// 	}
-// 	invalid_lines = g_slist_reverse (invalid_lines);
-//
-// 	while (invalid_lines && GPOINTER_TO_INT (invalid_lines->data) < end_offset)
-// 	{
-// 		GSList *old_contexts;
-// 		gint line_start_offset, line_end_offset;
-// 		LineInfo line;
-//
-// 		line_start_offset = GPOINTER_TO_INT (invalid_lines->data);
-// 		invalid_lines = g_slist_delete_link (invalid_lines, invalid_lines);
-//
-// 		gtk_text_iter_set_offset (&line_start, line_start_offset);
-//                 line_end = line_start;
-//                 gtk_text_iter_forward_line (&line_end);
-// 		line_end_offset = gtk_text_iter_get_offset (&line_end);
-//
-// 		/* Last buffer line. */
-// 		if (line_start_offset == line_end_offset)
-// 		{
-// 			g_assert (line_start_offset == gtk_text_buffer_get_char_count (buffer));
-// 			break;
-// 		}
-//
-// 		/* Analyze the line */
-// 		old_contexts = erase_segments (ce,
-// 					       line_start_offset,
-// 					       line_end_offset,
-// 					       TRUE,
-// 					       ce->priv->hint);
-//                 get_line_info (buffer, &line_start, &line_end, &line);
-//
-// 		if (!line_start_offset)
-// 			state = ce->priv->root_segment;
-// 		else
-// 			state = get_segment_at_offset (ce,
-// 						       ce->priv->hint ? ce->priv->hint : state,
-// 						       line_start_offset - 1);
-//
-// 		hint = ce->priv->hint;
-//
-// 		if (hint && hint->parent != state)
-// 			hint = NULL;
-//
-// 		CHECK_TREE (ce);
-// 		state = analyze_line (ce, state, &line, &hint);
-// 		CHECK_TREE (ce);
-//
-// 		if (hint && hint->parent == ce->priv->root_segment)
-// 			ce->priv->hint = hint;
-// 		else if (state->parent == ce->priv->root_segment)
-// 			ce->priv->hint = state;
-//
-// 		line_info_destroy (&line);
-// 		g_slist_foreach (old_contexts, (GFunc) context_unref, NULL);
-// 		g_slist_free (old_contexts);
-//
-// 		gtk_text_region_add (ce->priv->refresh_region, &line_start, &line_end);
-//
-// 		if (!invalid_lines || GPOINTER_TO_INT (invalid_lines->data) != line_end_offset)
-// 		{
-// 			Segment *old_state = get_segment_at_offset (ce,
-// 								    ce->priv->hint ? ce->priv->hint : state,
-// 								    line_end_offset);
-//
-// 			if (state->context != old_state->context)
-// 				invalid_lines = g_slist_prepend (invalid_lines,
-// 								 GINT_TO_POINTER (line_end_offset));
-// 			else
-// 				segment_merge (ce, state, old_state);
-//
-// 			CHECK_TREE (ce);
-// 		}
-// 	}
-//
-// 	if (end_offset == gtk_text_buffer_get_char_count (buffer))
-// 	{
-// 		g_assert (ce->priv->invalid.length <= 1);
-//
-// 		if (ce->priv->invalid.length)
-// 		{
-// 			invalid = get_invalid_first (ce);
-// 			segment_remove (ce, invalid);
-// 			CHECK_TREE (ce);
-// 		}
-// 	}
-// 	else if (invalid_lines)
-// 	{
-// 		invalid = get_invalid_after (ce, end_offset);
-//
-// 		if (!invalid || invalid->start_at > end_offset)
-// 			text_inserted (ce, end_offset, 0, FALSE);
-//
-// 		CHECK_TREE (ce);
-// 	}
-//
-// 	g_slist_free (invalid_lines);
-// 	return ce->priv->invalid.length == 0;
-// }
+out:
+	g_slist_foreach (invalid_region_contexts, (GFunc) context_unref, NULL);
+	g_slist_free (invalid_region_contexts);
+}
 
 
 /* DEFINITIONS MANAGEMENT ------------------------------------------------- */
@@ -4706,30 +4462,23 @@ context_definition_new (gchar              *id,
 
 	/* Main contexts (i.e. the contexts with id "language:language")
 	 * should have extend-parent="true" and end-at-line-end="false". */
-	if (!parent)
+	if (!parent && regex_match_simple ("(.+):\\1", id))
 	{
-		EggRegex *r = egg_regex_new ("(.+):\\1", 0, 0, NULL);
-
-		if (egg_regex_match (r, id, 0))
+		if (end_at_line_end)
 		{
-			if (end_at_line_end)
-			{
-				g_warning ("end-at-line-end should be "
-					   "\"false\" for main contexts (id: %s)",
-					   id);
-				definition->end_at_line_end = FALSE;
-			}
-
-			if (!extend_parent)
-			{
-				g_warning ("extend-parent should be "
-					   "\"true\" for main contexts (id: %s)",
-					   id);
-				definition->extend_parent = TRUE;
-			}
+			g_warning ("end-at-line-end should be "
+				   "\"false\" for main contexts (id: %s)",
+				   id);
+			definition->end_at_line_end = FALSE;
 		}
 
-		egg_regex_free (r);
+		if (!extend_parent)
+		{
+			g_warning ("extend-parent should be "
+				   "\"true\" for main contexts (id: %s)",
+				   id);
+			definition->extend_parent = TRUE;
+		}
 	}
 
 	return definition;
@@ -5077,9 +4826,9 @@ check_segment (GtkSourceContextEngine *ce,
 	g_assert (!segment->next || segment->next->start_at >= segment->end_at);
 
 	if (SEGMENT_IS_INVALID (segment))
-		g_assert (g_slist_find (ce->priv->invalid.list, segment) != NULL);
+		g_assert (g_slist_find (ce->priv->invalid, segment) != NULL);
 	else
-		g_assert (g_slist_find (ce->priv->invalid.list, segment) == NULL);
+		g_assert (g_slist_find (ce->priv->invalid, segment) == NULL);
 
 	if (segment->children)
 		g_assert (!SEGMENT_IS_INVALID (segment) && SEGMENT_IS_CONTAINER (segment));

@@ -65,7 +65,6 @@ enum {
 	CAN_REDO,
 	HIGHLIGHT_UPDATED,
 	MARKER_UPDATED,
-	UPDATE_HIGHLIGHT,
 	DEBUG,
 	LAST_SIGNAL
 };
@@ -160,7 +159,6 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 	klass->can_redo 	 = NULL;
 	klass->highlight_updated = NULL;
 	klass->marker_updated    = NULL;
-	klass->update_highlight  = NULL;
 
 	/* Do not set these signals handlers directly on the parent_class since
 	 * that will cause problems (a loop). */
@@ -249,19 +247,6 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 			  G_TYPE_NONE,
 			  1,
 			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE);
-
-	buffer_signals[UPDATE_HIGHLIGHT] =
-	    g_signal_new ("update_highlight",
-			  G_OBJECT_CLASS_TYPE (object_class),
-			  G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
-			  G_STRUCT_OFFSET (GtkSourceBufferClass, update_highlight),
-			  NULL, NULL,
-			  gtksourceview_marshal_VOID__BOXED_BOXED_BOOLEAN,
-			  G_TYPE_NONE,
-			  3,
-			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE,
-			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE,
-			  G_TYPE_BOOLEAN);
 
 	buffer_signals[DEBUG] =
 	    g_signal_new ("debug",
@@ -1224,6 +1209,31 @@ gtk_source_buffer_get_language (GtkSourceBuffer *buffer)
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
 
 	return buffer->priv->language;
+}
+
+/**
+ * _gtk_source_buffer_update_highlight:
+ *
+ * @buffer: a #GtkSourceBuffer.
+ * @start: start of the area to highlight.
+ * @end: end of the area to highlight.
+ * @synchronous: whether the area should be highlighted synchronously.
+ *
+ * Asks the buffer to analyze and highlight given area.
+ **/
+void
+_gtk_source_buffer_update_highlight (GtkSourceBuffer   *buffer,
+				     const GtkTextIter *start,
+				     const GtkTextIter *end,
+				     gboolean           synchronous)
+{
+	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
+
+	if (buffer->priv->highlight_engine != NULL)
+		_gtk_source_engine_update_highlight (buffer->priv->highlight_engine,
+						     start,
+						     end,
+						     synchronous);
 }
 
 /* Markers functionality */

@@ -77,3 +77,19 @@ _gtk_source_engine_text_deleted (GtkSourceEngine *engine,
 							    offset,
 							    length);
 }
+
+void
+_gtk_source_engine_update_highlight (GtkSourceEngine   *engine,
+				     const GtkTextIter *start,
+				     const GtkTextIter *end,
+				     gboolean           synchronous)
+{
+	g_return_if_fail (GTK_IS_SOURCE_ENGINE (engine));
+	g_return_if_fail (start != NULL && end != NULL);
+	g_return_if_fail (GTK_SOURCE_ENGINE_GET_CLASS (engine)->update_highlight != NULL);
+
+	GTK_SOURCE_ENGINE_GET_CLASS (engine)->update_highlight (engine,
+								start,
+								end,
+								synchronous);
+}

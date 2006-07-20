@@ -66,12 +66,6 @@ struct _GtkSourceBufferClass
 	void (* marker_updated)         (GtkSourceBuffer *buffer,
 					 GtkTextIter     *where);
 
-	/* highlighting engines connect to these */
-	void (* update_highlight)       (GtkSourceBuffer   *buffer,
-					 const GtkTextIter *start,
-					 const GtkTextIter *end,
-					 gboolean           synchronous);
-
 	void (* debug)			(GtkSourceBuffer   *buffer);
 
 };
@@ -140,6 +134,10 @@ GtkSourceMarker         *gtk_source_buffer_get_next_marker      (GtkSourceBuffer
 GtkSourceMarker         *gtk_source_buffer_get_prev_marker      (GtkSourceBuffer        *buffer,
 								 GtkTextIter            *iter);
 
+void			 _gtk_source_buffer_update_highlight    (GtkSourceBuffer        *buffer,
+								 const GtkTextIter      *start,
+								 const GtkTextIter      *end,
+								 gboolean                synchronous);
 
 G_END_DECLS
 

@@ -264,62 +264,6 @@ remove_all_markers (GtkSourceBuffer *buffer)
 	}
 }
 
-// static void
-// print_tags (GtkSourceLanguage *lang)
-// {
-// 	GSList *tags, *l;
-// 	tags = gtk_source_language_get_tags (lang);
-// 	l = tags;
-//
-// // 	g_print ("List of tags in current language\n");
-// 	while (l != NULL)
-// 	{
-// 		gchar *name;
-// 		gchar *id;
-// 		GtkSourceTag *tag;
-//
-// 		tag = GTK_SOURCE_TAG (l->data);
-//
-// 		g_object_get (tag, "name", &name, "id", &id, NULL);
-//
-// // 		g_print (" name '%s', id '%s'\n", name, id);
-//
-// 		g_free (id);
-// 		g_free (name);
-//
-// 		l = g_slist_next (l);
-// 	}
-//
-// 	g_slist_foreach (tags, (GFunc)g_object_unref, NULL);
-// 	g_slist_free (tags);
-// }
-
-// static GtkSourceLanguage *
-// get_language_for_file (GtkSourceLanguagesManager *manager,
-// 		       const gchar 		 *filename)
-// {
-// 	guint i;
-// 	const gchar *ext_c[] = {".c", ".h"};
-// 	const gchar *ext_xml[] = {".xml", ".lang", ".rng"};
-// 	const gchar *ext_html[] = {".htm", ".html"};
-//
-// 	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGES_MANAGER (manager), NULL);
-// 	g_return_val_if_fail (filename != NULL, NULL);
-//
-// #define CHECK_EXT(lang)										\
-// 	for (i = 0; i < G_N_ELEMENTS (ext_##lang); ++i)						\
-// 		if (g_str_has_suffix (filename, ext_##lang[i]))					\
-// 			return gtk_source_languages_manager_get_language_by_id (manager, #lang);
-//
-// 	CHECK_EXT (c);
-// 	CHECK_EXT (xml);
-// 	CHECK_EXT (html);
-//
-// #undef CHECK_EXT
-//
-// 	return NULL;
-// }
-
 static gboolean
 open_file (GtkSourceBuffer *buffer, const gchar *filename)
 {
@@ -347,20 +291,10 @@ open_file (GtkSourceBuffer *buffer, const gchar *filename)
 
 	language = gtk_source_languages_manager_get_language_for_filename (manager, filename);
 
-// 	if (language == NULL)
-// 		language = get_language_for_file (manager, filename);
-
 	if (language == NULL)
-	{
 		g_print ("No language found for file `%s'\n", filename);
-		g_object_set (G_OBJECT (buffer), "highlight", FALSE, NULL);
-	}
-	else
-	{
-		g_object_set (G_OBJECT (buffer), "highlight", TRUE, NULL);
-		gtk_source_buffer_set_language (buffer, language);
-	}
 
+	gtk_source_buffer_set_language (buffer, language);
 	g_object_set_data_full (G_OBJECT (buffer),
 				"filename", g_strdup (filename),
 				(GDestroyNotify) g_free);
@@ -1010,9 +944,9 @@ create_source_buffer (GtkSourceLanguagesManager *manager)
 	GtkSourceBuffer *buffer;
 
 	buffer = GTK_SOURCE_BUFFER (gtk_source_buffer_new (NULL));
-	g_object_ref (manager);
+	g_object_set (G_OBJECT (buffer), "highlight", TRUE, NULL);
 	g_object_set_data_full (G_OBJECT (buffer), "languages-manager",
-				manager, (GDestroyNotify) g_object_unref);
+				g_object_ref (manager), (GDestroyNotify) g_object_unref);
 
 	return buffer;
 }
