@@ -53,34 +53,38 @@ struct _GtkSourceContextEngineClass
 
 GType		 _gtk_source_context_engine_get_type	(void) G_GNUC_CONST;
 
-GtkSourceEngine	*_gtk_source_context_engine_new		(GtkSourceLanguage	*lang);
+GtkSourceContextEngine *_gtk_source_context_engine_new  (GtkSourceLanguage	*lang);
 
 gboolean	 _gtk_source_context_engine_define_context
 							(GtkSourceContextEngine	 *ce,
-							 gchar			 *id,
-							 gchar			 *parent_id,
-							 gchar			 *match_regex,
-							 gchar			 *start_regex,
-							 gchar			 *end_regex,
-							 gchar			 *style,
+							 const gchar		 *id,
+							 const gchar		 *parent_id,
+							 const gchar		 *match_regex,
+							 const gchar		 *start_regex,
+							 const gchar		 *end_regex,
+							 const gchar		 *style,
 							 gboolean		  extend_parent,
 							 gboolean		  end_at_line_end,
 							 GError			**error);
 
 gboolean	 _gtk_source_context_engine_add_sub_pattern
 							(GtkSourceContextEngine	 *ce,
-							 gchar			 *id,
-							 gchar			 *parent_id,
-							 gchar			 *name,
-							 gchar			 *where,
-							 gchar			 *style,
+							 const gchar		 *id,
+							 const gchar		 *parent_id,
+							 const gchar		 *name,
+							 const gchar		 *where,
+							 const gchar		 *style,
 							 GError			**error);
 
 gboolean	 _gtk_source_context_engine_add_ref 	(GtkSourceContextEngine	 *ce,
-							 gchar			 *parent_id,
-							 gchar			 *ref_id,
+							 const gchar		 *parent_id,
+							 const gchar		 *ref_id,
 							 gboolean		  all,
 							 GError			**error);
+
+/* Only for lang files version 1, do not use it */
+void		 _gtk_source_context_engine_set_escape_char (GtkSourceContextEngine	*ce,
+							     gunichar			 esc_char);
 
 G_END_DECLS
 

@@ -179,36 +179,6 @@ gtk_source_language_finalize (GObject *object)
 	G_OBJECT_CLASS (gtk_source_language_parent_class)->finalize (object);
 }
 
-gchar *
-_gtk_source_language_strconvescape (gchar *source)
-{
-	gunichar cur_char;
-	gunichar last_char = 0;
-	gchar *dest;
-	gchar *src;
-
-	if (source == NULL)
-		return NULL;
-
-	src = dest = source;
-
-	while (*src)
-	{
-		cur_char = g_utf8_get_char (src);
-		src = g_utf8_next_char (src);
-		if (last_char == '\\' && cur_char == 'n') {
-			cur_char = '\n';
-		} else if (last_char == '\\' && cur_char == 't') {
-			cur_char = '\t';
-		}
-		dest += g_unichar_to_utf8 (cur_char, dest);
-		last_char = cur_char;
-	}
-	*dest = '\0';
-
-	return source;
-}
-
 static GSList *
 parse_mime_types_or_globs (xmlTextReaderPtr reader,
 			   const char      *attr_name)
@@ -366,7 +336,7 @@ process_language_node (xmlTextReaderPtr reader, const gchar *filename)
  *
  * Returns the ID of the language. The ID is not locale-dependent.
  *
- * Return value: the ID of @language.
+ * Return value: the ID of @language, it must be freed it with g_free.
  **/
 gchar *
 gtk_source_language_get_id (GtkSourceLanguage *language)
@@ -558,27 +528,54 @@ _gtk_source_language_get_languages_manager (GtkSourceLanguage *language)
 
 /* Highlighting engine creation ------------------------------------------ */
 
+void
+_gtk_source_language_define_language_styles (GtkSourceLanguage *lang)
+{
+#define ADD_ALIAS(style,mapto)								\
+	g_hash_table_insert (lang->priv->styles, g_strdup (style), g_strdup (mapto))
+
+	ADD_ALIAS ("Base-N Integer", "def:base-n-integer");
+	ADD_ALIAS ("Character", "def:character");
+	ADD_ALIAS ("Comment", "def:comment");
+	ADD_ALIAS ("Function", "def:function");
+	ADD_ALIAS ("Decimal", "def:decimal");
+	ADD_ALIAS ("Floating Point", "def:floating-point");
+	ADD_ALIAS ("Keyword", "def:keyword");
+	ADD_ALIAS ("Preprocessor", "def:preprocessor");
+	ADD_ALIAS ("String", "def:string");
+	ADD_ALIAS ("Specials", "def:specials");
+	ADD_ALIAS ("Data Type", "def:data-type");
+	ADD_ALIAS ("Others", "def:others");
+	ADD_ALIAS ("Others 2", "def:others2");
+	ADD_ALIAS ("Others 3", "def:others3");
+
+#undef ADD_ALIAS
+}
+
 GtkSourceEngine *
 _gtk_source_language_create_engine (GtkSourceLanguage *language)
 {
-	GtkSourceEngine *engine = NULL;
+	GtkSourceContextEngine *ce;
+	gboolean success = FALSE;
+
+	ce = _gtk_source_context_engine_new (language);
 
 	switch (language->priv->version)
 	{
-	case GTK_SOURCE_LANGUAGE_VERSION_1_0:
-		g_return_val_if_reached (NULL);
-		break;
+		case GTK_SOURCE_LANGUAGE_VERSION_1_0:
+			success = _gtk_source_language_file_parse_version1 (language, ce);
+			break;
 
-	case GTK_SOURCE_LANGUAGE_VERSION_2_0:
-		engine = _gtk_source_context_engine_new (language);
-		if (!_gtk_source_language_file_parse_version2 (language,
-							       GTK_SOURCE_CONTEXT_ENGINE (engine)))
-		{
-			g_object_unref (engine);
-			engine = NULL;
-		}
-		break;
+		case GTK_SOURCE_LANGUAGE_VERSION_2_0:
+			success = _gtk_source_language_file_parse_version2 (language, ce);
+			break;
 	}
 
-	return engine;
+	if (!success)
+	{
+		g_object_unref (ce);
+		ce = NULL;
+	}
+
+	return ce ? GTK_SOURCE_ENGINE (ce) : NULL;
 }

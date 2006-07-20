@@ -1,3 +1,7 @@
+if USE_GNOME_VFS
+GVFS_FLAG = -DUSE_GNOME_VFS
+endif
+
 INCLUDES = 				\
 	-DDATADIR=\""$(datadir)"\" 	\
 	-DG_LOG_DOMAIN=\"GtkSourceView\"\
@@ -6,6 +10,7 @@ INCLUDES = 				\
 	$(DEPRECATED_FLAGS)		\
 	$(WARN_CFLAGS) 			\
 	$(DEP_CFLAGS)			\
+	$(GVFS_FLAG)			\
 	$(TESTS_CFLAGS)
 
 # testing executables

@@ -36,6 +36,11 @@
 #ifdef TEST_XML_MEM
 #include <libxml/xmlreader.h>
 #endif
+#ifdef USE_GNOME_VFS
+#include <libgnomevfs/gnome-vfs-init.h>
+#include <libgnomevfs/gnome-vfs-mime-utils.h>
+#include <libgnomevfs/gnome-vfs-utils.h>
+#endif
 
 /* Global list of open windows */
 
@@ -264,6 +269,45 @@ remove_all_markers (GtkSourceBuffer *buffer)
 	}
 }
 
+static GtkSourceLanguage *
+get_language_for_file (GtkSourceLanguagesManager *manager,
+		       const gchar               *filename)
+{
+	GtkSourceLanguage *language = NULL;
+
+#ifdef USE_GNOME_VFS
+	gchar *mime_type;
+	gchar *uri;
+
+	/* I hate this! */
+	if (g_path_is_absolute (filename))
+	{
+		uri = gnome_vfs_get_uri_from_local_path (filename);
+	}
+	else
+	{
+		gchar *curdir, *path;
+		curdir = g_get_current_dir ();
+		path = g_strconcat (curdir, "/", filename, NULL);
+		g_free (curdir);
+		uri = gnome_vfs_get_uri_from_local_path (path);
+		g_free (path);
+	}
+
+	if ((mime_type = gnome_vfs_get_mime_type (uri)))
+		language = gtk_source_languages_manager_get_language_for_mime_type (manager,
+										    mime_type);
+
+	g_free (mime_type);
+	g_free (uri);
+#endif
+
+	if (!language)
+		language = gtk_source_languages_manager_get_language_for_filename (manager, filename);
+
+	return language;
+}
+
 static gboolean
 open_file (GtkSourceBuffer *buffer, const gchar *filename)
 {
@@ -289,7 +333,7 @@ open_file (GtkSourceBuffer *buffer, const gchar *filename)
 	if (!success)
 		goto out;
 
-	language = gtk_source_languages_manager_get_language_for_filename (manager, filename);
+	language = get_language_for_file (manager, filename);
 
 	if (language == NULL)
 		g_print ("No language found for file `%s'\n", filename);
@@ -1048,12 +1092,17 @@ main (int argc, char *argv[])
 	gtk_init (&argc, &argv);
 // 	gdk_window_set_debug_updates (TRUE);
 
+#ifdef USE_GNOME_VFS
+	gnome_vfs_init ();
+#endif
+
 #ifdef TEST_XML_MEM
 	xml_init ();
 #endif
 
 	/* create buffer */
-	lang_dirs = g_slist_prepend (NULL, g_strdup (TOP_SRCDIR "/gtksourceview/language-specs"));
+// 	lang_dirs = g_slist_prepend (NULL, g_strdup (TOP_SRCDIR "/gtksourceview/language-specs"));
+	lang_dirs = g_slist_prepend (NULL, g_strdup ("/usr/share/gtksourceview-1.0/language-specs"));
 	lm = g_object_new (GTK_TYPE_SOURCE_LANGUAGES_MANAGER,
 			   "lang_files_dirs", lang_dirs, NULL);
 	g_slist_foreach (lang_dirs, (GFunc) g_free, NULL);
@@ -1082,6 +1131,10 @@ main (int argc, char *argv[])
 
 #ifdef TEST_XML_MEM
 	xml_finalize ();
+#endif
+
+#ifdef USE_GNOME_VFS
+	gnome_vfs_shutdown ();
 #endif
 
 	return 0;

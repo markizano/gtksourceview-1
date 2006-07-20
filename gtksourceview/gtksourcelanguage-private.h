@@ -54,10 +54,12 @@ struct _GtkSourceLanguagePrivate
 
 GtkSourceLanguage *_gtk_source_language_new_from_file (const gchar			*filename,
 						       GtkSourceLanguagesManager	*lm);
-gchar *_gtk_source_language_strconvescape (gchar *source);
 
 GtkSourceLanguagesManager *_gtk_source_language_get_languages_manager (GtkSourceLanguage *language);
 
+void _gtk_source_language_define_language_styles  (GtkSourceLanguage      *language);
+gboolean _gtk_source_language_file_parse_version1 (GtkSourceLanguage      *language,
+						   GtkSourceContextEngine *engine);
 gboolean _gtk_source_language_file_parse_version2 (GtkSourceLanguage      *language,
 						   GtkSourceContextEngine *engine);
 GtkSourceEngine *_gtk_source_language_create_engine (GtkSourceLanguage *language);

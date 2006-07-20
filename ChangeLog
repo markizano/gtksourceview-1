@@ -1,5 +1,18 @@
 2006-07-20  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* configure.in: 
+	* tests/Makefile.am: 
+	* tests/test-widget.c: 
+	Added gnomevfs for test-widget back (optionally).
+	* gtksourceview/gtksourcecontextengine.[ch]:
+	* gtksourceview/gtksourcelanguage.c:
+	* gtksourceview/gtksourcelanguage-parser-1.c:
+	* gtksourceview/gtksourcelanguage-private.h:
+	* gtksourceview/Makefile.am:
+	Use old lang files with new engine.
+
+2006-07-20  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c: 
 	(create_child_context): do not add extra reference to context,
 	so the parent does not own a reference to it and it is actually

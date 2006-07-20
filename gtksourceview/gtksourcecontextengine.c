@@ -19,6 +19,9 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
+/* FIXME: toplevel children must have extend-parent=TRUE, because create_reg_all wants
+   end regex in toplevel context in this case */
+
 #include "gtksourceview-i18n.h"
 #include "gtksourcecontextengine.h"
 #include "gtktextregion.h"
@@ -452,6 +455,10 @@ create_tag (GtkSourceContextEngine *ce,
 	{
 		gtk_source_style_apply (style, new_tag);
 		gtk_source_style_free (style);
+	}
+	else
+	{
+		g_warning ("could not find style '%s'", style_name);
 	}
 
 	tags = g_slist_prepend (tags, new_tag);
@@ -1822,7 +1829,7 @@ _gtk_source_context_engine_init (GtkSourceContextEngine *ce)
 	ce->priv->style_scheme = gtk_source_style_scheme_get_default ();
 }
 
-GtkSourceEngine	*
+GtkSourceContextEngine *
 _gtk_source_context_engine_new (GtkSourceLanguage *lang)
 {
 	GtkSourceContextEngine *ce;
@@ -1833,7 +1840,7 @@ _gtk_source_context_engine_new (GtkSourceLanguage *lang)
 	ce->priv->id = g_strdup (lang->priv->id);
 	ce->priv->lang = lang;
 
-	return GTK_SOURCE_ENGINE (ce);
+	return ce;
 }
 
 
@@ -1965,7 +1972,7 @@ regex_new (const gchar           *pattern,
 }
 
 static gint
-sub_pattern_to_int (gchar *name)
+sub_pattern_to_int (const gchar *name)
 {
 	guint64 number;
 	gchar *end_name;
@@ -4365,13 +4372,13 @@ out:
 /* DEFINITIONS MANAGEMENT ------------------------------------------------- */
 
 static ContextDefinition *
-context_definition_new (gchar              *id,
+context_definition_new (const gchar        *id,
 			ContextType         type,
 			ContextDefinition  *parent,
-			gchar              *match,
-			gchar              *start,
-			gchar              *end,
-			gchar              *style,
+			const gchar        *match,
+			const gchar        *start,
+			const gchar        *end,
+			const gchar        *style,
 			gboolean            extend_parent,
 			gboolean            end_at_line_end,
 			GError            **error)
@@ -4588,12 +4595,12 @@ definition_child_new (ContextDefinition *definition,
 
 gboolean
 _gtk_source_context_engine_define_context (GtkSourceContextEngine  *ce,
-					   gchar                   *id,
-					   gchar                   *parent_id,
-					   gchar                   *match_regex,
-					   gchar                   *start_regex,
-					   gchar                   *end_regex,
-					   gchar                   *style,
+					   const gchar             *id,
+					   const gchar             *parent_id,
+					   const gchar             *match_regex,
+					   const gchar             *start_regex,
+					   const gchar             *end_regex,
+					   const gchar             *style,
 					   gboolean                 extend_parent,
 					   gboolean                 end_at_line_end,
 					   GError                 **error)
@@ -4673,11 +4680,11 @@ _gtk_source_context_engine_define_context (GtkSourceContextEngine  *ce,
 
 gboolean
 _gtk_source_context_engine_add_sub_pattern (GtkSourceContextEngine  *ce,
-					    gchar                   *id,
-					    gchar                   *parent_id,
-					    gchar                   *name,
-					    gchar                   *where,
-					    gchar                   *style,
+					    const gchar             *id,
+					    const gchar             *parent_id,
+					    const gchar             *name,
+					    const gchar             *where,
+					    const gchar             *style,
 					    GError                 **error)
 {
 	ContextDefinition *parent;
@@ -4756,8 +4763,8 @@ _gtk_source_context_engine_add_sub_pattern (GtkSourceContextEngine  *ce,
 
 gboolean
 _gtk_source_context_engine_add_ref (GtkSourceContextEngine  *ce,
-				    gchar                   *parent_id,
-				    gchar                   *ref_id,
+				    const gchar             *parent_id,
+				    const gchar             *ref_id,
 				    gboolean                 all,
 				    GError                 **error)
 {
@@ -4809,6 +4816,94 @@ _gtk_source_context_engine_add_ref (GtkSourceContextEngine  *ce,
 	definition_child_new (parent, ref, all);
 
 	return TRUE;
+}
+
+static void
+add_escape_ref (ContextDefinition      *definition,
+		GtkSourceContextEngine *ce)
+{
+	GError *error = NULL;
+
+	/* XXX */
+	if (definition->type != CONTEXT_TYPE_CONTAINER)
+		return;
+
+	_gtk_source_context_engine_add_ref (ce, definition->id,
+					    "gtk-source-context-engine-escape",
+					    FALSE, &error);
+
+	if (error)
+		goto out;
+
+	_gtk_source_context_engine_add_ref (ce, definition->id,
+					    "gtk-source-context-engine-line-escape",
+					    FALSE, &error);
+
+out:
+	if (error)
+	{
+		g_warning ("%s", error->message);
+		g_error_free (error);
+	}
+}
+
+static void
+prepend_definition (G_GNUC_UNUSED gchar *id,
+		    ContextDefinition *definition,
+		    GSList **list)
+{
+	*list = g_slist_prepend (*list, definition);
+}
+
+/* Only for lang files version 1, do not use it */
+/* XXX unicode */
+void
+_gtk_source_context_engine_set_escape_char (GtkSourceContextEngine *ce,
+					    gunichar                escape_char)
+{
+	GError *error = NULL;
+	char buf[10];
+	gint len;
+	char *escaped, *pattern;
+	GSList *definitions = NULL;
+
+	g_return_if_fail (GTK_IS_SOURCE_CONTEXT_ENGINE (ce));
+	g_return_if_fail (escape_char != 0);
+
+	len = g_unichar_to_utf8 (escape_char, buf);
+	g_return_if_fail (len > 0);
+
+	escaped = egg_regex_escape_string (buf, 1);
+	pattern = g_strdup_printf ("%s.", escaped);
+
+	g_hash_table_foreach (ce->priv->definitions, (GHFunc) prepend_definition, &definitions);
+	definitions = g_slist_reverse (definitions);
+
+	if (!_gtk_source_context_engine_define_context (ce, "gtk-source-context-engine-escape",
+							NULL, pattern, NULL, NULL, NULL,
+							TRUE, FALSE, &error))
+		goto out;
+
+	g_free (pattern);
+	pattern = g_strdup_printf ("%s$", escaped);
+
+	if (!_gtk_source_context_engine_define_context (ce, "gtk-source-context-engine-line-escape",
+							NULL, NULL, pattern, "^", NULL,
+							TRUE, FALSE, &error))
+		goto out;
+
+	g_slist_foreach (definitions, (GFunc) add_escape_ref, ce);
+
+out:
+	if (error)
+	{
+		g_warning ("%s", error->message);
+		g_error_free (error);
+	}
+
+	g_free (pattern);
+	g_free (escaped);
+	g_slist_free (definitions);
 }
 
 

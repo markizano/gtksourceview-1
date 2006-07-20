@@ -47,6 +47,7 @@ libgtksourceview_2_0_la_SOURCES = 	\
 	gtksourcelanguage.c 		\
 	gtksourcelanguage-private.h 	\
 	gtksourcelanguagesmanager.c 	\
+	gtksourcelanguage-parser-1.c	\
 	gtksourcelanguage-parser-2.c	\
 	gtksourceview-i18n.h 		\
 	gtksourceview-i18n.c		\
@@ -116,7 +117,6 @@ EXTRA_DIST = 				\
 	gtksourcetagstyle.h		\
 	gtksourcetagtable.h		\
 	gtksourcetagtable.c		\
-	gtksourcelanguage-parser-1.c	\
 	gtksourcetag-private.h 		\
 	gtksourcesimpleengine.h		\
 	gtksourcesimpleengine.c

@@ -69,11 +69,15 @@ esac],
 
 msg_tests=no
 AM_CONDITIONAL(BUILD_TESTS, false)
+AM_CONDITIONAL(USE_GNOME_VFS, false)
 
 if test x$build_tests = xtrue; then
 	AM_CONDITIONAL(BUILD_TESTS, true)
 	AC_DEFINE(BUILD_TESTS, [], [build test suite])
 	msg_tests=yes
+	PKG_CHECK_MODULES(TESTS, gnome-vfs-2.0,
+			  AM_CONDITIONAL(USE_GNOME_VFS, true),
+			  [:])
 fi
 
 # I18N stuff
