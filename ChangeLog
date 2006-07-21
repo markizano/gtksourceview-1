@@ -1,14 +1,24 @@
 2006-07-20  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourceundomanager.c:
+	(gtk_source_undo_manager_modified_changed_handler): replaced
+	g_return_if_fail with plain return and g_message, to prevent it
+	from killing test-widget.
+	* gtksourceview/gtksourcecontextengine.c:
+	fixed silly bug in update_syntax which made it erase segments at
+	the beginning of buffer.
+
+2006-07-20  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcelanguage-parser-1.c:
 	(engine_add_syntax_pattern): do free "freeme" string;
 	(build_keyword_list): increased keywords number limit to 1000.
 
 2006-07-20  Yevgen Muntyan  <muntyan@tamu.edu>
 
-	* configure.in: 
-	* tests/Makefile.am: 
-	* tests/test-widget.c: 
+	* configure.in:
+	* tests/Makefile.am:
+	* tests/test-widget.c:
 	Added gnomevfs for test-widget back (optionally).
 	* gtksourceview/gtksourcecontextengine.[ch]:
 	* gtksourceview/gtksourcelanguage.c:
@@ -19,7 +29,7 @@
 
 2006-07-20  Yevgen Muntyan  <muntyan@tamu.edu>
 
-	* gtksourceview/gtksourcecontextengine.c: 
+	* gtksourceview/gtksourcecontextengine.c:
 	(create_child_context): do not add extra reference to context,
 	so the parent does not own a reference to it and it is actually
 	freed when no segments are using it.
@@ -28,13 +38,13 @@
 
 	* gtksourceview/gtksourceview.c:
 	* gtksourceview/gtksourceengine.[ch]:
-	* gtksourceview/gtksourcebuffer.[ch]: replaced 
-	GtkSourceBuffer::update-highlight" signal with 
+	* gtksourceview/gtksourcebuffer.[ch]: replaced
+	GtkSourceBuffer::update-highlight" signal with
 	_gtk_source_buffer_update_highlight() function,
 	and added GtkSourceEngine.update_highlight method.
 	* gtksourceview/gtksourceview-marshal.list:
 	removed VOID:BOXED,BOXED,BOOLEAN which is not needed anymore.
-	* gtksourceview/gtksourcecontextengine.c: 
+	* gtksourceview/gtksourcecontextengine.c:
 	(regex_match_simple): new function;
 	(regex_new), (context_definition_new): use it here.
 	Refactored code so that text_inserted and text_deleted

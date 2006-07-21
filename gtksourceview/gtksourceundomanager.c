@@ -1073,7 +1073,12 @@ gtk_source_undo_manager_modified_changed_handler (GtkTextBuffer        *buffer,
 
 	/* gtk_text_buffer_get_modified (buffer) == TRUE */
 
-	g_return_if_fail (um->priv->modified_action == NULL);
+// 	g_return_if_fail (um->priv->modified_action == NULL);
+	if (um->priv->modified_action != NULL)
+	{
+		g_message ("%s: oops", G_STRLOC);
+		return;
+	}
 
 	if (action->order_in_group > 1)
 		um->priv->modified_undoing_group  = TRUE;

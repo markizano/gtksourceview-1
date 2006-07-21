@@ -322,6 +322,7 @@ struct _GtkSourceContextEnginePrivate
 	InvalidRegion		 invalid_region;
 
 	guint			 worker_handler;
+// 	guint			 worker_count;
 
 	/* Views highlight requests. */
 	GtkTextRegion		*highlight_requests;
@@ -1614,6 +1615,19 @@ idle_worker (GtkSourceContextEngine *ce)
 		return FALSE;
 	}
 
+// #define MANY_RUNS 10
+// 	if (++ce->priv->worker_count == MANY_RUNS)
+// 	{
+// 		ce->priv->worker_handler =
+// 			g_timeout_add_full (GTK_TEXT_VIEW_PRIORITY_VALIDATE,
+// 					    10,
+// 					    (GSourceFunc) idle_worker,
+// 					    ce,
+// 					    NULL);
+// 		return FALSE;
+// 	}
+// #undef MANY_RUNS
+
 	return TRUE;
 }
 
@@ -1629,12 +1643,15 @@ static void
 install_idle_worker (GtkSourceContextEngine *ce)
 {
 	if (!ce->priv->worker_handler)
+	{
 		/* Use the text view validation priority to get
 		 * highlighted text even before complete validation of
 		 * the buffer. */
 		ce->priv->worker_handler =
 			g_idle_add_full (GTK_TEXT_VIEW_PRIORITY_VALIDATE,
 					 (GSourceFunc) idle_worker, ce, NULL);
+// 		ce->priv->worker_count = 0;
+	}
 }
 
 
@@ -4333,6 +4350,7 @@ update_syntax (GtkSourceContextEngine *ce,
 		{
 			gtk_text_buffer_get_iter_at_offset (buffer, &line_start, invalid->start_at);
 			gtk_text_iter_set_line_offset (&line_start, 0);
+			line_start_offset = gtk_text_iter_get_offset (&line_start);
 			line_end = line_start;
 			gtk_text_iter_forward_line (&line_end);
 			line_end_offset = gtk_text_iter_get_offset (&line_end);
