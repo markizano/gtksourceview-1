@@ -87,7 +87,8 @@ enum {
 	PROP_SHOW_MARGIN,
 	PROP_MARGIN,
 	PROP_SMART_HOME_END,
-	PROP_HIGHLIGHT_CURRENT_LINE
+	PROP_HIGHLIGHT_CURRENT_LINE,
+	PROP_STYLE_SCHEME
 };
 
 struct _GtkSourceViewPrivate
@@ -103,6 +104,8 @@ struct _GtkSourceViewPrivate
 	gint             cached_margin_width;
 	gboolean	 smart_home_end;
 
+	GtkSourceStyleScheme *style_scheme;
+	GdkGC		*current_line_gc;
 	GHashTable 	*pixmap_cache;
 
 	GtkSourceBuffer *source_buffer;
@@ -128,6 +131,9 @@ static guint signals[LAST_SIGNAL] = { 0 };
 
 
 /* Prototypes. */
+static GObject *gtk_source_view_constructor		(GType               type,
+							 guint               n_construct_properties,
+							 GObjectConstructParam *construct_param);
 static void 	gtk_source_view_finalize 		(GObject            *object);
 
 static void	gtk_source_view_undo 			(GtkSourceView      *view);
@@ -183,6 +189,8 @@ static void	gtk_source_view_get_property		(GObject           *object,
 
 static void     gtk_source_view_style_set               (GtkWidget         *widget,
 							 GtkStyle          *previous_style);
+static void	gtk_source_view_realize			(GtkWidget         *widget);
+static void	gtk_source_view_unrealize		(GtkWidget         *widget);
 
 
 /* Private functions. */
@@ -198,6 +206,7 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 	textview_class 	= GTK_TEXT_VIEW_CLASS (klass);
 	widget_class 	= GTK_WIDGET_CLASS (klass);
 
+	object_class->constructor = gtk_source_view_constructor;
 	object_class->finalize = gtk_source_view_finalize;
 	object_class->get_property = gtk_source_view_get_property;
 	object_class->set_property = gtk_source_view_set_property;
@@ -206,6 +215,8 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 	widget_class->button_press_event = gtk_source_view_button_press_event;
 	widget_class->expose_event = gtk_source_view_expose;
 	widget_class->style_set = gtk_source_view_style_set;
+	widget_class->realize = gtk_source_view_realize;
+	widget_class->unrealize = gtk_source_view_unrealize;
 
 	textview_class->populate_popup = gtk_source_view_populate_popup;
 	textview_class->move_cursor = gtk_source_view_move_cursor;
@@ -282,6 +293,33 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 							       TRUE,
 							       G_PARAM_READWRITE));
 
+	/**
+	 * GtkSourceView:style-scheme:
+	 *
+	 * Style scheme. It contains styles for syntax highlighting, optionally
+	 * foreground, background, cursor color, current line color, and matching
+	 * brackets style.
+	 *
+	 * Since: 2.0
+	 */
+	g_object_class_install_property (object_class,
+					 PROP_STYLE_SCHEME,
+					 g_param_spec_object ("style_scheme",
+							      _("Style scheme"),
+							      _("Style scheme"),
+							      GTK_TYPE_SOURCE_STYLE_SCHEME,
+							      G_PARAM_READWRITE));
+
+	/**
+	 * GtkSourceView:right-margin-line-alpha:
+	 *
+	 * The ::right-margin-line-alpha determines the alpha component with
+	 * which the vertical line will be drawn. 0 means it is fully transparent
+	 * (invisible). 255 means it has full opacity (text under the line won't
+	 * be visible).
+	 *
+	 * Since: 1.6
+	 */
 	g_object_class_install_property (object_class,
 					 PROP_HIGHLIGHT_CURRENT_LINE,
 					 g_param_spec_boolean ("highlight_current_line",
@@ -474,6 +512,11 @@ gtk_source_view_set_property (GObject      *object,
 								    g_value_get_boolean (value));
 			break;
 
+		case PROP_STYLE_SCHEME:
+			gtk_source_view_set_style_scheme (view,
+							  g_value_get_object (value));
+			break;
+
 
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -544,6 +587,9 @@ gtk_source_view_get_property (GObject    *object,
 			g_value_set_boolean (value,
 					     gtk_source_view_get_highlight_current_line (view));
 
+		case PROP_STYLE_SCHEME:
+			g_value_set_object (value, view->priv->style_scheme);
+
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 			break;
@@ -569,6 +615,8 @@ gtk_source_view_init (GtkSourceView *view)
 	gtk_text_view_set_left_margin (GTK_TEXT_VIEW (view), 2);
 	gtk_text_view_set_right_margin (GTK_TEXT_VIEW (view), 2);
 
+	view->priv->style_scheme = gtk_source_style_scheme_get_default ();
+
 	tl = gtk_drag_dest_get_target_list (GTK_WIDGET (view));
 	g_return_if_fail (tl != NULL);
 
@@ -580,6 +628,30 @@ gtk_source_view_init (GtkSourceView *view)
 			  NULL);
 }
 
+static GObject *
+gtk_source_view_constructor (GType                  type,
+			     guint                  n_construct_properties,
+			     GObjectConstructParam *construct_param)
+{
+	GObject *object;
+	GtkSourceView *view;
+
+	object = G_OBJECT_CLASS(gtk_source_view_parent_class)->constructor (type,
+									    n_construct_properties,
+									    construct_param);
+	view = GTK_SOURCE_VIEW (object);
+
+	if (!view->priv->style_scheme)
+	{
+		GtkSourceStyleScheme *scheme;
+		scheme = gtk_source_style_scheme_get_default ();
+		gtk_source_view_set_style_scheme (view, scheme);
+		g_object_unref (scheme);
+	}
+
+	return object;
+}
+
 static void
 gtk_source_view_finalize (GObject *object)
 {
@@ -589,6 +661,9 @@ gtk_source_view_finalize (GObject *object)
 	g_return_if_fail (GTK_IS_SOURCE_VIEW (object));
 
 	view = GTK_SOURCE_VIEW (object);
+
+	if (view->priv->style_scheme)
+		g_object_unref (view->priv->style_scheme);
 
 	if (view->priv->pixmap_cache)
 		g_hash_table_destroy (view->priv->pixmap_cache);
@@ -725,6 +800,8 @@ set_source_buffer (GtkSourceView *view, GtkTextBuffer *buffer)
 				  "marker_updated",
 				  G_CALLBACK (marker_updated_cb),
 				  view);
+		_gtk_source_buffer_set_style_scheme (view->priv->source_buffer,
+						     view->priv->style_scheme);
 	}
 	else
 	{
@@ -1358,6 +1435,7 @@ gtk_source_view_expose (GtkWidget      *widget,
 			gint y;
 			gint height;
 			gint win_y;
+			GdkGC *gc;
 
 			gtk_text_buffer_get_iter_at_mark (text_view->buffer,
 							  &cur,
@@ -1384,8 +1462,13 @@ gtk_source_view_expose (GtkWidget      *widget,
 			redraw_rect.width = visible_rect.width;
 			redraw_rect.height = visible_rect.height;
 
+			if (view->priv->current_line_gc)
+				gc = view->priv->current_line_gc;
+			else
+				gc = widget->style->bg_gc[GTK_WIDGET_STATE (widget)];
+
 			gdk_draw_rectangle (event->window,
-					    widget->style->bg_gc[GTK_WIDGET_STATE (widget)],
+					    gc,
 					    TRUE,
 					    redraw_rect.x + MAX (0, gtk_text_view_get_left_margin (text_view) - 1),
 					    win_y,
@@ -2445,3 +2528,73 @@ gtk_source_view_style_set (GtkWidget *widget, GtkStyle *previous_style)
 	}
 }
 
+static void
+update_current_line_gc (GtkSourceView *view)
+{
+	GdkColor color;
+	GtkWidget *widget = GTK_WIDGET (view);
+
+	if (!GTK_WIDGET_REALIZED (view))
+		return;
+
+	if (view->priv->current_line_gc)
+	{
+		g_object_unref (view->priv->current_line_gc);
+		view->priv->current_line_gc = NULL;
+	}
+
+	if (view->priv->style_scheme &&
+	    gtk_source_style_scheme_get_current_line_color (view->priv->style_scheme, &color))
+	{
+		GdkGCValues values;
+		values.foreground = color;
+		view->priv->current_line_gc = gdk_gc_new_with_values (widget->window,
+								      &values,
+								      GDK_GC_FOREGROUND);
+	}
+}
+
+/* XXX screen-changed */
+static void
+gtk_source_view_realize (GtkWidget *widget)
+{
+	GTK_WIDGET_CLASS(gtk_source_view_parent_class)->realize (widget);
+	update_current_line_gc (GTK_SOURCE_VIEW (widget));
+}
+
+static void
+gtk_source_view_unrealize (GtkWidget *widget)
+{
+	GtkSourceView *view = GTK_SOURCE_VIEW (widget);
+
+	if (view->priv->current_line_gc)
+		g_object_unref (view->priv->current_line_gc);
+	view->priv->current_line_gc = NULL;
+
+	GTK_WIDGET_CLASS(gtk_source_view_parent_class)->unrealize (widget);
+}
+
+/**
+ * gtk_source_view_set_style_scheme:
+ * @view: a #GtkSourceView.
+ *
+ * Sets style scheme used in %view.
+ **/
+void
+gtk_source_view_set_style_scheme (GtkSourceView        *view,
+				  GtkSourceStyleScheme *scheme)
+{
+	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
+	g_return_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme));
+
+	if (view->priv->style_scheme == scheme)
+		return;
+
+	if (view->priv->style_scheme)
+		g_object_unref (view->priv->style_scheme);
+
+	view->priv->style_scheme = g_object_ref (scheme);
+	_gtk_source_style_scheme_apply (scheme, GTK_WIDGET (view));
+	_gtk_source_buffer_set_style_scheme (view->priv->source_buffer, scheme);
+	update_current_line_gc (view);
+}

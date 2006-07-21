@@ -92,6 +92,7 @@ struct _GtkSourceBufferPrivate
 	GtkSourceLanguage     *language;
 
 	GtkSourceEngine       *highlight_engine;
+	GtkSourceStyleScheme  *style_scheme;
 
 	GtkSourceUndoManager  *undo_manager;
 };
@@ -102,9 +103,6 @@ G_DEFINE_TYPE (GtkSourceBuffer, gtk_source_buffer, GTK_TYPE_TEXT_BUFFER)
 
 static guint 	 buffer_signals[LAST_SIGNAL];
 
-static GObject  *gtk_source_buffer_constructor          (GType                    type,
-							 guint                    n_construct_properties,
-							 GObjectConstructParam   *construct_param);
 static void 	 gtk_source_buffer_finalize		(GObject                 *object);
 static void 	 gtk_source_buffer_dispose		(GObject                 *object);
 static void      gtk_source_buffer_set_property         (GObject                 *object,
@@ -149,7 +147,6 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 	object_class 	= G_OBJECT_CLASS (klass);
 	tb_class	= GTK_TEXT_BUFFER_CLASS (klass);
 
-	object_class->constructor  = gtk_source_buffer_constructor;
 	object_class->finalize	   = gtk_source_buffer_finalize;
 	object_class->dispose	   = gtk_source_buffer_dispose;
 	object_class->get_property = gtk_source_buffer_get_property;
@@ -291,40 +288,6 @@ gtk_source_buffer_init (GtkSourceBuffer *buffer)
 			  buffer);
 }
 
-static GObject *
-gtk_source_buffer_constructor (GType                  type,
-			       guint                  n_construct_properties,
-			       GObjectConstructParam *construct_param)
-{
-	GObject *g_object;
-
-	g_object = G_OBJECT_CLASS (gtk_source_buffer_parent_class)->constructor (type,
-										 n_construct_properties,
-										 construct_param);
-
-	if (g_object)
-	{
-		GtkSourceStyle *style;
-
-		GtkSourceBuffer *source_buffer = GTK_SOURCE_BUFFER (g_object);
-
-		/* FIXME */
-		style = gtk_source_style_new (GTK_SOURCE_STYLE_USE_BACKGROUND |
-					      GTK_SOURCE_STYLE_USE_FOREGROUND |
-					      GTK_SOURCE_STYLE_USE_BOLD);
-
-		gdk_color_parse ("white", &style->foreground);
-		gdk_color_parse ("gray", &style->background);
-		style->bold = TRUE;
-
-		/* Set default bracket match style */
-		gtk_source_buffer_set_bracket_match_style (source_buffer, style);
-		gtk_source_style_free (style);
-	}
-
-	return g_object;
-}
-
 static void
 gtk_source_buffer_finalize (GObject *object)
 {
@@ -338,6 +301,9 @@ gtk_source_buffer_finalize (GObject *object)
 
 	if (buffer->priv->markers)
 		g_array_free (buffer->priv->markers, TRUE);
+
+	if (buffer->priv->style_scheme)
+		g_object_unref (buffer->priv->style_scheme);
 
 	g_free (buffer->priv);
 	buffer->priv = NULL;
@@ -1183,11 +1149,19 @@ gtk_source_buffer_set_language (GtkSourceBuffer   *buffer,
 	if (language != NULL)
 	{
 		g_object_ref (language);
+
 		/* get a new engine */
 		buffer->priv->highlight_engine = _gtk_source_language_create_engine (language);
+
 		if (buffer->priv->highlight_engine)
+		{
 			_gtk_source_engine_attach_buffer (buffer->priv->highlight_engine,
 							  GTK_TEXT_BUFFER (buffer));
+
+			if (buffer->priv->style_scheme)
+				_gtk_source_engine_set_style_scheme (buffer->priv->highlight_engine,
+								     buffer->priv->style_scheme);
+		}
 	}
 
 	g_object_notify (G_OBJECT (buffer), "language");
@@ -1234,6 +1208,40 @@ _gtk_source_buffer_update_highlight (GtkSourceBuffer   *buffer,
 						     start,
 						     end,
 						     synchronous);
+}
+
+/**
+ * _gtk_source_buffer_set_style_scheme:
+ *
+ * @buffer: a #GtkSourceBuffer.
+ * @scheme: style scheme.
+ *
+ * Sets style scheme used by the buffer.
+ **/
+void
+_gtk_source_buffer_set_style_scheme (GtkSourceBuffer      *buffer,
+				     GtkSourceStyleScheme *scheme)
+{
+	GtkSourceStyle *style;
+
+	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
+	g_return_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme));
+
+	if (buffer->priv->style_scheme == scheme)
+		return;
+
+	if (buffer->priv->style_scheme)
+		g_object_unref (buffer->priv->style_scheme);
+
+	buffer->priv->style_scheme = g_object_ref (scheme);
+
+	style = gtk_source_style_scheme_get_matching_brackets_style (scheme);
+	gtk_source_buffer_set_bracket_match_style (buffer, style);
+	gtk_source_style_free (style);
+
+	if (buffer->priv->highlight_engine != NULL)
+		_gtk_source_engine_set_style_scheme (buffer->priv->highlight_engine,
+						     scheme);
 }
 
 /* Markers functionality */

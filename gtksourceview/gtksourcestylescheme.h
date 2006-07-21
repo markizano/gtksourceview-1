@@ -21,6 +21,7 @@
 #ifndef __GTK_SOURCE_STYLE_SCHEME_H__
 #define __GTK_SOURCE_STYLE_SCHEME_H__
 
+#include <gtk/gtkwidget.h>
 #include <gtksourceview/gtksourcestyle.h>
 
 G_BEGIN_DECLS
@@ -56,6 +57,14 @@ GtkSourceStyleScheme	*gtk_source_style_scheme_new		(GtkSourceStyleScheme *parent
 /* Return value must be freed with gtk_source_style_free */
 GtkSourceStyle		*gtk_source_style_scheme_get_style	(GtkSourceStyleScheme *scheme,
 								 const gchar          *style);
+GtkSourceStyle		*gtk_source_style_scheme_get_matching_brackets_style
+								(GtkSourceStyleScheme *scheme);
+gboolean		 gtk_source_style_scheme_get_current_line_color
+								(GtkSourceStyleScheme *scheme,
+								 GdkColor             *color);
+
+void			 _gtk_source_style_scheme_apply		(GtkSourceStyleScheme *scheme,
+								 GtkWidget            *widget);
 
 G_END_DECLS
 

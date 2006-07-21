@@ -1,3 +1,15 @@
+2006-07-21  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcebuffer.[ch]:
+	* gtksourceview/gtksourcecontextengine.c:
+	* gtksourceview/gtksourceengine.[ch]:
+	* gtksourceview/gtksourcestylescheme.[ch]:
+	* gtksourceview/gtksourceview.[ch]:
+	Made style scheme a GtkSourceView property. Now style scheme
+	controls all the colors, including foreground/background and
+	current line, and matching brackets. Added methods needed for
+	that.
+
 2006-07-20  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourceundomanager.c:

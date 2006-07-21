@@ -20,6 +20,16 @@
 
 #include "gtksourceview-i18n.h"
 #include "gtksourcestylescheme.h"
+#include "gtksourceview.h"
+
+#define STYLE_HAS_FOREGROUND(s) ((s) && ((s)->mask & GTK_SOURCE_STYLE_USE_FOREGROUND))
+#define STYLE_HAS_BACKGROUND(s) ((s) && ((s)->mask & GTK_SOURCE_STYLE_USE_BACKGROUND))
+
+#define STYLE_TEXT		"text"
+#define STYLE_SELECTED		"text-selected"
+#define STYLE_BRACKETS		"brackets"
+#define STYLE_CURSOR		"cursor"
+#define STYLE_CURRENT_LINE	"cursor"
 
 struct _GtkSourceStyleSchemePrivate
 {
@@ -97,6 +107,35 @@ gtk_source_style_scheme_get_style (GtkSourceStyleScheme *scheme,
 							  style_name);
 	else
 		return NULL;
+}
+
+GtkSourceStyle *
+gtk_source_style_scheme_get_matching_brackets_style (GtkSourceStyleScheme *scheme)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme), NULL);
+	return gtk_source_style_scheme_get_style (scheme, STYLE_BRACKETS);
+}
+
+gboolean
+gtk_source_style_scheme_get_current_line_color (GtkSourceStyleScheme *scheme,
+						GdkColor             *color)
+{
+	GtkSourceStyle *style;
+	gboolean ret = FALSE;
+
+	g_return_val_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme), FALSE);
+	g_return_val_if_fail (color != NULL, FALSE);
+
+	style = gtk_source_style_scheme_get_style (scheme, STYLE_CURRENT_LINE);
+
+	if (STYLE_HAS_FOREGROUND (style))
+	{
+		*color = style->foreground;
+		ret = TRUE;
+	}
+
+	gtk_source_style_free (style);
+	return ret;
 }
 
 static void
@@ -187,8 +226,77 @@ gtk_source_style_scheme_get_default (void)
 	ADD_FORE_BOLD ("def:package", "#FF00FF");
 	ADD_FORE ("def:escape", "#9010D0");
 
+	add_style (default_scheme, STYLE_BRACKETS,
+		   GTK_SOURCE_STYLE_USE_BACKGROUND |
+			GTK_SOURCE_STYLE_USE_FOREGROUND |
+			GTK_SOURCE_STYLE_USE_BOLD,
+		   "white", "gray", FALSE, TRUE, FALSE, FALSE);
+
 #undef ADD_FORE
 #undef ADD_FORE_BOLD
 
 	return default_scheme;
+}
+
+static void
+set_text_style (GtkWidget      *widget,
+		GtkSourceStyle *style,
+		GtkStateType    state)
+{
+	GdkColor *color;
+
+	if (STYLE_HAS_BACKGROUND (style))
+		color = &style->background;
+	else
+		color = NULL;
+
+	gtk_widget_modify_base (widget, state, color);
+
+	if (STYLE_HAS_FOREGROUND (style))
+		color = &style->foreground;
+	else
+		color = NULL;
+
+	gtk_widget_modify_text (widget, state, color);
+}
+
+static void
+set_cursor_color (GtkWidget      *widget,
+		  GtkSourceStyle *style)
+{
+	GdkColor *color;
+
+	if (STYLE_HAS_FOREGROUND (style))
+		color = &style->foreground;
+	else
+		color = &widget->style->text[GTK_STATE_NORMAL];
+
+	g_print ("implement me\n");
+}
+
+void
+_gtk_source_style_scheme_apply (GtkSourceStyleScheme *scheme,
+				GtkWidget            *widget)
+{
+	GtkSourceStyle *style;
+
+	g_return_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme));
+	g_return_if_fail (GTK_IS_WIDGET (widget));
+
+	gtk_widget_ensure_style (widget);
+
+	style = gtk_source_style_scheme_get_style (scheme, STYLE_TEXT);
+	set_text_style (widget, style, GTK_STATE_NORMAL);
+	set_text_style (widget, style, GTK_STATE_ACTIVE);
+	set_text_style (widget, style, GTK_STATE_PRELIGHT);
+	set_text_style (widget, style, GTK_STATE_INSENSITIVE);
+	gtk_source_style_free (style);
+
+	style = gtk_source_style_scheme_get_style (scheme, STYLE_SELECTED);
+	set_text_style (widget, style, GTK_STATE_SELECTED);
+	gtk_source_style_free (style);
+
+	style = gtk_source_style_scheme_get_style (scheme, STYLE_CURSOR);
+	set_cursor_color (widget, style);
+	gtk_source_style_free (style);
 }

@@ -1,10 +1,10 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*- 
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*-
  *  gtksourceview.h
  *
  *  Copyright (C) 2001 - Mikael Hermansson <tyan@linux.se> and
  *  Chris Phelps <chicane@reninet.com>
  *
- *  Copyright (C) 2003 - Gustavo Giráldez and Paolo Maggi 
+ *  Copyright (C) 2003 - Gustavo Giráldez and Paolo Maggi
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU Library General Public License as published by
@@ -45,14 +45,14 @@ typedef struct _GtkSourceViewClass GtkSourceViewClass;
 
 typedef struct _GtkSourceViewPrivate GtkSourceViewPrivate;
 
-struct _GtkSourceView 
+struct _GtkSourceView
 {
 	GtkTextView           parent;
 
 	GtkSourceViewPrivate *priv;
 };
 
-struct _GtkSourceViewClass 
+struct _GtkSourceViewClass
 {
 	GtkTextViewClass parent_class;
 
@@ -80,29 +80,32 @@ void 		 gtk_source_view_set_show_line_markers  (GtkSourceView   *view,
 							 gboolean         show);
 gboolean	 gtk_source_view_get_show_line_markers  (GtkSourceView   *view);
 
-void 		 gtk_source_view_set_tabs_width 	(GtkSourceView   *view, 
+void 		 gtk_source_view_set_tabs_width 	(GtkSourceView   *view,
 							 guint            width);
 guint            gtk_source_view_get_tabs_width         (GtkSourceView   *view);
 
-void		 gtk_source_view_set_auto_indent 	(GtkSourceView   *view, 
+void		 gtk_source_view_set_auto_indent 	(GtkSourceView   *view,
 							 gboolean         enable);
 gboolean	 gtk_source_view_get_auto_indent 	(GtkSourceView   *view);
 
-void		 gtk_source_view_set_insert_spaces_instead_of_tabs 
-							(GtkSourceView   *view, 
+void		 gtk_source_view_set_insert_spaces_instead_of_tabs
+							(GtkSourceView   *view,
 							 gboolean         enable);
-gboolean	 gtk_source_view_get_insert_spaces_instead_of_tabs 
+gboolean	 gtk_source_view_get_insert_spaces_instead_of_tabs
 							(GtkSourceView   *view);
 
 void		 gtk_source_view_set_show_margin 	(GtkSourceView   *view,
 							 gboolean         show);
 gboolean 	 gtk_source_view_get_show_margin 	(GtkSourceView   *view);
 
-void		 gtk_source_view_set_highlight_current_line 	
+void		 gtk_source_view_set_highlight_current_line
 							(GtkSourceView   *view,
 							 gboolean         show);
-gboolean 	 gtk_source_view_get_highlight_current_line 	
+gboolean 	 gtk_source_view_get_highlight_current_line
 							(GtkSourceView   *view);
+
+void		 gtk_source_view_set_style_scheme       (GtkSourceView   *view,
+							 GtkSourceStyleScheme *scheme);
 
 void		 gtk_source_view_set_margin 		(GtkSourceView   *view,
 							 guint            margin);

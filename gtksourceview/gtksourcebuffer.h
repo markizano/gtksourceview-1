@@ -29,7 +29,7 @@
 #include <gtk/gtk.h>
 #include <gtksourceview/gtksourcelanguage.h>
 #include <gtksourceview/gtksourcemarker.h>
-#include <gtksourceview/gtksourcestyle.h>
+#include <gtksourceview/gtksourcestylescheme.h>
 
 G_BEGIN_DECLS
 
@@ -138,6 +138,8 @@ void			 _gtk_source_buffer_update_highlight    (GtkSourceBuffer        *buffer,
 								 const GtkTextIter      *start,
 								 const GtkTextIter      *end,
 								 gboolean                synchronous);
+void			 _gtk_source_buffer_set_style_scheme    (GtkSourceBuffer        *buffer,
+								 GtkSourceStyleScheme   *scheme);
 
 G_END_DECLS
 

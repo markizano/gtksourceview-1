@@ -26,7 +26,6 @@
 #include "gtksourcecontextengine.h"
 #include "gtktextregion.h"
 #include "gtksourcetag.h"
-#include "gtksourcestylescheme.h"
 #include "gtksourcelanguage-private.h"
 #include "gtksourcebuffer.h"
 #include "eggregex.h"
@@ -424,6 +423,39 @@ unhighlight_region (GtkSourceContextEngine *ce,
 	g_hash_table_foreach (ce->priv->tags, (GHFunc) unhighlight_region_cb, &data);
 }
 
+static void
+set_tag_style (GtkSourceContextEngine *ce,
+	       GtkTextTag             *tag,
+	       const gchar            *style_name)
+{
+	GtkSourceStyle *style;
+
+	g_return_if_fail (GTK_IS_TEXT_TAG (tag));
+	g_return_if_fail (style_name != NULL);
+
+	if (!ce->priv->style_scheme)
+		return;
+
+	style = gtk_source_style_scheme_get_style (ce->priv->style_scheme, style_name);
+
+	if (!style)
+	{
+		const char *map_to = style_name;
+		while (!style && (map_to = g_hash_table_lookup (ce->priv->lang->priv->styles, map_to)))
+			style = gtk_source_style_scheme_get_style (ce->priv->style_scheme, map_to);
+	}
+
+	if (style)
+	{
+		gtk_source_style_apply (style, tag);
+		gtk_source_style_free (style);
+	}
+	else
+	{
+		g_warning ("could not find style '%s'", style_name);
+	}
+}
+
 static GtkTextTag *
 create_tag (GtkSourceContextEngine *ce,
 	    const gchar            *style_name)
@@ -431,7 +463,6 @@ create_tag (GtkSourceContextEngine *ce,
 	GSList *tags;
 	GtkTextTag *new_tag;
 	GtkTextTagTable *table;
-	GtkSourceStyle *style;
 
 	g_assert (style_name != NULL);
 
@@ -440,27 +471,7 @@ create_tag (GtkSourceContextEngine *ce,
 	new_tag = g_object_new (GTK_TYPE_SOURCE_TAG, NULL);
 	table = gtk_text_buffer_get_tag_table (ce->priv->buffer);
 	gtk_text_tag_table_add (table, new_tag);
-
-	style = gtk_source_style_scheme_get_style (ce->priv->style_scheme,
-						   style_name);
-
-	if (!style)
-	{
-		const char *def = g_hash_table_lookup (ce->priv->lang->priv->styles, style_name);
-		if (def)
-			style = gtk_source_style_scheme_get_style (ce->priv->style_scheme,
-								   def);
-	}
-
-	if (style)
-	{
-		gtk_source_style_apply (style, new_tag);
-		gtk_source_style_free (style);
-	}
-	else
-	{
-		g_warning ("could not find style '%s'", style_name);
-	}
+	set_tag_style (ce, new_tag, style_name);
 
 	tags = g_slist_prepend (tags, new_tag);
 	g_hash_table_insert (ce->priv->tags, g_strdup (style_name), tags);
@@ -1796,6 +1807,39 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 }
 
 static void
+set_tag_style_hash_cb (const char             *style,
+		       GSList                 *tags,
+		       GtkSourceContextEngine *ce)
+{
+	while (tags)
+	{
+		set_tag_style (ce, tags->data, style);
+		tags = tags->next;
+	}
+}
+
+static void
+gtk_source_context_engine_set_style_scheme (GtkSourceEngine      *engine,
+					    GtkSourceStyleScheme *scheme)
+{
+	GtkSourceContextEngine *ce;
+
+	g_return_if_fail (GTK_IS_SOURCE_CONTEXT_ENGINE (engine));
+	g_return_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme));
+
+	ce = GTK_SOURCE_CONTEXT_ENGINE (engine);
+
+	if (scheme == ce->priv->style_scheme)
+		return;
+
+	if (ce->priv->style_scheme)
+		g_object_unref (ce->priv->style_scheme);
+
+	ce->priv->style_scheme = g_object_ref (scheme);
+	g_hash_table_foreach (ce->priv->tags, (GHFunc) set_tag_style_hash_cb, ce);
+}
+
+static void
 gtk_source_context_engine_finalize (GObject *object)
 {
 	GtkSourceContextEngine *ce = GTK_SOURCE_CONTEXT_ENGINE (object);
@@ -1815,7 +1859,9 @@ gtk_source_context_engine_finalize (GObject *object)
 
 	g_hash_table_destroy (ce->priv->definitions);
 	g_free (ce->priv->id);
-	g_object_unref (ce->priv->style_scheme);
+
+	if (ce->priv->style_scheme)
+		g_object_unref (ce->priv->style_scheme);
 
 	G_OBJECT_CLASS (_gtk_source_context_engine_parent_class)->finalize (object);
 }
@@ -1832,6 +1878,7 @@ _gtk_source_context_engine_class_init (GtkSourceContextEngineClass *klass)
 	engine_class->text_inserted = gtk_source_context_engine_text_inserted;
 	engine_class->text_deleted = gtk_source_context_engine_text_deleted;
 	engine_class->update_highlight = gtk_source_context_engine_update_highlight;
+	engine_class->set_style_scheme = gtk_source_context_engine_set_style_scheme;
 
 	g_type_class_add_private (object_class, sizeof (GtkSourceContextEnginePrivate));
 }
@@ -1843,7 +1890,6 @@ _gtk_source_context_engine_init (GtkSourceContextEngine *ce)
 						GtkSourceContextEnginePrivate);
 	ce->priv->definitions = g_hash_table_new_full (g_str_hash, g_str_equal, g_free,
 						       (GDestroyNotify) context_definition_free);
-	ce->priv->style_scheme = gtk_source_style_scheme_get_default ();
 }
 
 GtkSourceContextEngine *
@@ -4874,6 +4920,12 @@ prepend_definition (G_GNUC_UNUSED gchar *id,
 }
 
 /* Only for lang files version 1, do not use it */
+/* It's called after lang file is parsed. It creates two special contexts
+   contexts and puts them into every container context defined. These contexts
+   are 'x.' and 'x$', where 'x' is the escape char. In this way, patterns from
+   lang files are matched only if match doesn't start with escaped char, and
+   escaped char in the end of line means that the current contexts extends to the
+   next line. */
 /* XXX unicode */
 void
 _gtk_source_context_engine_set_escape_char (GtkSourceContextEngine *ce,
