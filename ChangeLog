@@ -1,3 +1,14 @@
+2006-07-23  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcelanguage-private.h:
+	* gtksourceview/gtksourcelanguagesmanager.c:
+	new function _gtk_source_languages_manager_get_rng_file to
+	avoid hardcoding rng file location. Now the file can be in
+	any lang file directory.
+	* gtksourceview/gtksourcelanguage-parser-1.c:
+	(file_parse): use _gtk_source_languages_manager_get_rng_file
+	here.
+
 2006-07-21  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcebuffer.[ch]:

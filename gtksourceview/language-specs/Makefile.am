@@ -1,6 +1,8 @@
-SCHEMAS = 			\
-	language.dtd		\
+RNG =				\
 	language2.rng
+
+SCHEMAS = 			\
+	language.dtd
 
 LANGUAGES =			\
 	def.lang		\
@@ -43,10 +45,10 @@ LANGUAGES =			\
 	vhdl.lang		\
 	xml.lang
 
-EXTRA_DIST = $(SCHEMAS) $(LANGUAGES)
+EXTRA_DIST = $(SCHEMAS) $(LANGUAGES) $(RNG)
 
 languagesdir = $(datadir)/gtksourceview-2.0/language-specs
-languages_DATA = $(LANGUAGES)
+languages_DATA = $(LANGUAGES) $(RNG)
 
 schemasdir = $(datadir)/gtksourceview-2.0/schemas
 schemas_DATA = $(SCHEMAS)

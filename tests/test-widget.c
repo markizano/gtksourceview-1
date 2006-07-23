@@ -1101,8 +1101,8 @@ main (int argc, char *argv[])
 #endif
 
 	/* create buffer */
-// 	lang_dirs = g_slist_prepend (NULL, g_strdup (TOP_SRCDIR "/gtksourceview/language-specs"));
-	lang_dirs = g_slist_prepend (NULL, g_strdup ("/usr/share/gtksourceview-1.0/language-specs"));
+	lang_dirs = g_slist_prepend (NULL, g_strdup (TOP_SRCDIR "/gtksourceview/language-specs"));
+// 	lang_dirs = g_slist_prepend (NULL, g_strdup ("/usr/share/gtksourceview-1.0/language-specs"));
 	lm = g_object_new (GTK_TYPE_SOURCE_LANGUAGES_MANAGER,
 			   "lang_files_dirs", lang_dirs, NULL);
 	g_slist_foreach (lang_dirs, (GFunc) g_free, NULL);

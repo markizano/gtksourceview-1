@@ -44,8 +44,6 @@
 #include "gtksourcecontextengine.h"
 #include <eggregex.h>
 
-#define RNG_SCHEMA_DIR  DATADIR "/gtksourceview-2.0/schemas/language2.rng"
-
 #define PARSER_ERROR parser_error_quark ()
 
 typedef enum {
@@ -1627,13 +1625,10 @@ file_parse (gchar                     *filename,
 	    GSList                   **loaded_lang_ids,
 	    GError                   **error)
 {
-	gchar *rng_lang_schema = RNG_SCHEMA_DIR;
-
 	ParserState *parser_state;
 	xmlTextReader *reader = NULL;
 	int ret;
 	int fd;
-
 	GError *tmp_error = NULL;
 
 	DEBUG (g_message ("loading file '%s'", filename));
@@ -1646,7 +1641,6 @@ file_parse (gchar                     *filename,
 	if (fd != -1)
 		reader = xmlReaderForFd (fd, filename, NULL, 0);
 
-
 	if (reader == NULL)
 	{
 		g_set_error (&tmp_error,
@@ -1655,55 +1649,62 @@ file_parse (gchar                     *filename,
 			     "unable to open the file");
 	}
 
-	/* Validate using a RelaxNG schema */
-	if (!tmp_error && xmlTextReaderRelaxNGValidate (reader, rng_lang_schema))
+	if (tmp_error == NULL)
 	{
-		g_set_error (&tmp_error,
-			     PARSER_ERROR,
-			     PARSER_ERROR_CANNOT_VALIDATE,
-			     "unable to load the RelaxNG schema '%s'",
-			     rng_lang_schema);
+		GtkSourceLanguagesManager *lm;
+		const gchar *rng_lang_schema;
+
+		lm = _gtk_source_language_get_languages_manager (language);
+		rng_lang_schema = _gtk_source_languages_manager_get_rng_file (lm);
+
+		if (!rng_lang_schema)
+		{
+			g_set_error (&tmp_error,
+				     PARSER_ERROR,
+				     PARSER_ERROR_CANNOT_VALIDATE,
+				     "could not find the RelaxNG schema file");
+		}
+		else if (xmlTextReaderRelaxNGValidate (reader, rng_lang_schema))
+		{
+			g_set_error (&tmp_error,
+				     PARSER_ERROR,
+				     PARSER_ERROR_CANNOT_VALIDATE,
+				     "unable to load the RelaxNG schema '%s'",
+				     rng_lang_schema);
+		}
 	}
 
 	parser_state = parser_state_new (language, engine,
 					 defined_regexes, styles,
 					 reader, loaded_lang_ids);
 
-	if (!tmp_error)
+	while (!tmp_error && (ret = xmlTextReaderRead (parser_state->reader)) == 1)
 	{
-		ret = xmlTextReaderRead (parser_state->reader);
-		while (ret == 1)
+		int type;
+
+		if (!xmlTextReaderIsValid (parser_state->reader))
 		{
-			int type;
+			/* TODO: get the error message from the
+			 * xml parser */
+			g_set_error (&tmp_error,
+				     PARSER_ERROR,
+				     PARSER_ERROR_INVALID_DOC,
+				     "invalid language file");
+		}
 
-			if (!xmlTextReaderIsValid (parser_state->reader))
-			{
-				/* TODO: get the error message from the
-				 * xml parser */
-				g_set_error (&tmp_error,
-					     PARSER_ERROR,
-					     PARSER_ERROR_INVALID_DOC,
-					     "invalid language file");
-			}
+		if (tmp_error)
+			break;
 
-			if (tmp_error)
+		type = xmlTextReaderNodeType (parser_state->reader);
+
+		switch (type)
+		{
+			case XML_READER_TYPE_ELEMENT:
+				element_start (parser_state, &tmp_error);
 				break;
-
-			type = xmlTextReaderNodeType (parser_state->reader);
-			switch (type)
-			{
-				case XML_READER_TYPE_ELEMENT:
-					element_start (parser_state, &tmp_error);
-					break;
-				case XML_READER_TYPE_END_ELEMENT:
-					element_end (parser_state, &tmp_error);
-					break;
-			}
-
-			if (tmp_error)
+			case XML_READER_TYPE_END_ELEMENT:
+				element_end (parser_state, &tmp_error);
 				break;
-
-			ret = xmlTextReaderRead (parser_state->reader);
 		}
 	}
 

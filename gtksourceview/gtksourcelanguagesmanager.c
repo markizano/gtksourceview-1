@@ -29,6 +29,10 @@
 #include "gtksourcelanguage-private.h"
 #include "gtksourcelanguage.h"
 
+#define RNG_SCHEMA_FILE "language2.rng"
+#define SOURCEVIEW_DIR		"gtksourceview-2.0"
+#define LANGUAGE_DIR		"language-specs"
+
 enum {
 	PROP_0,
 	PROP_LANG_SPECS_DIRS
@@ -38,6 +42,7 @@ struct _GtkSourceLanguagesManagerPrivate
 {
 	GSList 		*available_languages;
 	GSList		*language_specs_directories;
+	char		*rng_file;
 };
 
 
@@ -80,8 +85,7 @@ gtk_source_languages_manager_class_init (GtkSourceLanguagesManagerClass *klass)
 							       _("List of directories where the "
 								 "language specification files (.lang) "
 								 "are located"),
-							       (G_PARAM_READWRITE |
-							        G_PARAM_CONSTRUCT_ONLY)));
+							       G_PARAM_READWRITE));
 }
 
 static void
@@ -92,11 +96,10 @@ gtk_source_languages_manager_set_property (GObject 	*object,
 {
 	GtkSourceLanguagesManager *lm;
 
-	g_return_if_fail (GTK_IS_SOURCE_LANGUAGES_MANAGER (object));
-
 	lm = GTK_SOURCE_LANGUAGES_MANAGER (object);
 
-	switch (prop_id) {
+	switch (prop_id)
+	{
 	    case PROP_LANG_SPECS_DIRS:
 		gtk_source_languages_manager_set_specs_dirs (
 				lm,
@@ -117,14 +120,14 @@ gtk_source_languages_manager_get_property (GObject 	*object,
 {
 	GtkSourceLanguagesManager *lm;
 
-	g_return_if_fail (GTK_IS_SOURCE_LANGUAGES_MANAGER (object));
-
 	lm = GTK_SOURCE_LANGUAGES_MANAGER (object);
 
-	switch (prop_id) {
+	switch (prop_id)
+	{
 	    case PROP_LANG_SPECS_DIRS:
 		    g_value_set_pointer (value, lm->priv->language_specs_directories);
 		    break;
+
 	    default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 		break;
@@ -135,6 +138,8 @@ static void
 gtk_source_languages_manager_init (GtkSourceLanguagesManager *lm)
 {
 	lm->priv = g_new0 (GtkSourceLanguagesManagerPrivate, 1);
+	/* initialize dirs list with default value */
+	gtk_source_languages_manager_set_specs_dirs (lm, NULL);
 }
 
 /**
@@ -159,31 +164,25 @@ gtk_source_languages_manager_finalize (GObject *object)
 
 	lm = GTK_SOURCE_LANGUAGES_MANAGER (object);
 
-	if (lm->priv->available_languages != NULL)
-	{
-		GSList *list = lm->priv->available_languages;
-
-		g_slist_foreach (list, (GFunc) g_object_unref, NULL);
-		g_slist_free (list);
-	}
-
+	g_slist_foreach (lm->priv->available_languages, (GFunc) g_object_unref, NULL);
+	g_slist_free (lm->priv->available_languages);
 	slist_deep_free (lm->priv->language_specs_directories);
-
+	g_free (lm->priv->rng_file);
 	g_free (lm->priv);
 
 	G_OBJECT_CLASS (gtk_source_languages_manager_parent_class)->finalize (object);
 }
-
-#define SOURCEVIEW_DIR		"gtksourceview-2.0"
-#define LANGUAGE_DIR		"language-specs"
-#define USER_CONFIG_BASE_DIR	".gnome2"
 
 static void
 gtk_source_languages_manager_set_specs_dirs (GtkSourceLanguagesManager *lm,
 					     const GSList              *dirs)
 {
 	g_return_if_fail (GTK_IS_SOURCE_LANGUAGES_MANAGER (lm));
-	g_return_if_fail (lm->priv->language_specs_directories == NULL);
+	g_return_if_fail (lm->priv->available_languages == NULL);
+
+	if (lm->priv->language_specs_directories != NULL)
+		slist_deep_free (lm->priv->language_specs_directories);
+	lm->priv->language_specs_directories = NULL;
 
 	if (dirs == NULL)
 	{
@@ -228,6 +227,9 @@ gtk_source_languages_manager_set_specs_dirs (GtkSourceLanguagesManager *lm,
 
 		dirs = g_slist_next (dirs);
 	}
+
+	lm->priv->language_specs_directories =
+		g_slist_reverse (lm->priv->language_specs_directories);
 }
 
 /**
@@ -244,6 +246,44 @@ gtk_source_languages_manager_get_lang_files_dirs (GtkSourceLanguagesManager *lm)
 	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGES_MANAGER (lm), NULL);
 
 	return lm->priv->language_specs_directories;
+}
+
+/**
+ * _gtk_source_languages_manager_get_rng_file:
+ * @lm: a #GtkSourceLanguagesManager.
+ *
+ * Returns location of the RNG schema file for lang files version 2.
+ *
+ * Returns: path to RNG file. It belongs to %lm and must not be freed or modified.
+ **/
+const char *
+_gtk_source_languages_manager_get_rng_file (GtkSourceLanguagesManager *lm)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGES_MANAGER (lm), NULL);
+
+	if (!lm->priv->rng_file)
+	{
+		const GSList *dirs;
+
+		dirs = gtk_source_languages_manager_get_lang_files_dirs (lm);
+
+		while (dirs != NULL)
+		{
+			char *file = g_build_filename (dirs->data, RNG_SCHEMA_FILE, NULL);
+
+			if (g_file_test (file, G_FILE_TEST_EXISTS))
+			{
+				lm->priv->rng_file = file;
+				break;
+			}
+
+			g_free (file);
+
+			dirs = dirs->next;
+		}
+	}
+
+	return lm->priv->rng_file;
 }
 
 static void
