@@ -422,7 +422,7 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 			      G_STRUCT_OFFSET (GtkSourceViewClass, undo),
 			      NULL,
 			      NULL,
-			      gtksourceview_marshal_VOID__VOID,
+			      _gtksourceview_marshal_VOID__VOID,
 			      G_TYPE_NONE,
 			      0);
 	signals [REDO] =
@@ -432,7 +432,7 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 			      G_STRUCT_OFFSET (GtkSourceViewClass, redo),
 			      NULL,
 			      NULL,
-			      gtksourceview_marshal_VOID__VOID,
+			      _gtksourceview_marshal_VOID__VOID,
 			      G_TYPE_NONE,
 			      0);
 
