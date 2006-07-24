@@ -1,4 +1,4 @@
-GTKDOC_CFLAGS = -I$(top_srcdir) $(DEP_CFLAGS) $(GNOMEPRINT_CFLAGS)
+GTKDOC_CFLAGS = -I$(top_srcdir) $(DEP_CFLAGS)
 GTKDOC_LIBS = $(top_builddir)/gtksourceview/libgtksourceview-2.0.la
 
 ## Process this file with automake to produce Makefile.in
@@ -30,7 +30,9 @@ IGNORE_HFILES =					\
 	gtksourceview-marshal.h			\
 	gtksourceview-typebuiltins.h		\
 	gtktextregion.h				\
+	gtksourceengine.h			\
 	gtksourcecontextengine.h		\
+	gtksourceprintjob.h			\
 	regex.h					\
 	regex_internal.h
 

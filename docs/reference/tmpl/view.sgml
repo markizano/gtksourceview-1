@@ -77,6 +77,11 @@ GtkSourceView
 
 </para>
 
+<!-- ##### ARG GtkSourceView:style-scheme ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG GtkSourceView:tabs-width ##### -->
 <para>
 

@@ -1,5 +1,47 @@
 2006-07-24  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	Updated EggRegex and pcre, updated build infrastructure for it,
+	made it optionally use system pcre. Made the library export only 
+	public symbols.
+
+	* docs/reference/gtksourceview.types:
+	* docs/reference/Makefile.am: made gtk-doc work again,
+	without PrintJob and old removed classes.
+
+	* gtksourceview/libegg/regex/*: synced with Marco's eggregex
+	repository. Now it's pcre-6.7, and EggRegex using byte offsets.
+
+	* gtksourceview/gtksourcecontextengine.c: updated code using
+	EggRegex. Corrected lot of places dealing with zero-length
+	segments. It all needs rewriting.
+	* gtksourceview/gtksourcelanguage-parser-2.c: updated code using
+	EggRegex. Made parser_error_quark() static.
+
+	* gtksourceview/Makefile.am:
+	* gtksourceview/gtksourceview.c:
+	* gtksourceview/gtksourceundomanager.c:
+	* gtksourceview/gtksourcebuffer.c: prefixed marshals with 
+	underscore.
+	* gtksourceview/gtksourceview-i18n.[ch]: prefixed gtksourceview_gettext
+	with underscore.
+
+	* gtksourceview/Makefile.am: use -export-symbols-regex in LDFLAGS
+	to export only gtk_source_* symbols.
+
+	* tests/Makefile.am: do not build testregion since it requires private
+	api.
+
+	* acinclude.m4:
+	* configure.in: GTK_SOURCE_VIEW_AC_PCRE macro for --with-system-pcre 
+	configure option and pcre options needed in config.h.
+
+	* gtksourceview/gtksourcesimpleengine.[ch]:
+	* gtksourceview/gtksourcetag-private.h:
+	* gtksourceview/gtksourcetagstyle.h:
+	* gtksourceview/gtksourcetagtable.[ch]: removed these files.
+
+2006-07-24  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourceview.c: (set_source_buffer): reference
 	the buffer, to avoid disconnecting callbacks from garbage.
 

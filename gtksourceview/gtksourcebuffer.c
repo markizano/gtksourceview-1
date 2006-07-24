@@ -206,7 +206,7 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 			  G_SIGNAL_RUN_LAST,
 			  G_STRUCT_OFFSET (GtkSourceBufferClass, can_undo),
 			  NULL, NULL,
-			  gtksourceview_marshal_VOID__BOOLEAN,
+			  _gtksourceview_marshal_VOID__BOOLEAN,
 			  G_TYPE_NONE,
 			  1,
 			  G_TYPE_BOOLEAN);
@@ -217,7 +217,7 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 			  G_SIGNAL_RUN_LAST,
 			  G_STRUCT_OFFSET (GtkSourceBufferClass, can_redo),
 			  NULL, NULL,
-			  gtksourceview_marshal_VOID__BOOLEAN,
+			  _gtksourceview_marshal_VOID__BOOLEAN,
 			  G_TYPE_NONE,
 			  1,
 			  G_TYPE_BOOLEAN);
@@ -228,7 +228,7 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 			  G_SIGNAL_RUN_LAST,
 			  G_STRUCT_OFFSET (GtkSourceBufferClass, highlight_updated),
 			  NULL, NULL,
-			  gtksourceview_marshal_VOID__BOXED_BOXED,
+			  _gtksourceview_marshal_VOID__BOXED_BOXED,
 			  G_TYPE_NONE,
 			  2,
 			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE,
@@ -240,7 +240,7 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 			  G_SIGNAL_RUN_LAST,
 			  G_STRUCT_OFFSET (GtkSourceBufferClass, marker_updated),
 			  NULL, NULL,
-			  gtksourceview_marshal_VOID__BOXED,
+			  _gtksourceview_marshal_VOID__BOXED,
 			  G_TYPE_NONE,
 			  1,
 			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE);
@@ -251,7 +251,7 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 			  G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
 			  G_STRUCT_OFFSET (GtkSourceBufferClass, debug),
 			  NULL, NULL,
-			  gtksourceview_marshal_VOID__VOID,
+			  _gtksourceview_marshal_VOID__VOID,
 			  G_TYPE_NONE, 0);
 }
 

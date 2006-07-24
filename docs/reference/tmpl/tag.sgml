@@ -23,37 +23,10 @@ GtkSourceTag
 </para>
 
 
-<!-- ##### ARG GtkSourceTag:id ##### -->
-<para>
-
-</para>
-
-<!-- ##### ARG GtkSourceTag:tag-style ##### -->
-<para>
-
-</para>
-
 <!-- ##### STRUCT GtkSourceTagClass ##### -->
 <para>
 
 </para>
 
-
-<!-- ##### FUNCTION gtk_source_tag_get_style ##### -->
-<para>
-
-</para>
-
-@tag: 
-@Returns: 
-
-
-<!-- ##### FUNCTION gtk_source_tag_set_style ##### -->
-<para>
-
-</para>
-
-@tag: 
-@style: 
-
+@base_class: 
 

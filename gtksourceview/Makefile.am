@@ -64,7 +64,7 @@ libgtksourceview_2_0_la_SOURCES = 	\
 
 libgtksourceview_2_0_la_LIBADD = $(DEP_LIBS) $(EGGREGEX_LIBS)
 
-libgtksourceview_2_0_la_LDFLAGS = -no-undefined
+libgtksourceview_2_0_la_LDFLAGS = -no-undefined -export-symbols-regex "^gtk_source_.*"
 
 libgtksourceview_2_0_includedir = $(includedir)/gtksourceview-2.0/gtksourceview
 
@@ -73,11 +73,11 @@ libgtksourceview_2_0_include_HEADERS =		\
 	gtksourceview-typebuiltins.h
 
 gtksourceview-marshal.h: gtksourceview-marshal.list $(GLIB_GENMARSHAL)
-	$(GLIB_GENMARSHAL) $< --header --prefix=gtksourceview_marshal > $@
+	$(GLIB_GENMARSHAL) $< --header --prefix=_gtksourceview_marshal > $@
 
 gtksourceview-marshal.c: gtksourceview-marshal.list $(GLIB_GENMARSHAL)
 	echo "#include \"gtksourceview-marshal.h\"" > $@ && \
-	$(GLIB_GENMARSHAL) $< --body --prefix=gtksourceview_marshal >> $@
+	$(GLIB_GENMARSHAL) $< --body --prefix=_gtksourceview_marshal >> $@
 
 $(srcdir)/gtksourceview-typebuiltins.c: Makefile.am $(libgtksourceview_headers)
 	cd $(srcdir) \
@@ -114,11 +114,7 @@ $(srcdir)/gtksourceview-typebuiltins.h: Makefile.am $(libgtksourceview_headers)
 
 EXTRA_DIST = 				\
 	gtksourceview-marshal.list	\
-	gtksourcetagstyle.h		\
-	gtksourcetagtable.h		\
-	gtksourcetagtable.c		\
-	gtksourcetag-private.h 		\
-	gtksourcesimpleengine.h		\
-	gtksourcesimpleengine.c
+	gtksourceprintjob.c		\
+	gtksourceprintjob.h
 
 CLEANFILES = $(BUILT_SOURCES)

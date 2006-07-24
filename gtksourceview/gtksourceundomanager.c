@@ -179,7 +179,7 @@ gtk_source_undo_manager_class_init (GtkSourceUndoManagerClass *klass)
 			      G_SIGNAL_RUN_LAST,
 			      G_STRUCT_OFFSET (GtkSourceUndoManagerClass, can_undo),
 			      NULL, NULL,
-			      gtksourceview_marshal_VOID__BOOLEAN,
+			      _gtksourceview_marshal_VOID__BOOLEAN,
 			      G_TYPE_NONE,
 			      1,
 			      G_TYPE_BOOLEAN);
@@ -190,7 +190,7 @@ gtk_source_undo_manager_class_init (GtkSourceUndoManagerClass *klass)
 			      G_SIGNAL_RUN_LAST,
 			      G_STRUCT_OFFSET (GtkSourceUndoManagerClass, can_redo),
 			      NULL, NULL,
-			      gtksourceview_marshal_VOID__BOOLEAN,
+			      _gtksourceview_marshal_VOID__BOOLEAN,
 			      G_TYPE_NONE,
 			      1,
 			      G_TYPE_BOOLEAN);

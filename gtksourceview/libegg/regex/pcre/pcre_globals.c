@@ -6,7 +6,7 @@
 and semantics are as close as possible to those of the Perl 5 language.
 
                        Written by Philip Hazel
-           Copyright (c) 1997-2005 University of Cambridge
+           Copyright (c) 1997-2006 University of Cambridge
 
 -----------------------------------------------------------------------------
 Redistribution and use in source and binary forms, with or without
@@ -49,23 +49,19 @@ differently, and global variables are not used (see pcre.in). */
 
 #include "pcre_internal.h"
 
-/* EggRegex uses the functions from glib. */
+
 #ifndef VPCOMPAT
 #ifdef __cplusplus
-/*
 extern "C" void *(*pcre_malloc)(size_t) = malloc;
 extern "C" void  (*pcre_free)(void *) = free;
 extern "C" void *(*pcre_stack_malloc)(size_t) = malloc;
 extern "C" void  (*pcre_stack_free)(void *) = free;
-*/
 extern "C" int   (*pcre_callout)(pcre_callout_block *) = NULL;
 #else
-/*
 void *(*pcre_malloc)(size_t) = malloc;
 void  (*pcre_free)(void *) = free;
 void *(*pcre_stack_malloc)(size_t) = malloc;
 void  (*pcre_stack_free)(void *) = free;
-*/
 int   (*pcre_callout)(pcre_callout_block *) = NULL;
 #endif
 #endif

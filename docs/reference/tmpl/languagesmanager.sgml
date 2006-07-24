@@ -28,6 +28,11 @@ GtkSourceLanguagesManager
 
 </para>
 
+<!-- ##### ARG GtkSourceLanguagesManager:style-schemes-dirs ##### -->
+<para>
+
+</para>
+
 <!-- ##### FUNCTION gtk_source_languages_manager_new ##### -->
 <para>
 
@@ -42,16 +47,6 @@ GtkSourceLanguagesManager
 </para>
 
 @lm: 
-@Returns: 
-
-
-<!-- ##### FUNCTION gtk_source_languages_manager_get_language_from_mime_type ##### -->
-<para>
-
-</para>
-
-@lm: 
-@mime_type: 
 @Returns: 
 
 

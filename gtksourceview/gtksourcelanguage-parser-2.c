@@ -94,7 +94,7 @@ typedef struct _ParserState ParserState;
 
 
 
-GQuark            parser_error_quark           (void);
+static GQuark     parser_error_quark           (void);
 static gboolean   str_to_bool                  (gchar *string);
 static gchar     *generate_new_id              (ParserState *parser_state);
 static gboolean   id_is_decorated              (gchar *id,
@@ -153,7 +153,7 @@ static gchar     *expand_regex                 (ParserState *parser_state,
 						gboolean insert_parentheses,
 						GError **error);
 
-GQuark
+static GQuark
 parser_error_quark (void)
 {
 	static GQuark err_q = 0;
@@ -791,8 +791,8 @@ replace_by_id (const EggRegex *egg_regex,
 	GError *tmp_error = NULL;
 	ParserState *parser_state = data;
 
-	escapes = egg_regex_fetch (egg_regex, regex, 1);
-	tmp = egg_regex_fetch (egg_regex, regex, 2);
+	escapes = egg_regex_fetch (egg_regex, 1, regex);
+	tmp = egg_regex_fetch (egg_regex, 2, regex);
 
 	g_strstrip (tmp);
 
@@ -939,9 +939,8 @@ expand_regex_vars (ParserState *parser_state, gchar *regex, gint len, GError **e
 	/* Use parser_state to pass the GError because we cannot pass
 	 * it directly to the callback */
 	parser_state->error = error;
-	expanded_regex = egg_regex_replace_eval (egg_re, regex, len, 0,
-			replace_by_id, parser_state,
-			0);
+	expanded_regex = egg_regex_replace_eval (egg_re, regex, len, 0, 0,
+						 replace_by_id, parser_state);
 	parser_state->error = NULL;
 
 	if (*error == NULL)
@@ -950,7 +949,7 @@ expand_regex_vars (ParserState *parser_state, gchar *regex, gint len, GError **e
 				  regex, expanded_regex));
         }
 
-	egg_regex_free (egg_re);
+	egg_regex_unref (egg_re);
 
 	if (*error != NULL)
 	{
@@ -970,11 +969,11 @@ replace_delimiter (const EggRegex *egg_regex,
 	gchar *delim, *escapes;
 	ParserState *parser_state = data;
 
-	escapes = egg_regex_fetch (egg_regex, regex, 1);
+	escapes = egg_regex_fetch (egg_regex, 1, regex);
 	g_string_append (expanded_regex, escapes);
 	g_free (escapes);
 
-	delim = egg_regex_fetch (egg_regex, regex, 2);
+	delim = egg_regex_fetch (egg_regex, 2, regex);
 	DEBUG (g_message ("replacing '\\%%%s'", delim));
 
 	switch (delim[0])
@@ -1022,14 +1021,13 @@ expand_regex_delimiters (ParserState *parser_state,
 
 	egg_re = egg_regex_new (re, 0, 0, NULL);
 
-	expanded_regex = egg_regex_replace_eval (egg_re, regex, len, 0,
-			replace_delimiter, parser_state,
-			0);
+	expanded_regex = egg_regex_replace_eval (egg_re, regex, len, 0, 0,
+						 replace_delimiter, parser_state);
 
 	DEBUG (g_message ("expanded regex delims '%s' to '%s'",
 				regex, expanded_regex));
 
-	egg_regex_free (egg_re);
+	egg_regex_unref (egg_re);
 
 	return expanded_regex;
 }

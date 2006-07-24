@@ -1,32 +1,27 @@
 if BUILD_EGG_REGEX
 
+if !USE_SYSTEM_PCRE
 SUBDIRS = pcre
+pcre_lib = pcre/libpcre.la
+pcre_incl = -I$(srcdir)/pcre
+else
+pcre_lib = $(PCRE_LIBS)
+pcre_incl = $(PCRE_CFLAGS)
+endif
 
-INCLUDES = \
-  $(DEPRECATED_FLAGS) \
-  $(DEP_CFLAGS)
-#  $(WARN_CFLAGS) was removed because blocked compilation
+INCLUDES =			\
+	$(DEPRECATED_FLAGS)	\
+	$(DEP_CFLAGS)		\
+	$(pcre_incl)
 
 noinst_LTLIBRARIES = libeggregex.la
 
-libeggregex_la_LIBADD =       \
-	$(DEP_LIBS)           \
-	pcre/libpcre.la
+libeggregex_la_LIBADD =		\
+	$(DEP_LIBS)		\
+	$(pcre_lib)
 
-libeggregex_la_SOURCES = \
-  eggregex.c
-
-#noinst_PROGRAMS = testregex
-
-#testregex_SOURCES = testregex.c
-#testregex_LDFLAGS = \
-#	libeggregex.la \
-#	$(DEP_LIBS)
-#testregex_DEPENDENCIES = libeggregex.la 
+libeggregex_la_SOURCES =	\
+	eggregex.c		\
+	eggregex.h
 
 endif
-
-noinst_HEADERS = \
-  eggregex.h
-
-

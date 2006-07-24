@@ -32,9 +32,9 @@
 #include <errno.h>
 #include <string.h>
 
-// #define ENABLE_DEBUG
+#define ENABLE_DEBUG
 // #define ENABLE_PROFILE
-// #define ENABLE_CHECK_TREE
+#define ENABLE_CHECK_TREE
 
 #ifdef ENABLE_DEBUG
 #define DEBUG(x) (x)
@@ -1495,14 +1495,6 @@ update_tree (GtkSourceContextEngine *ce)
 			      start_offset,
 			      0);
 
-	if (!get_invalid_at_ (ce, start_offset))
-		create_segment (ce,
-				ce->priv->root_segment,
-				NULL,
-				start_offset,
-				end_offset - region->delta,
-				NULL);
-
 	if (region->delta >= 0)
 		insert_range (ce,
 			      end_offset - region->delta,
@@ -1511,6 +1503,11 @@ update_tree (GtkSourceContextEngine *ce)
 		delete_range (ce,
 			      end_offset,
 			      end_offset - region->delta);
+
+	if (!get_invalid_at_ (ce, start_offset))
+		insert_range (ce,
+			      start_offset,
+			      0);
 
 	region->empty = TRUE;
 	CHECK_TREE (ce);
@@ -1910,7 +1907,7 @@ regex_unref (Regex *regex)
 	if (regex && --regex->ref_count == 0)
 	{
 		if (regex->resolved)
-			egg_regex_free (regex->u.regex);
+			egg_regex_unref (regex->u.regex);
 		else
 			g_free (regex->u.info.pattern);
 		g_free (regex);
@@ -1948,25 +1945,6 @@ find_single_byte_escape (const gchar *string)
 	return FALSE;
 }
 
-static gboolean
-regex_match_simple (const gchar *pattern,
-		    const gchar *string)
-{
-	EggRegex *regex;
-	gboolean result;
-
-	g_return_val_if_fail (pattern != NULL, FALSE);
-	g_return_val_if_fail (string != NULL, FALSE);
-
-	regex = egg_regex_new (pattern, 0, 0, NULL);
-	g_return_val_if_fail (regex != NULL, FALSE);
-
-	result = egg_regex_match (regex, string, 0);
-
-	egg_regex_free (regex);
-	return result;
-}
-
 /**
  * regex_new:
  *
@@ -1996,7 +1974,7 @@ regex_new (const gchar           *pattern,
 	regex = g_new0 (Regex, 1);
 	regex->ref_count = 1;
 
-	if (regex_match_simple (START_REF_REGEX, pattern))
+	if (egg_regex_match_simple (START_REF_REGEX, pattern, 0, 0))
 	{
 		regex->resolved = FALSE;
 		regex->u.info.pattern = g_strdup (pattern);
@@ -2053,8 +2031,8 @@ replace_start_regex (const EggRegex *regex,
 		const gchar *matched_text;
 	} *data = user_data;
 
-	escapes = egg_regex_fetch (regex, matched_text, 1);
-	num_string = egg_regex_fetch (regex, matched_text, 2);
+	escapes = egg_regex_fetch (regex, 1, matched_text);
+	num_string = egg_regex_fetch (regex, 2, matched_text);
 	num = sub_pattern_to_int (num_string);
 
 	if (num < 0)
@@ -2063,8 +2041,8 @@ replace_start_regex (const EggRegex *regex,
 					       num_string);
 	else
 		subst = egg_regex_fetch (data->start_regex->u.regex,
-					 data->matched_text,
-					 num);
+					 num,
+					 data->matched_text);
 
 	if (subst)
 	{
@@ -2126,9 +2104,9 @@ regex_resolve (Regex       *regex,
 	data.matched_text = matched_text;
 	expanded_regex = egg_regex_replace_eval (start_ref,
 						 regex->u.info.pattern,
-						 -1, 0,
+						 -1, 0, 0,
 						 replace_start_regex,
-						 &data, 0);
+						 &data);
 	new_regex = regex_new (expanded_regex, regex->u.info.flags, NULL);
 
 	if (!new_regex || !new_regex->resolved)
@@ -2140,7 +2118,7 @@ regex_resolve (Regex       *regex,
 		new_regex = regex_new ("$never-match^", 0, NULL);
 	}
 
-	egg_regex_free (start_ref);
+	egg_regex_unref (start_ref);
 	return new_regex;
 }
 
@@ -2150,10 +2128,20 @@ regex_match (Regex       *regex,
 	     gint         line_length,
 	     gint         line_pos)
 {
+	gint byte_length = line_length;
+	gint byte_pos = line_pos;
+
 	g_assert (regex->resolved);
-	return  egg_regex_match_extended (regex->u.regex, line,
-					  line_length, line_pos,
-					  0, NULL);
+
+	if (line_length > 0)
+		byte_length = (g_utf8_offset_to_pointer (line, line_length) - line);
+
+	if (line_pos > 0)
+		byte_pos = (g_utf8_offset_to_pointer (line, line_pos) - line);
+
+	return egg_regex_match_full (regex->u.regex, line,
+				     byte_length, byte_pos,
+				     0, NULL);
 }
 
 static gchar *
@@ -2162,44 +2150,60 @@ regex_fetch (Regex       *regex,
 	     gint         num)
 {
 	g_assert (regex->resolved);
-	return egg_regex_fetch (regex->u.regex, line, num);
+	return egg_regex_fetch (regex->u.regex, num, line);
 }
 
 static void
 regex_fetch_pos (Regex       *regex,
-		 const gchar *matched_text,
+		 const gchar *text,
 		 gint         num,
 		 gint        *start_pos,
 		 gint        *end_pos)
 {
+	gint byte_start_pos, byte_end_pos;
+
 	g_assert (regex->resolved);
 
-	if (!egg_regex_fetch_pos (regex->u.regex, matched_text,
-				  num, start_pos, end_pos))
+	if (!egg_regex_fetch_pos (regex->u.regex, num, &byte_start_pos, &byte_end_pos))
 	{
 		if (start_pos)
 			*start_pos = -1;
 		if (end_pos)
 			*end_pos = -1;
 	}
+	else
+	{
+		if (start_pos)
+			*start_pos = g_utf8_pointer_to_offset (text, text + byte_start_pos);
+		if (end_pos)
+			*end_pos = g_utf8_pointer_to_offset (text, text + byte_end_pos);
+	}
 }
 
 static void
 regex_fetch_named_pos (Regex       *regex,
-		       const gchar *matched_text,
+		       const gchar *text,
 		       const gchar *name,
 		       gint        *start_pos,
 		       gint        *end_pos)
 {
+	gint byte_start_pos, byte_end_pos;
+
 	g_assert (regex->resolved);
 
-	if (!egg_regex_fetch_named_pos (regex->u.regex, matched_text,
-					name, start_pos, end_pos))
+	if (!egg_regex_fetch_named_pos (regex->u.regex, name, &byte_start_pos, &byte_end_pos))
 	{
 		if (start_pos)
 			*start_pos = -1;
 		if (end_pos)
 			*end_pos = -1;
+	}
+	else
+	{
+		if (start_pos)
+			*start_pos = g_utf8_pointer_to_offset (text, text + byte_start_pos);
+		if (end_pos)
+			*end_pos = g_utf8_pointer_to_offset (text, text + byte_end_pos);
 	}
 }
 
@@ -2332,6 +2336,7 @@ can_apply_match (Context  *state,
 		 * the end of the ancestor.
 		 * For instance in C a net-address context matches even if
 		 * it contains the end of a multi-line comment. */
+		/* XXX pos and match_start ?? */
 		if (!regex_match (regex, line->text, pos, match_start))
 		{
 			/* This match is not valid, so we can try to match
@@ -3925,7 +3930,7 @@ segment_erase_range_ (GtkSourceContextEngine *ce,
 		return;
 	}
 
-	if (segment->start_at >= end || segment->end_at <= start)
+	if (segment->start_at > end || segment->end_at < start)
 		return;
 
 	if (segment->start_at >= start && segment->end_at <= end && segment->parent)
@@ -3934,11 +3939,32 @@ segment_erase_range_ (GtkSourceContextEngine *ce,
 		return;
 	}
 
-	for (child = segment->children; child != NULL; )
+	if (segment->start_at == end)
 	{
-		Segment *next = child->next;
-		segment_erase_range_ (ce, child, start, end);
-		child = next;
+		for (child = segment->children; child != NULL && child->start_at == end; )
+		{
+			Segment *next = child->next;
+			segment_erase_range_ (ce, child, start, end);
+			child = next;
+		}
+	}
+	else if (segment->end_at == start)
+	{
+		for (child = segment->last_child; child != NULL && child->end_at == start; )
+		{
+			Segment *prev = child->prev;
+			segment_erase_range_ (ce, child, start, end);
+			child = prev;
+		}
+	}
+	else
+	{
+		for (child = segment->children; child != NULL; )
+		{
+			Segment *next = child->next;
+			segment_erase_range_ (ce, child, start, end);
+			child = next;
+		}
 	}
 
 	if (segment->sub_patterns)
@@ -4120,7 +4146,7 @@ erase_segments (GtkSourceContextEngine *ce,
 		Segment *next = child->next;
 		GSList *contexts_here;
 
-		if (child->end_at <= start && child->start_at < start)
+		if (child->end_at < start)
 		{
 			child = next;
 
@@ -4130,7 +4156,7 @@ erase_segments (GtkSourceContextEngine *ce,
 			continue;
 		}
 
-		if (child->start_at >= end && child->end_at > end)
+		if (child->start_at > end)
 		{
 			ce->priv->hint = child;
 			break;
@@ -4156,15 +4182,13 @@ erase_segments (GtkSourceContextEngine *ce,
 		if (!ce->priv->hint)
 			ce->priv->hint = child;
 
-		if (child->start_at >= end &&
-		    !(child->start_at == child->end_at && child->start_at == end))
+		if (child->start_at > end)
 		{
 			child = prev;
 			continue;
 		}
 
-		if (child->end_at <= start &&
-		    !(child->start_at == child->end_at && child->start_at == start))
+		if (child->end_at < start)
 		{
 			break;
 		}
@@ -4179,6 +4203,8 @@ erase_segments (GtkSourceContextEngine *ce,
 		segment_erase_range_ (ce, child, start, end);
 		child = prev;
 	}
+
+	CHECK_TREE (ce);
 
 	return contexts;
 }
@@ -4305,21 +4331,31 @@ update_syntax (GtkSourceContextEngine *ce,
 					       ce->priv->hint);
                 get_line_info (buffer, &line_start, &line_end, &line);
 
+		{
+			invalid = get_invalid_segment (ce);
+			g_assert (!invalid || invalid->start_at >= line_end_offset);
+		}
+
 		if (!line_start_offset)
 			state = ce->priv->root_segment;
 		else
 			state = get_segment_at_offset (ce,
 						       ce->priv->hint ? ce->priv->hint : state,
 						       line_start_offset - 1);
+		g_assert (state->context != NULL);
 
 		hint = ce->priv->hint;
 
 		if (hint && hint->parent != state)
 			hint = NULL;
 
-		CHECK_TREE (ce);
 		state = analyze_line (ce, state, &line, &hint);
 		CHECK_TREE (ce);
+
+		{
+			invalid = get_invalid_segment (ce);
+			g_assert (!invalid || invalid->start_at >= line_end_offset);
+		}
 
 		if (hint && hint->parent == ce->priv->root_segment)
 			ce->priv->hint = hint;
@@ -4520,7 +4556,7 @@ context_definition_new (const gchar        *id,
 
 	/* Main contexts (i.e. the contexts with id "language:language")
 	 * should have extend-parent="true" and end-at-line-end="false". */
-	if (!parent && regex_match_simple ("(.+):\\1", id))
+	if (!parent && egg_regex_match_simple ("(.+):\\1", id, 0, 0))
 	{
 		if (end_at_line_end)
 		{

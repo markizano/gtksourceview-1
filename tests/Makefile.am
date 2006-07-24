@@ -14,7 +14,10 @@ INCLUDES = 				\
 	$(TESTS_CFLAGS)
 
 # testing executables
-noinst_PROGRAMS = test-widget testregion
+EXTRA_PROGRAMS = test-widget testregion
+# testregion need gtk_text_region_ api which is normally private
+# modify gtksourceview/Makefile.am to export gtk_text_* symbols
+noinst_PROGRAMS = test-widget
 
 test_widget_SOURCES = test-widget.c
 
