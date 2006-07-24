@@ -1,5 +1,10 @@
 2006-07-24  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c: (find_insertion_place),
+	(update_tree): bugs.
+
+2006-07-24  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c: (delete_range): do not
 	invalidate deletion place, update_tree() takes care about it.
 

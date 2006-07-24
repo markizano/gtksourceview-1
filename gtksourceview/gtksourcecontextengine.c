@@ -32,9 +32,9 @@
 #include <errno.h>
 #include <string.h>
 
-#define ENABLE_DEBUG
+// #define ENABLE_DEBUG
 // #define ENABLE_PROFILE
-#define ENABLE_CHECK_TREE
+// #define ENABLE_CHECK_TREE
 
 #ifdef ENABLE_DEBUG
 #define DEBUG(x) (x)
@@ -989,7 +989,8 @@ find_insertion_place (Segment  *segment,
 	 * adjacent zero-length segments, and crash */
 	if (segment->start_at == offset)
 	{
-		if (SEGMENT_IS_INVALID (segment->children))
+		if (SEGMENT_IS_INVALID (segment->children) &&
+		    segment->children->start_at == offset)
 		{
 			*parent = segment->children;
 		}
@@ -1468,7 +1469,8 @@ static GSList *
 update_tree (GtkSourceContextEngine *ce)
 {
 	InvalidRegion *region = &ce->priv->invalid_region;
-	gint start_offset, end_offset;
+	gint start, end, delta;
+	gint erase_start, erase_end;
 	GtkTextIter iter;
 	GSList *contexts = NULL;
 
@@ -1476,40 +1478,52 @@ update_tree (GtkSourceContextEngine *ce)
 		return NULL;
 
 	gtk_text_buffer_get_iter_at_mark (ce->priv->buffer, &iter, region->start);
-	start_offset = gtk_text_iter_get_offset (&iter);
+	start = gtk_text_iter_get_offset (&iter);
 	gtk_text_buffer_get_iter_at_mark (ce->priv->buffer, &iter, region->end);
-	end_offset = gtk_text_iter_get_offset (&iter);
+	end = gtk_text_iter_get_offset (&iter);
 
-	g_assert (start_offset <= end_offset);
-	g_assert (start_offset <= end_offset - region->delta);
+	delta = region->delta;
 
-	if (start_offset < end_offset - region->delta)
-		contexts = erase_segments (ce,
-					   start_offset,
-					   end_offset - region->delta,
-					   TRUE,
-					   NULL);
+	g_assert (start <= MIN (end, end - delta));
+
+	/* Here start and end are actual offsets in the buffer; delta is how much
+	 * was inserted/removed, and length is the distance between start and end.
+	 * First, we insert/delete range from the tree, to make offsets in tree
+	 * match offsets in the buffer. Then, create an invalid segment for the rest
+	 * of the area if needed. */
+
+	if (delta > 0)
+		insert_range (ce, start, delta);
+	else if (delta < 0)
+		delete_range_ (ce, end, end - delta);
+
+	if (delta <= 0)
+	{
+		erase_start = start;
+		erase_end = end;
+	}
 	else
-		insert_range (ce,
-			      start_offset,
-			      0);
+	{
+		erase_start = start + delta;
+		erase_end = end;
+	}
 
-	if (region->delta >= 0)
-		insert_range (ce,
-			      end_offset - region->delta,
-			      region->delta);
-	else
-		delete_range_ (ce,
-			       end_offset,
-			       end_offset - region->delta);
-
-	if (!get_invalid_at_ (ce, start_offset))
-		insert_range (ce,
-			      start_offset,
-			      0);
+	if (erase_start < erase_end)
+	{
+		contexts = erase_segments (ce, erase_start, erase_end, TRUE, NULL);
+		create_segment (ce, ce->priv->root_segment, NULL, erase_start, erase_end, NULL);
+	}
+	else if (!get_invalid_at_ (ce, start))
+	{
+		insert_range (ce, start, 0);
+	}
 
 	region->empty = TRUE;
+
+#ifdef ENABLE_CHECK_TREE
+	g_assert (get_invalid_at_ (ce, start) != NULL);
 	CHECK_TREE (ce);
+#endif
 
 	return contexts;
 }
