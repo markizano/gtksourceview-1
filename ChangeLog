@@ -1,3 +1,8 @@
+2006-07-24  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourceview.c: (set_source_buffer): reference
+	the buffer, to avoid disconnecting callbacks from garbage.
+
 2006-07-23  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcestyle.[ch]: prefixed 

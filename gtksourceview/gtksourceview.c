@@ -792,11 +792,12 @@ set_source_buffer (GtkSourceView *view,
 		g_signal_handlers_disconnect_by_func (view->priv->source_buffer,
 						      marker_updated_cb,
 						      view);
+		g_object_unref (view->priv->source_buffer);
 	}
 
 	if (buffer && GTK_IS_SOURCE_BUFFER (buffer))
 	{
-		view->priv->source_buffer = GTK_SOURCE_BUFFER (buffer);
+		view->priv->source_buffer = g_object_ref (buffer);
 
 		g_signal_connect (buffer,
 				  "highlight_updated",
