@@ -29,19 +29,23 @@
 #include "gtksourcelanguage-private.h"
 #include "gtksourcelanguage.h"
 
-#define RNG_SCHEMA_FILE "language2.rng"
+#define RNG_SCHEMA_FILE		"language2.rng"
 #define SOURCEVIEW_DIR		"gtksourceview-2.0"
 #define LANGUAGE_DIR		"language-specs"
+#define STYLE_DIR		"styles"
 
 enum {
 	PROP_0,
-	PROP_LANG_SPECS_DIRS
+	PROP_LANG_SPECS_DIRS,
+	PROP_STYLE_SCHEMES_DIRS
 };
 
 struct _GtkSourceLanguagesManagerPrivate
 {
 	GSList 		*available_languages;
 	GSList		*language_specs_directories;
+	GSList 		*style_schemes;
+	GSList		*style_schemes_directories;
 	char		*rng_file;
 };
 
@@ -53,8 +57,6 @@ static void	 gtk_source_languages_manager_finalize	 	(GObject 		   *object);
 
 static void	 slist_deep_free 				(GSList 		   *list);
 static GSList 	*get_lang_files 				(GtkSourceLanguagesManager *lm);
-static GSList	*build_file_listing 				(const gchar 		   *directory,
-					 			 GSList			   *filenames);
 
 static void	 gtk_source_languages_manager_set_property 	(GObject 		   *object,
 					   			 guint 	 		    prop_id,
@@ -66,6 +68,8 @@ static void	 gtk_source_languages_manager_get_property 	(GObject 		   *object,
 					   			 GParamSpec		   *pspec);
 static void	 gtk_source_languages_manager_set_specs_dirs	(GtkSourceLanguagesManager *lm,
 								 const GSList 		   *dirs);
+static void	 gtk_source_languages_manager_set_styles_dirs	(GtkSourceLanguagesManager *lm,
+								 const GSList              *dirs);
 
 
 static void
@@ -86,6 +90,15 @@ gtk_source_languages_manager_class_init (GtkSourceLanguagesManagerClass *klass)
 								 "language specification files (.lang) "
 								 "are located"),
 							       G_PARAM_READWRITE));
+
+	g_object_class_install_property (object_class,
+					 PROP_STYLE_SCHEMES_DIRS,
+					 g_param_spec_pointer ("style_schemes_dirs",
+						 	       _("Style schemes directories"),
+							       _("List of directories where the "
+								 "style scheme files (.styles) "
+								 "are located"),
+							       G_PARAM_READWRITE));
 }
 
 static void
@@ -101,9 +114,11 @@ gtk_source_languages_manager_set_property (GObject 	*object,
 	switch (prop_id)
 	{
 	    case PROP_LANG_SPECS_DIRS:
-		gtk_source_languages_manager_set_specs_dirs (
-				lm,
-				g_value_get_pointer (value));
+		gtk_source_languages_manager_set_specs_dirs (lm, g_value_get_pointer (value));
+		break;
+
+	    case PROP_STYLE_SCHEMES_DIRS:
+		gtk_source_languages_manager_set_styles_dirs (lm, g_value_get_pointer (value));
 		break;
 
 	    default:
@@ -128,6 +143,10 @@ gtk_source_languages_manager_get_property (GObject 	*object,
 		    g_value_set_pointer (value, lm->priv->language_specs_directories);
 		    break;
 
+	    case PROP_STYLE_SCHEMES_DIRS:
+		    g_value_set_pointer (value, lm->priv->style_schemes_directories);
+		    break;
+
 	    default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 		break;
@@ -140,6 +159,7 @@ gtk_source_languages_manager_init (GtkSourceLanguagesManager *lm)
 	lm->priv = g_new0 (GtkSourceLanguagesManagerPrivate, 1);
 	/* initialize dirs list with default value */
 	gtk_source_languages_manager_set_specs_dirs (lm, NULL);
+	gtk_source_languages_manager_set_styles_dirs (lm, NULL);
 }
 
 /**
@@ -152,9 +172,7 @@ gtk_source_languages_manager_init (GtkSourceLanguagesManager *lm)
 GtkSourceLanguagesManager *
 gtk_source_languages_manager_new (void)
 {
-	return GTK_SOURCE_LANGUAGES_MANAGER (
-					g_object_new (GTK_TYPE_SOURCE_LANGUAGES_MANAGER,
-				      	NULL));
+	return g_object_new (GTK_TYPE_SOURCE_LANGUAGES_MANAGER, NULL);
 }
 
 static void
@@ -167,10 +185,60 @@ gtk_source_languages_manager_finalize (GObject *object)
 	g_slist_foreach (lm->priv->available_languages, (GFunc) g_object_unref, NULL);
 	g_slist_free (lm->priv->available_languages);
 	slist_deep_free (lm->priv->language_specs_directories);
+	slist_deep_free (lm->priv->style_schemes_directories);
 	g_free (lm->priv->rng_file);
 	g_free (lm->priv);
 
 	G_OBJECT_CLASS (gtk_source_languages_manager_parent_class)->finalize (object);
+}
+
+static GSList *
+slist_deep_copy (const GSList *list)
+{
+	GSList *copy = NULL;
+
+	while (list != NULL)
+	{
+		copy = g_slist_prepend (copy, g_strdup (list->data));
+		list = list->next;
+	}
+
+	return g_slist_reverse (copy);
+}
+
+static GSList *
+copy_data_dirs_list (const GSList              *list,
+		     const gchar               *basename)
+{
+	const gchar * const *xdg_dirs;
+	GSList *new_list = NULL;
+
+	if (list != NULL)
+		return slist_deep_copy (list);
+
+	/* Don't be tricked by the list order: what we want
+	 * is [xdg2, xdg1, ~], in other words it should be
+	 * in reverse order. This is due to the fact that
+	 * in get_lang_files() we walk the list, read each
+	 * dir and prepend the files, so the files in last
+	 * dir of this list will be first in the files list.
+	 */
+
+	new_list = g_slist_prepend (new_list,
+				    g_build_filename (g_get_user_config_dir (),
+						      SOURCEVIEW_DIR,
+						      basename,
+						      NULL));
+
+	/* fetch specs in XDG_DATA_DIRS */
+	for (xdg_dirs = g_get_system_data_dirs (); xdg_dirs && *xdg_dirs; xdg_dirs++)
+		new_list = g_slist_prepend (new_list,
+					    g_build_filename (*xdg_dirs,
+							      SOURCEVIEW_DIR,
+							      basename,
+							      NULL));
+
+	return new_list;
 }
 
 static void
@@ -182,54 +250,21 @@ gtk_source_languages_manager_set_specs_dirs (GtkSourceLanguagesManager *lm,
 
 	if (lm->priv->language_specs_directories != NULL)
 		slist_deep_free (lm->priv->language_specs_directories);
-	lm->priv->language_specs_directories = NULL;
 
-	if (dirs == NULL)
-	{
-		const gchar * const *xdg_dirs;
-		gint i;
+	lm->priv->language_specs_directories = copy_data_dirs_list (dirs, LANGUAGE_DIR);
+}
 
-		/* Don't be tricked by the list order: what we want
-		 * is [xdg2, xdg1, ~], in other words it should be
-		 * in reverse order. This is due to the fact that
-		 * in get_lang_files() we walk the list, read each
-		 * dir and prepend the files, so the files in last
-		 * dir of this list will be first in the files list.
-		 */
+static void
+gtk_source_languages_manager_set_styles_dirs (GtkSourceLanguagesManager *lm,
+					      const GSList              *dirs)
+{
+	g_return_if_fail (GTK_IS_SOURCE_LANGUAGES_MANAGER (lm));
+	g_return_if_fail (lm->priv->available_languages == NULL);
 
-		lm->priv->language_specs_directories =
-			g_slist_prepend (lm->priv->language_specs_directories,
-					 g_build_filename (g_get_user_config_dir (),
-							   SOURCEVIEW_DIR,
-							   LANGUAGE_DIR,
-							   NULL));
+	if (lm->priv->style_schemes_directories != NULL)
+		slist_deep_free (lm->priv->style_schemes_directories);
 
-		/* fetch specs in XDG_DATA_DIRS */
-		xdg_dirs = g_get_system_data_dirs ();
-		for (i = 0; xdg_dirs[i] != NULL; i++)
-		{
-			lm->priv->language_specs_directories =
-				g_slist_prepend (lm->priv->language_specs_directories,
-						 g_build_filename (xdg_dirs[i],
-								   SOURCEVIEW_DIR,
-								   LANGUAGE_DIR,
-								   NULL));
-		}
-
-		return;
-	}
-
-	while (dirs != NULL)
-	{
-		lm->priv->language_specs_directories =
-			g_slist_prepend (lm->priv->language_specs_directories,
-					 g_strdup ((const gchar*)dirs->data));
-
-		dirs = g_slist_next (dirs);
-	}
-
-	lm->priv->language_specs_directories =
-		g_slist_reverse (lm->priv->language_specs_directories);
+	lm->priv->style_schemes_directories = copy_data_dirs_list (dirs, STYLE_DIR);
 }
 
 /**
@@ -246,6 +281,22 @@ gtk_source_languages_manager_get_lang_files_dirs (GtkSourceLanguagesManager *lm)
 	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGES_MANAGER (lm), NULL);
 
 	return lm->priv->language_specs_directories;
+}
+
+/**
+ * gtk_source_languages_manager_get_style_schemes_dirs:
+ * @lm: a #GtkSourceLanguagesManager.
+ *
+ * Gets a list of style schemes directories for the given language manager.
+ *
+ * Return value: a list of style schemes directories (as strings).
+ **/
+const GSList *
+gtk_source_languages_manager_get_style_schemes_dirs (GtkSourceLanguagesManager *lm)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGES_MANAGER (lm), NULL);
+
+	return lm->priv->style_schemes_directories;
 }
 
 /**
@@ -496,57 +547,58 @@ gtk_source_languages_manager_get_language_by_id (GtkSourceLanguagesManager *lm,
 }
 
 static GSList *
-get_lang_files (GtkSourceLanguagesManager *lm)
-{
-	GSList *filenames = NULL;
-	GSList *dirs;
-
-	g_return_val_if_fail (lm->priv->language_specs_directories != NULL, NULL);
-
-	dirs = lm->priv->language_specs_directories;
-
-	while (dirs != NULL)
-	{
-		filenames = build_file_listing ((const gchar*)dirs->data,
-						filenames);
-
-		dirs = g_slist_next (dirs);
-	}
-
-	return filenames;
-}
-
-static GSList *
-build_file_listing (const gchar *directory, GSList *filenames)
+build_file_listing (const gchar *directory,
+		    GSList      *filenames,
+		    const gchar *suffix)
 {
 	GDir *dir;
-	const gchar *file_name;
+	const gchar *name;
 
 	dir = g_dir_open (directory, 0, NULL);
 
 	if (dir == NULL)
 		return filenames;
 
-	file_name = g_dir_read_name (dir);
-
-	while (file_name != NULL)
+	while ((name = g_dir_read_name (dir)))
 	{
-		gchar *full_path = g_build_filename (directory, file_name, NULL);
-		gchar *last_dot = strrchr (full_path, '.');
+		gchar *full_path = g_build_filename (directory, name, NULL);
 
 		if (!g_file_test (full_path, G_FILE_TEST_IS_DIR) &&
-		    last_dot &&
-		    (strcmp (last_dot + 1, "lang") == 0))
+		    g_str_has_suffix (name, suffix))
+		{
 			filenames = g_slist_prepend (filenames, full_path);
+		}
 		else
+		{
 			g_free (full_path);
-
-		file_name = g_dir_read_name (dir);
+		}
 	}
 
 	g_dir_close (dir);
 
 	return filenames;
+}
+
+static GSList *
+get_data_files (GSList      *dirs,
+		const gchar *suffix)
+{
+	GSList *filenames = NULL;
+
+	while (dirs != NULL)
+	{
+		filenames = build_file_listing (dirs->data, filenames, suffix);
+		dirs = dirs->next;
+	}
+
+	return filenames;
+}
+
+static GSList *
+get_lang_files (GtkSourceLanguagesManager *lm)
+{
+	g_return_val_if_fail (lm->priv->language_specs_directories != NULL, NULL);
+	return get_data_files (lm->priv->language_specs_directories, ".lang");
 }
 
 static void
@@ -556,3 +608,71 @@ slist_deep_free (GSList *list)
 	g_slist_free (list);
 }
 
+static GSList *
+get_style_scheme_files (GtkSourceLanguagesManager *lm)
+{
+	g_return_val_if_fail (lm->priv->style_schemes_directories != NULL, NULL);
+	return get_data_files (lm->priv->style_schemes_directories, ".styles");
+}
+
+/**
+ * gtk_source_languages_manager_get_available_style_schemes:
+ * @lm: a #GtkSourceLanguagesManager.
+ *
+ * Gets a list of available style schemes for the given language manager.
+ * This function returns a pointer to a internal list, so there is no need to
+ * free it after usage.
+ *
+ * Return value: a list of #GtkSourceStyleScheme.
+ **/
+const GSList *
+gtk_source_languages_manager_get_available_style_schemes (GtkSourceLanguagesManager *lm)
+{
+	GSList *files;
+	GHashTable *schemes;
+	GtkSourceStyleScheme *scheme;
+
+	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGES_MANAGER (lm), NULL);
+
+	if (lm->priv->style_schemes)
+		return lm->priv->style_schemes;
+
+	files = get_style_scheme_files (lm);
+	schemes = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
+
+	scheme = _gtk_source_style_scheme_get_default ();
+	lm->priv->style_schemes = g_slist_prepend (lm->priv->style_schemes, scheme);
+	g_hash_table_insert (schemes,
+			     g_strdup (gtk_source_style_scheme_get_id (scheme)),
+			     g_object_ref (scheme));
+
+	while (files)
+	{
+		gchar *filename = files->data;
+
+		files = g_slist_delete_link (files, files);
+
+		scheme = _gtk_source_style_scheme_new_from_file (filename);
+
+		if (scheme)
+		{
+			const char *id = gtk_source_style_scheme_get_id (scheme);
+			GtkSourceStyleScheme *old;
+
+			old = g_hash_table_lookup (schemes, id);
+
+			if (old)
+				lm->priv->style_schemes = g_slist_remove (lm->priv->style_schemes, old);
+
+			lm->priv->style_schemes = g_slist_prepend (lm->priv->style_schemes, scheme);
+			g_hash_table_insert (schemes, g_strdup (id), g_object_ref (scheme));
+		}
+
+		g_free (filename);
+	}
+
+	g_hash_table_destroy (schemes);
+
+	lm->priv->style_schemes = g_slist_reverse (lm->priv->style_schemes);
+	return lm->priv->style_schemes;
+}

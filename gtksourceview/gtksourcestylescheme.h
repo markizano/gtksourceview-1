@@ -50,9 +50,10 @@ struct _GtkSourceStyleSchemeClass
 
 GType			 gtk_source_style_scheme_get_type	(void) G_GNUC_CONST;
 
-/* Default style scheme */
-GtkSourceStyleScheme	*gtk_source_style_scheme_get_default	(void);
-GtkSourceStyleScheme	*gtk_source_style_scheme_new		(GtkSourceStyleScheme *parent);
+GtkSourceStyleScheme	*gtk_source_style_scheme_new		(const gchar          *id);
+
+const gchar             *gtk_source_style_scheme_get_id         (GtkSourceStyleScheme *scheme);
+const gchar             *gtk_source_style_scheme_get_name       (GtkSourceStyleScheme *scheme);
 
 /* Return value must be freed with gtk_source_style_free */
 GtkSourceStyle		*gtk_source_style_scheme_get_style	(GtkSourceStyleScheme *scheme,
@@ -65,6 +66,9 @@ gboolean		 gtk_source_style_scheme_get_current_line_color
 
 void			 _gtk_source_style_scheme_apply		(GtkSourceStyleScheme *scheme,
 								 GtkWidget            *widget);
+GtkSourceStyleScheme	*_gtk_source_style_scheme_new_from_file (const gchar          *filename);
+/* Default style scheme */
+GtkSourceStyleScheme	*_gtk_source_style_scheme_get_default	(void);
 
 G_END_DECLS
 

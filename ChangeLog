@@ -1,5 +1,21 @@
 2006-07-23  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/language-specs/gvim.styles: default style scheme.
+	* gtksourceview/gtksourcelanguagesmanager.[ch]: added 
+	GtkSourceLanguagesManager:style-schemes-dirs property and
+	corresponding api. GtkSourceLanguages now also manages style
+	schemes similar to languages.
+	* gtksourceview/gtksourcestylescheme.[ch]: added
+	GtkSourceStyleScheme:id and :name properties; added
+	_gtk_source_style_scheme_new_from_file.
+	* gtksourceview/gtksourceview.c: connect to notify::buffer on view
+	to update priv->source_buffer pointer; set style scheme in the buffer
+	only after we got a GtkSourceBuffer.
+	* tests/test-widget.c: use style schemes files in 
+	$srcdir/gtksourceview/language-specs and set the non-default one.
+
+2006-07-23  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcelanguage-private.h:
 	* gtksourceview/gtksourcelanguagesmanager.c:
 	new function _gtk_source_languages_manager_get_rng_file to

@@ -782,6 +782,8 @@ create_view_window (GtkSourceBuffer *buffer, GtkSourceView *from)
 	GtkActionGroup *action_group;
 	GtkUIManager *ui_manager;
 	GError *error;
+	const GSList *schemes;
+	GtkSourceLanguagesManager *lm;
 
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
 	g_return_val_if_fail (from == NULL || GTK_IS_SOURCE_VIEW (from), NULL);
@@ -794,6 +796,11 @@ create_view_window (GtkSourceBuffer *buffer, GtkSourceView *from)
 
 	/* view */
 	view = gtk_source_view_new_with_buffer (buffer);
+
+	lm = g_object_get_data (G_OBJECT (buffer), "languages-manager");
+	schemes = gtk_source_languages_manager_get_available_style_schemes (lm);
+	if (schemes->next)
+		gtk_source_view_set_style_scheme (GTK_SOURCE_VIEW (view), schemes->next->data);
 
 	g_signal_connect (buffer, "mark_set", G_CALLBACK (move_cursor_cb), view);
 	g_signal_connect (buffer, "changed", G_CALLBACK (update_cursor_position), view);
@@ -1086,7 +1093,7 @@ main (int argc, char *argv[])
 	GtkSourceLanguagesManager *lm;
 	GtkSourceBuffer *buffer;
 
-	GSList *lang_dirs;
+	GSList *lang_dirs, *style_dirs;
 
 	/* initialization */
 	gtk_init (&argc, &argv);
@@ -1103,10 +1110,16 @@ main (int argc, char *argv[])
 	/* create buffer */
 	lang_dirs = g_slist_prepend (NULL, g_strdup (TOP_SRCDIR "/gtksourceview/language-specs"));
 // 	lang_dirs = g_slist_prepend (NULL, g_strdup ("/usr/share/gtksourceview-1.0/language-specs"));
+	style_dirs = g_slist_prepend (NULL, g_strdup (TOP_SRCDIR "/gtksourceview/language-specs"));
+
 	lm = g_object_new (GTK_TYPE_SOURCE_LANGUAGES_MANAGER,
-			   "lang_files_dirs", lang_dirs, NULL);
+			   "lang_files_dirs", lang_dirs,
+			   "style_schemes_dirs", style_dirs,
+			   NULL);
 	g_slist_foreach (lang_dirs, (GFunc) g_free, NULL);
+	g_slist_foreach (style_dirs, (GFunc) g_free, NULL);
 	g_slist_free (lang_dirs);
+	g_slist_free (style_dirs);
 
 	buffer = create_source_buffer (lm);
 	g_object_unref (lm);

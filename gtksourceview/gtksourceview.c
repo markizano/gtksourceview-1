@@ -597,6 +597,12 @@ gtk_source_view_get_property (GObject    *object,
 }
 
 static void
+notify_buffer (GtkSourceView *view)
+{
+	set_source_buffer (view, gtk_text_view_get_buffer (GTK_TEXT_VIEW (view)));
+}
+
+static void
 gtk_source_view_init (GtkSourceView *view)
 {
 	GtkTargetList *tl;
@@ -615,8 +621,6 @@ gtk_source_view_init (GtkSourceView *view)
 	gtk_text_view_set_left_margin (GTK_TEXT_VIEW (view), 2);
 	gtk_text_view_set_right_margin (GTK_TEXT_VIEW (view), 2);
 
-	view->priv->style_scheme = gtk_source_style_scheme_get_default ();
-
 	tl = gtk_drag_dest_get_target_list (GTK_WIDGET (view));
 	g_return_if_fail (tl != NULL);
 
@@ -625,6 +629,11 @@ gtk_source_view_init (GtkSourceView *view)
 	g_signal_connect (G_OBJECT (view),
 			  "drag_data_received",
 			  G_CALLBACK (view_dnd_drop),
+			  NULL);
+
+	g_signal_connect (view,
+			  "notify::buffer",
+			  G_CALLBACK (notify_buffer),
 			  NULL);
 }
 
@@ -644,10 +653,12 @@ gtk_source_view_constructor (GType                  type,
 	if (!view->priv->style_scheme)
 	{
 		GtkSourceStyleScheme *scheme;
-		scheme = gtk_source_style_scheme_get_default ();
+		scheme = _gtk_source_style_scheme_get_default ();
 		gtk_source_view_set_style_scheme (view, scheme);
 		g_object_unref (scheme);
 	}
+
+	set_source_buffer (view, gtk_text_view_get_buffer (GTK_TEXT_VIEW (view)));
 
 	return object;
 }
@@ -767,14 +778,12 @@ marker_updated_cb (GtkSourceBuffer *buffer,
 }
 
 static void
-set_source_buffer (GtkSourceView *view, GtkTextBuffer *buffer)
+set_source_buffer (GtkSourceView *view,
+		   GtkTextBuffer *buffer)
 {
-	/* keep our pointer to the source buffer in sync with
-	 * textview's, though it would be a lot nicer if GtkTextView
-	 * had a "set_buffer" signal */
-	/* FIXME: in gtk 2.3 we have a buffer property so we can
-	 * connect to the notify signal.  Unfortunately we can't
-	 * depend on gtk 2.3 yet (see bug #108353) */
+	if (buffer == (GtkTextBuffer*) view->priv->source_buffer)
+		return;
+
 	if (view->priv->source_buffer)
 	{
 		g_signal_handlers_disconnect_by_func (view->priv->source_buffer,
@@ -783,15 +792,12 @@ set_source_buffer (GtkSourceView *view, GtkTextBuffer *buffer)
 		g_signal_handlers_disconnect_by_func (view->priv->source_buffer,
 						      marker_updated_cb,
 						      view);
-		g_object_remove_weak_pointer (G_OBJECT (view->priv->source_buffer),
-					      (gpointer *) &view->priv->source_buffer);
 	}
 
 	if (buffer && GTK_IS_SOURCE_BUFFER (buffer))
 	{
 		view->priv->source_buffer = GTK_SOURCE_BUFFER (buffer);
-		g_object_add_weak_pointer (G_OBJECT (buffer),
-					   (gpointer *) &view->priv->source_buffer);
+
 		g_signal_connect (buffer,
 				  "highlight_updated",
 				  G_CALLBACK (highlight_updated_cb),
@@ -800,8 +806,10 @@ set_source_buffer (GtkSourceView *view, GtkTextBuffer *buffer)
 				  "marker_updated",
 				  G_CALLBACK (marker_updated_cb),
 				  view);
-		_gtk_source_buffer_set_style_scheme (view->priv->source_buffer,
-						     view->priv->style_scheme);
+
+		if (view->priv->style_scheme)
+			_gtk_source_buffer_set_style_scheme (view->priv->source_buffer,
+							     view->priv->style_scheme);
 	}
 	else
 	{
@@ -1364,13 +1372,6 @@ gtk_source_view_expose (GtkWidget      *widget,
 	text_view = GTK_TEXT_VIEW (widget);
 
 	event_handled = FALSE;
-
-	/* maintain the our source_buffer pointer synchronized */
-	if (text_view->buffer != GTK_TEXT_BUFFER (view->priv->source_buffer) &&
-	    GTK_IS_SOURCE_BUFFER (text_view->buffer))
-	{
-		set_source_buffer (view, text_view->buffer);
-	}
 
 	/* check if the expose event is for the text window first, and
 	 * make sure the visible region is highlighted */
@@ -2547,6 +2548,8 @@ update_current_line_gc (GtkSourceView *view)
 	    gtk_source_style_scheme_get_current_line_color (view->priv->style_scheme, &color))
 	{
 		GdkGCValues values;
+		gdk_colormap_alloc_color (gtk_widget_get_colormap (widget),
+					  &color, TRUE, TRUE);
 		values.foreground = color;
 		view->priv->current_line_gc = gdk_gc_new_with_values (widget->window,
 								      &values,
@@ -2554,7 +2557,6 @@ update_current_line_gc (GtkSourceView *view)
 	}
 }
 
-/* XXX screen-changed */
 static void
 gtk_source_view_realize (GtkWidget *widget)
 {
@@ -2595,6 +2597,8 @@ gtk_source_view_set_style_scheme (GtkSourceView        *view,
 
 	view->priv->style_scheme = g_object_ref (scheme);
 	_gtk_source_style_scheme_apply (scheme, GTK_WIDGET (view));
-	_gtk_source_buffer_set_style_scheme (view->priv->source_buffer, scheme);
 	update_current_line_gc (view);
+
+	if (view->priv->source_buffer)
+		_gtk_source_buffer_set_style_scheme (view->priv->source_buffer, scheme);
 }

@@ -1,0 +1,22 @@
+<style-scheme id="default">
+  <style name="brackets" foreground="white" background="grey" bold="TRUE"/>
+  <style name="def:base-n-integer" foreground="#FF00FF"/>
+  <style name="def:character" foreground="#FF00FF"/>
+  <style name="def:comment" foreground="#0000FF"/>
+  <style name="def:data-type" foreground="#2E8B57" bold="TRUE"/>
+  <style name="def:function" foreground="#008A8C"/>
+  <style name="def:decimal" foreground="#FF00FF"/>
+  <style name="def:floating-point" foreground="#FF00FF"/>
+  <style name="def:keyword" foreground="#A52A2A" bold="TRUE"/>
+  <style name="def:preprocessor" foreground="#A020F0"/>
+  <style name="def:string" foreground="#FF00FF"/>
+  <style name="def:specials" foreground="#FFFFFF" background="#FF0000"/>
+  <style name="def:others" foreground="#2E8B57" bold="TRUE"/>
+  <style name="def:others2" foreground="#008B8B"/>
+  <style name="def:others3" foreground="#6A5ACD"/>
+  <style name="def:net-address" foreground="#0000FF" italic="TRUE" underline="TRUE"/>
+  <style name="def:note" foreground="#0000FF" background="#FFFF00" bold="TRUE"/>
+  <style name="def:error" background="#FF0000" bold="TRUE"/>
+  <style name="def:package" foreground="#FF00FF" bold="TRUE"/>
+  <style name="def:escape" foreground="#9010D0"/>
+</style-scheme>
