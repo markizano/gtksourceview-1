@@ -432,7 +432,7 @@ set_tag_style (GtkSourceContextEngine *ce,
 	g_return_if_fail (GTK_IS_TEXT_TAG (tag));
 	g_return_if_fail (style_name != NULL);
 
-	gtk_source_style_unapply (tag);
+	_gtk_source_style_unapply (tag);
 
 	if (!ce->priv->style_scheme)
 		return;
@@ -448,7 +448,7 @@ set_tag_style (GtkSourceContextEngine *ce,
 
 	if (style)
 	{
-		gtk_source_style_apply (style, tag);
+		_gtk_source_style_apply (style, tag);
 		gtk_source_style_free (style);
 	}
 	else

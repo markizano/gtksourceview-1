@@ -57,11 +57,9 @@ GtkSourceStyle	*gtk_source_style_new		(GtkSourceStyleMask    mask);
 GtkSourceStyle	*gtk_source_style_copy		(const GtkSourceStyle *style);
 void		 gtk_source_style_free		(GtkSourceStyle       *style);
 
-void		 gtk_source_style_apply		(const GtkSourceStyle *style,
+void		 _gtk_source_style_apply	(const GtkSourceStyle *style,
 						 GtkTextTag           *tag);
-void		 gtk_source_style_unapply	(GtkTextTag           *tag);
-void		 gtk_source_style_compose	(GtkSourceStyle       *dest,
-						 const GtkSourceStyle *src);
+void		 _gtk_source_style_unapply	(GtkTextTag           *tag);
 
 G_END_DECLS
 

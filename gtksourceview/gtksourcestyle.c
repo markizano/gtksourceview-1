@@ -54,8 +54,8 @@ gtk_source_style_free (GtkSourceStyle *style)
 }
 
 void
-gtk_source_style_apply (const GtkSourceStyle *style,
-			GtkTextTag           *tag)
+_gtk_source_style_apply (const GtkSourceStyle *style,
+			 GtkTextTag           *tag)
 {
 	g_return_if_fail (style != NULL);
 	g_return_if_fail (GTK_IS_TEXT_TAG (tag));
@@ -79,7 +79,7 @@ gtk_source_style_apply (const GtkSourceStyle *style,
 }
 
 void
-gtk_source_style_unapply (GtkTextTag *tag)
+_gtk_source_style_unapply (GtkTextTag *tag)
 {
 	g_return_if_fail (GTK_IS_TEXT_TAG (tag));
 	g_object_set (tag,
@@ -90,27 +90,4 @@ gtk_source_style_unapply (GtkTextTag *tag)
 		      "underline-set", FALSE,
 		      "strikethrough-set", FALSE,
 		      NULL);
-}
-
-void
-gtk_source_style_compose (GtkSourceStyle       *dest,
-			  const GtkSourceStyle *src)
-{
-	g_return_if_fail (dest && src);
-
-#define COPY_ATTRIBUTE(m,v)				\
-	if ((src->mask & m) && !(dest->mask & m))	\
-	{						\
-		dest->mask |= m;			\
-		dest->v = src->v;			\
-	}
-
-	COPY_ATTRIBUTE (GTK_SOURCE_STYLE_USE_BACKGROUND, background)
-	COPY_ATTRIBUTE (GTK_SOURCE_STYLE_USE_FOREGROUND, foreground)
-	COPY_ATTRIBUTE (GTK_SOURCE_STYLE_USE_ITALIC, italic)
-	COPY_ATTRIBUTE (GTK_SOURCE_STYLE_USE_BOLD, bold)
-	COPY_ATTRIBUTE (GTK_SOURCE_STYLE_USE_UNDERLINE, underline)
-	COPY_ATTRIBUTE (GTK_SOURCE_STYLE_USE_STRIKETHROUGH, strikethrough)
-
-#undef COPY_ATTRIBUTE
 }

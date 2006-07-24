@@ -1,5 +1,14 @@
 2006-07-23  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcestyle.[ch]: prefixed 
+	gtk_source_style_(un)apply with underscore, removed 
+	gtk_source_style_compose.
+	* gtksourceview/gtksourcebuffer.c:
+	* gtksourceview/gtksourcecontextengine.c:
+	updated according to above.
+
+2006-07-23  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c: (set_tag_style): remove
 	old style attributes before setting new ones.
 
