@@ -1378,9 +1378,9 @@ fix_offsets_delete_ (Segment *segment,
 }
 
 static void
-delete_range (GtkSourceContextEngine *ce,
-	      gint                    start,
-	      gint                    end)
+delete_range_ (GtkSourceContextEngine *ce,
+	       gint                    start,
+	       gint                    end)
 {
 	g_return_if_fail (start < end);
 
@@ -1388,8 +1388,7 @@ delete_range (GtkSourceContextEngine *ce,
 	erase_segments (ce, start, end, FALSE, NULL);
 	fix_offsets_delete_ (ce->priv->root_segment, start, end - start, ce->priv->hint);
 
-	if (!get_invalid_at_ (ce, start))
-		ce->priv->hint = create_segment (ce, ce->priv->root_segment, NULL, start, start, NULL);
+	/* no need to invalidate at start, update_tree will do it */
 
 	CHECK_TREE (ce);
 };
@@ -1500,9 +1499,9 @@ update_tree (GtkSourceContextEngine *ce)
 			      end_offset - region->delta,
 			      region->delta);
 	else
-		delete_range (ce,
-			      end_offset,
-			      end_offset - region->delta);
+		delete_range_ (ce,
+			       end_offset,
+			       end_offset - region->delta);
 
 	if (!get_invalid_at_ (ce, start_offset))
 		insert_range (ce,

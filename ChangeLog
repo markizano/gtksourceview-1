@@ -1,5 +1,10 @@
 2006-07-24  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c: (delete_range): do not
+	invalidate deletion place, update_tree() takes care about it.
+
+2006-07-24  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	Updated EggRegex and pcre, updated build infrastructure for it,
 	made it optionally use system pcre. Made the library export only 
 	public symbols.
