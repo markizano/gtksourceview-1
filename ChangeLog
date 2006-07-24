@@ -1,5 +1,10 @@
 2006-07-23  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c: (set_tag_style): remove
+	old style attributes before setting new ones.
+
+2006-07-23  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/language-specs/gvim.styles: default style scheme.
 	* gtksourceview/gtksourcelanguagesmanager.[ch]: added 
 	GtkSourceLanguagesManager:style-schemes-dirs property and

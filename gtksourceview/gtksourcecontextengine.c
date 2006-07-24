@@ -321,7 +321,6 @@ struct _GtkSourceContextEnginePrivate
 	InvalidRegion		 invalid_region;
 
 	guint			 worker_handler;
-// 	guint			 worker_count;
 
 	/* Views highlight requests. */
 	GtkTextRegion		*highlight_requests;
@@ -432,6 +431,8 @@ set_tag_style (GtkSourceContextEngine *ce,
 
 	g_return_if_fail (GTK_IS_TEXT_TAG (tag));
 	g_return_if_fail (style_name != NULL);
+
+	gtk_source_style_unapply (tag);
 
 	if (!ce->priv->style_scheme)
 		return;
@@ -1626,19 +1627,6 @@ idle_worker (GtkSourceContextEngine *ce)
 		return FALSE;
 	}
 
-// #define MANY_RUNS 10
-// 	if (++ce->priv->worker_count == MANY_RUNS)
-// 	{
-// 		ce->priv->worker_handler =
-// 			g_timeout_add_full (GTK_TEXT_VIEW_PRIORITY_VALIDATE,
-// 					    10,
-// 					    (GSourceFunc) idle_worker,
-// 					    ce,
-// 					    NULL);
-// 		return FALSE;
-// 	}
-// #undef MANY_RUNS
-
 	return TRUE;
 }
 
@@ -1661,7 +1649,6 @@ install_idle_worker (GtkSourceContextEngine *ce)
 		ce->priv->worker_handler =
 			g_idle_add_full (GTK_TEXT_VIEW_PRIORITY_VALIDATE,
 					 (GSourceFunc) idle_worker, ce, NULL);
-// 		ce->priv->worker_count = 0;
 	}
 }
 
