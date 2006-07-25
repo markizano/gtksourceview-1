@@ -32,9 +32,9 @@
 #include <errno.h>
 #include <string.h>
 
-// #define ENABLE_DEBUG
+#define ENABLE_DEBUG
 // #define ENABLE_PROFILE
-// #define ENABLE_CHECK_TREE
+#define ENABLE_CHECK_TREE
 
 #ifdef ENABLE_DEBUG
 #define DEBUG(x) (x)
@@ -1486,8 +1486,8 @@ update_tree (GtkSourceContextEngine *ce)
 
 	g_assert (start <= MIN (end, end - delta));
 
-	/* Here start and end are actual offsets in the buffer; delta is how much
-	 * was inserted/removed, and length is the distance between start and end.
+	/* Here start and end are actual offsets in the buffer (they do not match offsets
+	 * in the tree if delta is not zero); delta is how much was inserted/removed.
 	 * First, we insert/delete range from the tree, to make offsets in tree
 	 * match offsets in the buffer. Then, create an invalid segment for the rest
 	 * of the area if needed. */
@@ -1681,12 +1681,25 @@ remove_tags_hash_cb (G_GNUC_UNUSED gpointer style,
 		     GSList          *tags,
 		     GtkTextTagTable *table)
 {
-	while (tags)
+	GSList *l = tags;
+
+	while (l != NULL)
 	{
-		gtk_text_tag_table_remove (table, tags->data);
-		g_object_unref (tags->data);
-		tags = tags->next;
+		gtk_text_tag_table_remove (table, l->data);
+		g_object_unref (l->data);
+		l = l->next;
 	}
+
+	g_slist_free (tags);
+}
+
+static void
+destroy_tags_hash (GtkSourceContextEngine *ce)
+{
+	g_hash_table_foreach (ce->priv->tags, (GHFunc) remove_tags_hash_cb,
+                              gtk_text_buffer_get_tag_table (ce->priv->buffer));
+	g_hash_table_destroy (ce->priv->tags);
+	ce->priv->tags = NULL;
 }
 
 /**
@@ -1741,10 +1754,7 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 		ce->priv->invalid_region.start = NULL;
 		ce->priv->invalid_region.end = NULL;
 
-		g_hash_table_foreach (ce->priv->tags, (GHFunc) remove_tags_hash_cb,
-                                      gtk_text_buffer_get_tag_table (ce->priv->buffer));
-		g_hash_table_destroy (ce->priv->tags);
-		ce->priv->tags = NULL;
+		destroy_tags_hash (ce);
 
 		if (ce->priv->refresh_region)
 			gtk_text_region_destroy (ce->priv->refresh_region, FALSE);
@@ -1779,8 +1789,7 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 		ce->priv->root_context = context_new (NULL, main_definition, NULL);
 		ce->priv->root_segment = create_segment (ce, NULL, ce->priv->root_context, 0, 0, NULL);
 
-		ce->priv->tags = g_hash_table_new_full (g_str_hash, g_str_equal, g_free,
-							(GDestroyNotify) g_slist_free);
+		ce->priv->tags = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
 
 		gtk_text_buffer_get_bounds (buffer, &start, &end);
 		ce->priv->invalid_region.start = gtk_text_buffer_create_mark (buffer, NULL,

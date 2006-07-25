@@ -1,3 +1,15 @@
+2006-07-25  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcecontextengine.c: fixed bug with tags hash 
+	table - it g_slist_free'd values, and led to funny memory corruption.
+	* gtksourceview/gtksourcelanguage-parser-2.c: (replace_delimiter): 
+	fixed a memory leak.
+	* gtksourceview/language-specs/c.lang: added comments into preprocessor
+	context.
+	* gtksourceview/language-specs/cpp.lang: added globs.
+	* gtksourceview/language-specs/language2.rng: corrected "mimetypes" and
+	"globs" attributes, so that each of them is optional, not both as a pair.
+
 2006-07-24  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcecontextengine.c: (find_insertion_place),

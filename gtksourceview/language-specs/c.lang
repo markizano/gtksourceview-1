@@ -81,12 +81,17 @@
                     </include>
                 </context>
 
-                <context id="preprocessor" style-ref="preprocessor">
-                    <match extended="true">
+                <context id="preprocessor" style-ref="preprocessor" end-at-line-end="true">
+                    <start extended="true">
                             \%{preproc-start}
                             (define|undef|error|pragma|if(n?def)?|else|elif|endif|line)
                             \b
-                    </match>
+                    </start>
+                    <include>
+                        <context ref="def:line-continue"/>
+                        <context ref="comment"/>
+                        <context ref="comment-multiline"/>
+                    </include>
                 </context>
 
                 <!-- Strings -->

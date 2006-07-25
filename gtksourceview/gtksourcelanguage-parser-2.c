@@ -962,16 +962,15 @@ expand_regex_vars (ParserState *parser_state, gchar *regex, gint len, GError **e
 
 static gboolean
 replace_delimiter (const EggRegex *egg_regex,
-	       const gchar *regex,
-	       GString *expanded_regex,
-	       gpointer data)
+		   const gchar    *regex,
+		   GString        *expanded_regex,
+		   gpointer        data)
 {
 	gchar *delim, *escapes;
 	ParserState *parser_state = data;
 
 	escapes = egg_regex_fetch (egg_regex, 1, regex);
 	g_string_append (expanded_regex, escapes);
-	g_free (escapes);
 
 	delim = egg_regex_fetch (egg_regex, 2, regex);
 	DEBUG (g_message ("replacing '\\%%%s'", delim));
@@ -987,6 +986,9 @@ replace_delimiter (const EggRegex *egg_regex,
 					parser_state->closing_delimiter);
 			break;
 	}
+
+	g_free (delim);
+	g_free (escapes);
 
 	return FALSE;
 }
