@@ -1,5 +1,12 @@
 2006-07-26  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c: added context_freeze() and
+	context_thaw() which are used to avoid destroying and recreating contexts
+	in update_syntax, and to avoid collecting child contexts there, which is 
+	slow.
+
+2006-07-26  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* acinclude.m4: do define EBCDIC to be 0, pcre wants it this way.
 	* gtksourceview/gtksourcecontextengine.c: 
 	(gtk_source_context_engine_attach_buffer): do not use enable_highlight

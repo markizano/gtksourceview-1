@@ -194,8 +194,6 @@ struct _DefinitionsIter
 
 struct _Context
 {
-	guint			 ref_count;
-
 	/* Definition for the context. */
 	ContextDefinition	*definition;
 
@@ -211,6 +209,9 @@ struct _Context
 
 	GtkTextTag		*tag;
 	GSList			*subpattern_tags;
+
+	guint			 ref_count;
+	guint                    frozen : 1;
 
 	/* Do all the ancestors extend their parent? */
 	guint			 all_ancestors_extend : 1;
@@ -355,10 +356,11 @@ static Context	       *context_new		(Context		*parent,
 						 ContextDefinition	*definition,
 						 const gchar		*line_text);
 static void		context_unref		(Context		*context);
-static GSList	       *erase_segments		(GtkSourceContextEngine *ce,
+static void		context_freeze		(Context		*context);
+static void		context_thaw		(Context		*context);
+static void		erase_segments		(GtkSourceContextEngine *ce,
 						 gint                    start,
 						 gint                    end,
-						 gboolean                collect_contexts,
 						 Segment                *hint);
 static void		find_insertion_place	(Segment		*segment,
 						 gint			 offset,
@@ -1386,7 +1388,7 @@ delete_range_ (GtkSourceContextEngine *ce,
 	g_return_if_fail (start < end);
 
 	/* XXX it may make two invalid segments adjacent, and we can get crash */
-	erase_segments (ce, start, end, FALSE, NULL);
+	erase_segments (ce, start, end, NULL);
 	fix_offsets_delete_ (ce->priv->root_segment, start, end - start, ce->priv->hint);
 
 	/* no need to invalidate at start, update_tree will do it */
@@ -1461,21 +1463,17 @@ get_invalid_line (GtkSourceContextEngine *ce)
  * @ce: a #GtkSourceContextEngine.
  *
  * Modifies syntax tree according to data in invalid_region.
- *
- * Returns: list of contexts in invalidates region. Caller must
- * free the list and context_unref() its elements.
  */
-static GSList *
+static void
 update_tree (GtkSourceContextEngine *ce)
 {
 	InvalidRegion *region = &ce->priv->invalid_region;
 	gint start, end, delta;
 	gint erase_start, erase_end;
 	GtkTextIter iter;
-	GSList *contexts = NULL;
 
 	if (region->empty)
-		return NULL;
+		return;
 
 	gtk_text_buffer_get_iter_at_mark (ce->priv->buffer, &iter, region->start);
 	start = gtk_text_iter_get_offset (&iter);
@@ -1510,7 +1508,7 @@ update_tree (GtkSourceContextEngine *ce)
 
 	if (erase_start < erase_end)
 	{
-		contexts = erase_segments (ce, erase_start, erase_end, TRUE, NULL);
+		erase_segments (ce, erase_start, erase_end, NULL);
 		create_segment (ce, ce->priv->root_segment, NULL, erase_start, erase_end, NULL);
 	}
 	else if (!get_invalid_at_ (ce, start))
@@ -1524,8 +1522,6 @@ update_tree (GtkSourceContextEngine *ce)
 	g_assert (get_invalid_at_ (ce, start) != NULL);
 	CHECK_TREE (ce);
 #endif
-
-	return contexts;
 }
 
 /* XXX make sure regions requested and highlighted are the same,
@@ -2663,6 +2659,78 @@ context_unref (Context *context)
 	regex_unref (context->reg_all);
 	g_slist_free (context->subpattern_tags); /* XXX */
 	g_free (context);
+}
+
+static void
+context_freeze_hash_cb (G_GNUC_UNUSED gpointer text,
+		        Context *context)
+{
+	context_freeze (context);
+}
+
+static void
+context_freeze (Context *ctx)
+{
+	ContextPtr *ptr;
+
+	g_assert (!ctx->frozen);
+	ctx->frozen = TRUE;
+	context_ref (ctx);
+
+	for (ptr = ctx->children; ptr != NULL; ptr = ptr->next)
+	{
+		if (ptr->fixed)
+		{
+			context_freeze (ptr->u.context);
+		}
+		else
+		{
+			g_hash_table_foreach (ptr->u.hash,
+					      (GHFunc) context_freeze_hash_cb,
+					      NULL);
+		}
+	}
+}
+
+static void
+get_child_contexts_hash_cb (G_GNUC_UNUSED gpointer text,
+			    Context *context,
+			    GSList **list)
+{
+	*list = g_slist_prepend (*list, context);
+}
+
+static void
+context_thaw (Context *ctx)
+{
+	ContextPtr *ptr;
+
+	if (!ctx->frozen)
+		return;
+
+	for (ptr = ctx->children; ptr != NULL; )
+	{
+		ContextPtr *next = ptr->next;
+
+		if (ptr->fixed)
+		{
+			context_thaw (ptr->u.context);
+		}
+		else
+		{
+			GSList *children = NULL;
+			g_hash_table_foreach (ptr->u.hash,
+					      (GHFunc) get_child_contexts_hash_cb,
+					      &children);
+			g_slist_foreach (children, (GFunc) context_thaw, NULL);
+			g_slist_free (children);
+		}
+
+		ptr = next;
+	}
+
+	ctx->frozen = FALSE;
+	context_unref (ctx);
 }
 
 static Context *
@@ -3808,24 +3876,6 @@ segment_remove (GtkSourceContextEngine *ce,
 	segment_destroy (ce, segment);
 }
 
-static GSList *
-get_contexts_in_segment (Segment *segment)
-{
-	Segment *child;
-	GSList *list = NULL;
-
-	if (!SEGMENT_IS_INVALID (segment))
-		list = g_slist_prepend (list, segment->context);
-
-	for (child = segment->children; child != NULL; child = child->next)
-	{
-		GSList *child_contexts = get_contexts_in_segment (child);
-		list = g_slist_concat (child_contexts, list);
-	}
-
-	return list;
-}
-
 static void
 segment_erase_middle_ (GtkSourceContextEngine *ce,
 		       Segment                *segment,
@@ -4124,31 +4174,24 @@ segment_merge (GtkSourceContextEngine *ce,
  * @ce: #GtkSourceContextEngine.
  * @start: start offset of region to erase.
  * @end: end offset of region to erase.
- * @collect_contexts: whether it should collect list of contexts
- * in removed segments.
  * @hint: segment around @start to make it faster.
  *
  * Erases all non-toplevel segments in the interval
  * [@start, @end]. Its action on the tree is roughly
  * equivalent to segment_erase_range_(ce->priv->root_segment, start, end)
  * (but that does not accept toplevel segment).
- *
- * Returns: list of contexts in deleted segments if @collect_contexts is TRUE
- * or NULL. The caller must free the list and context_unref() its elements.
  */
-static GSList *
+static void
 erase_segments (GtkSourceContextEngine *ce,
 		gint                    start,
 		gint                    end,
-		gboolean                collect_contexts,
 		Segment                *hint)
 {
 	Segment *root = ce->priv->root_segment;
 	Segment *child, *hint_prev;
-	GSList *contexts = NULL;
 
 	if (!root->children)
-		return NULL;
+		return;
 
 	if (!hint)
 		hint = ce->priv->hint;
@@ -4166,7 +4209,6 @@ erase_segments (GtkSourceContextEngine *ce,
 	while (child)
 	{
 		Segment *next = child->next;
-		GSList *contexts_here;
 
 		if (child->end_at < start)
 		{
@@ -4184,13 +4226,6 @@ erase_segments (GtkSourceContextEngine *ce,
 			break;
 		}
 
-		if (collect_contexts)
-		{
-			contexts_here = get_contexts_in_segment (child);
-			g_slist_foreach (contexts_here, (GFunc) context_ref, NULL);
-			contexts = g_slist_concat (contexts_here, contexts);
-		}
-
 		segment_erase_range_ (ce, child, start, end);
 		child = next;
 	}
@@ -4199,7 +4234,6 @@ erase_segments (GtkSourceContextEngine *ce,
 	while (child)
 	{
 		Segment *prev = child->prev;
-		GSList *contexts_here;
 
 		if (!ce->priv->hint)
 			ce->priv->hint = child;
@@ -4215,20 +4249,11 @@ erase_segments (GtkSourceContextEngine *ce,
 			break;
 		}
 
-		if (collect_contexts)
-		{
-			contexts_here = get_contexts_in_segment (child);
-			g_slist_foreach (contexts_here, (GFunc) context_ref, NULL);
-			contexts = g_slist_concat (contexts_here, contexts);
-		}
-
 		segment_erase_range_ (ce, child, start, end);
 		child = prev;
 	}
 
 	CHECK_TREE (ce);
-
-	return contexts;
 }
 
 /**
@@ -4265,9 +4290,9 @@ update_syntax (GtkSourceContextEngine *ce,
 	Segment *state = ce->priv->root_segment;
 	Segment *hint = ce->priv->hint;
 	GTimer *timer;
-	GSList *invalid_region_contexts;
 
-	invalid_region_contexts = update_tree (ce);
+	context_freeze (ce->priv->root_context);
+	update_tree (ce);
 
 	if (!gtk_text_buffer_get_char_count (buffer))
 	{
@@ -4345,7 +4370,7 @@ update_syntax (GtkSourceContextEngine *ce,
 		}
 
 		/* Analyze the line */
-		erase_segments (ce, line_start_offset, line_end_offset, FALSE, ce->priv->hint);
+		erase_segments (ce, line_start_offset, line_end_offset, ce->priv->hint);
                 get_line_info (buffer, &line_start, &line_end, &line);
 
 		{
@@ -4374,9 +4399,10 @@ update_syntax (GtkSourceContextEngine *ce,
 			g_assert (!invalid || invalid->start_at >= line_end_offset);
 		}
 
-		if (hint && hint->parent == ce->priv->root_segment)
+		/* XXX this is wrong */
+		if (hint)
 			ce->priv->hint = hint;
-		else if (state->parent == ce->priv->root_segment)
+		else
 			ce->priv->hint = state;
 
 		line_info_destroy (&line);
@@ -4466,8 +4492,7 @@ update_syntax (GtkSourceContextEngine *ce,
 	g_timer_destroy (timer);
 
 out:
-	g_slist_foreach (invalid_region_contexts, (GFunc) context_unref, NULL);
-	g_slist_free (invalid_region_contexts);
+	context_thaw (ce->priv->root_context);
 }
 
 
