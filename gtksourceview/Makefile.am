@@ -64,8 +64,7 @@ libgtksourceview_2_0_la_SOURCES = 	\
 
 libgtksourceview_2_0_la_LIBADD = $(DEP_LIBS) $(EGGREGEX_LIBS)
 
-# libgtksourceview_2_0_la_LDFLAGS = -no-undefined -export-symbols-regex "^gtk_source_.*"
-libgtksourceview_2_0_la_LDFLAGS = -no-undefined -export-symbols-regex ".*"
+libgtksourceview_2_0_la_LDFLAGS = -no-undefined -export-symbols-regex "^gtk_source_.*"
 
 libgtksourceview_2_0_includedir = $(includedir)/gtksourceview-2.0/gtksourceview
 

@@ -1,5 +1,10 @@
 2006-07-25  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/Makefile.am: reverted last commit, it was made by 
+	mistake.
+
+2006-07-25  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/libegg/regex/pcre/AUTHORS:
 	* gtksourceview/libegg/regex/pcre/ChangeLog:
 	* gtksourceview/libegg/regex/pcre/COPYING:
