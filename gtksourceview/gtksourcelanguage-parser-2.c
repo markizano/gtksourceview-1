@@ -280,7 +280,6 @@ create_definition (ParserState *parser_state,
 	xmlNode *context_node, *child;
 
 	GString *all_items;
-	gchar *item;
 
 	EggRegexCompileFlags flags, match_flags = 0, start_flags = 0, end_flags = 0;
 
@@ -385,34 +384,28 @@ create_definition (ParserState *parser_state,
 		{
 			/* <prefix> */
 			if (child->children != NULL)
-				prefix = g_strdup ((gchar *)child->children->content);
+				prefix = g_strdup ((gchar*) child->children->content);
 			else
 				prefix = g_strdup ("");
-			g_strstrip (prefix);
 		}
 		else if (xmlStrcmp (BAD_CAST "suffix", child->name) == 0)
 		{
 			/* <suffix> */
 			if (child->children != NULL)
-				suffix = g_strdup ((gchar *)child->children->content);
+				suffix = g_strdup ((gchar*) child->children->content);
 			else
 				suffix = g_strdup ("");
-			g_strstrip (suffix);
 		}
-		else if ((xmlStrcmp (BAD_CAST "keyword", child->name) == 0)
-				&& child->children)
+		else if (xmlStrcmp (BAD_CAST "keyword", child->name) == 0 &&
+			 child->children != NULL)
 		{
 			/* <keyword> */
 			all_items = g_string_new (NULL);
 			if (prefix != NULL)
-			{
 				g_string_append (all_items, prefix);
-			}
 			else
-			{
 				g_string_append (all_items,
-						parser_state->opening_delimiter);
-			}
+						 parser_state->opening_delimiter);
 			g_string_append (all_items, "(");
 
 			/* Read every keyword/symbol concatenating them
@@ -422,17 +415,12 @@ create_definition (ParserState *parser_state,
 				/* TODO: this could be done destructively,
 				 * modifing the string in place without the
 				 * copy */
-				item = g_strdup ((gchar *)child->children->content);
-				g_strstrip (item);
-
-				g_string_append (all_items, item);
-				g_free (item);
+				g_string_append (all_items, (gchar*) child->children->content);
 
 				child = child->next;
 
 				/* Skip text nodes */
-				if (child != NULL
-						&& xmlStrcmp (BAD_CAST "text", child->name) == 0)
+				if (child != NULL && !xmlStrcmp (BAD_CAST "text", child->name))
 					child = child->next;
 
 				/* These are the conditions which control
@@ -452,14 +440,10 @@ create_definition (ParserState *parser_state,
 
 			g_string_append (all_items, ")");
 			if (suffix != NULL)
-			{
 				g_string_append (all_items, suffix);
-			}
 			else
-			{
 				g_string_append (all_items,
-						parser_state->closing_delimiter);
-			}
+						 parser_state->closing_delimiter);
 
 			match = g_string_free (all_items, FALSE);
 			match_flags = flags;
@@ -476,29 +460,23 @@ create_definition (ParserState *parser_state,
 
 	if (tmp_error == NULL && start != NULL)
 	{
-		gchar *tmp;
-		g_strstrip (start);
-		tmp = start;
+		gchar *tmp = start;
 		start = expand_regex (parser_state, start, start_flags,
-				TRUE, FALSE, &tmp_error);
+				      TRUE, FALSE, &tmp_error);
 		g_free (tmp);
 	}
 	if (tmp_error == NULL && end != NULL)
 	{
-		gchar *tmp;
-		g_strstrip (end);
-		tmp = end;
+		gchar *tmp = end;
 		end = expand_regex (parser_state, end, end_flags,
-				TRUE, FALSE, &tmp_error);
+				    TRUE, FALSE, &tmp_error);
 		g_free (tmp);
 	}
 	if (tmp_error == NULL && match != NULL)
 	{
-		gchar *tmp;
-		g_strstrip (match);
-		tmp = match;
+		gchar *tmp = match;
 		match = expand_regex (parser_state, match, match_flags,
-				TRUE, FALSE, &tmp_error);
+				      TRUE, FALSE, &tmp_error);
 		g_free (tmp);
 	}
 
@@ -1169,12 +1147,10 @@ handle_define_regex_element (ParserState *parser_state,
 	for (i=0; regex_options[i] != NULL; i++)
 	{
 		tmp = xmlTextReaderGetAttribute (parser_state->reader,
-				BAD_CAST regex_options[i]);
+						 BAD_CAST regex_options[i]);
 		if (tmp != NULL)
-		{
 			flags = update_regex_flags (flags, regex_options[i],
-					str_to_bool ((gchar *)tmp));
-		}
+						    str_to_bool ((gchar *)tmp));
 		xmlFree (tmp);
 	}
 
@@ -1183,24 +1159,17 @@ handle_define_regex_element (ParserState *parser_state,
 
 	type = xmlTextReaderNodeType (parser_state->reader);
 
-	if (type == XML_READER_TYPE_TEXT ||
-		 type == XML_READER_TYPE_CDATA)
-	{
+	if (type == XML_READER_TYPE_TEXT || type == XML_READER_TYPE_CDATA)
 		regex = xmlTextReaderValue (parser_state->reader);
-	}
 	else
-	{
 		regex = xmlStrdup (BAD_CAST "");
-	}
 
-	g_strstrip ((gchar *)regex);
-	expanded_regex = expand_regex (parser_state, (gchar *)regex, flags,
-			FALSE, TRUE, &tmp_error);
+	expanded_regex = expand_regex (parser_state, (gchar*) regex, flags,
+				       FALSE, TRUE, &tmp_error);
 
 	if (tmp_error == NULL)
 	{
 		DEBUG (g_message ("defined regex %s: \"%s\"", id, (gchar *)regex));
-
 		g_hash_table_insert (parser_state->defined_regexes, id, expanded_regex);
 	}
 
@@ -1237,51 +1206,18 @@ handle_default_regex_options_element (ParserState *parser_state,
 
 	options = xmlTextReaderValue (parser_state->reader);
 
-	g_strstrip ((gchar *)options);
+	g_strstrip ((gchar*) options);
 
-	if (!calc_regex_flags ((gchar *)options, &(parser_state->regex_compile_flags)))
+	if (!calc_regex_flags ((gchar*) options, &(parser_state->regex_compile_flags)))
 	{
 		g_set_error (error,
-				PARSER_ERROR,
-				PARSER_ERROR_MALFORMED_REGEX,
-				_ ("malformed regex options '%s'"),
-				(gchar *)options);
+			     PARSER_ERROR,
+			     PARSER_ERROR_MALFORMED_REGEX,
+			     _ ("malformed regex options '%s'"),
+			     (gchar*) options);
 	}
 
 	xmlFree (options);
-}
-
-static void
-populate_styles (ParserState *parser_state, gchar *style_id,
-		GError **error)
-{
-	GHashTable *ht;
-	GError *tmp_error = NULL;
-
-        /* FIXME */
-// 	ht = parser_state->language->priv->tag_id_to_style_name;
-
-// 	DEBUG (g_message ("associating '%s' to '%s'", style_id, style_id));
-//
-// 	if (g_hash_table_lookup (ht, style_id) != NULL)
-// 	{
-// 		g_set_error (&tmp_error,
-// 				PARSER_ERROR,
-// 				PARSER_ERROR_WRONG_ID,
-// 				"duplicated style id '%s'",
-// 				style_id);
-// 	}
-// 	else
-// 	{
-// 		g_hash_table_insert (ht, g_strdup (style_id),
-// 				g_strdup (style_id));
-// 	}
-
-	if (tmp_error != NULL)
-	{
-		g_propagate_error (error, tmp_error);
-		return;
-	}
 }
 
 static void
@@ -1440,12 +1376,6 @@ parse_style (ParserState *parser_state,
 			     map_to, id);
 	}
 
-	if (!tmp_error)
-	{
-		/* XXX */
-		populate_styles (parser_state, id, &tmp_error);
-	}
-
 	if (!tmp_error && lang_id && !lang_id[0])
 	{
 		g_free (lang_id);
@@ -1493,8 +1423,6 @@ handle_keyword_char_class_element (ParserState *parser_state,
 	while (type != XML_READER_TYPE_TEXT && type != XML_READER_TYPE_CDATA);
 
 	char_class = xmlTextReaderValue (parser_state->reader);
-
-	g_strstrip ((gchar*) char_class);
 
 	g_free (parser_state->opening_delimiter);
 	g_free (parser_state->closing_delimiter);

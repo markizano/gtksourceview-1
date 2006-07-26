@@ -52,9 +52,7 @@
                 </context>
 
                 <!-- Preprocessor -->
-                <define-regex id="preproc-start">
-                    ^\s*#\s*
-                </define-regex>
+                <define-regex id="preproc-start">^\s*#\s*</define-regex>
 
                 <context id="if0-comment" style-ref="comment-multiline">
                     <start>\%{preproc-start}if\s*0\b</start>

@@ -1,5 +1,16 @@
 2006-07-25  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcelanguage-parser-2.c: do not strip regular
+	expressions patterns, to allow having leading/trailing whitespace
+	there (e.g. " ").
+	* gtksourceview/language-specs/c.lang:
+	* gtksourceview/language-specs/html.lang:
+	* gtksourceview/language-specs/latex.lang:
+	* gtksourceview/language-specs/xml.lang: added "extended" attribute
+	or stripped patterns as appropriate.
+
+2006-07-25  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/Makefile.am: reverted last commit, it was made by 
 	mistake.
 

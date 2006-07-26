@@ -41,7 +41,7 @@
                 </context>
 
                 <context id="verbatim-env" style-ref="verbatim">
-                    <start>
+                    <start extended="true">
                         /
                             \\begin\{
                                 (

@@ -30,9 +30,9 @@
 
                 <!-- Attribute in the form: name="value" -->
                 <context id="attrib-quoted" style-ref="attrib-name">
-                    <start>
+                    <start extended="true">
                         /
-                            [a-z0-9:_-]+ # attribute name
+                            [a-z0-9:_-]+    # attribute name
                             \s*=\s*         # "="
                             (")             # string beginning
                         /xi
@@ -52,10 +52,10 @@
 
                 <!-- Attribute in the form: name=value -->
                 <context id="attrib-unquoted" style-ref="attrib-value">
-                    <start>
+                    <start extended="true">
                         /
-                            [a-z0-9:_-]+         # attribute name
-                            \s*=\s*                 # "="
+                            [a-z0-9:_-]+ # attribute name
+                            \s*=\s*      # "="
                         /xi
                     </start>
                     <end>(?=&gt;|\s)</end>
@@ -67,9 +67,9 @@
 
                 <!-- Attribute in the form: name -->
                 <context id="attrib-no-value" style-ref="attrib-name">
-                    <match>
+                    <match extended="true">
                         /
-                            [a-z0-9:_-]+         # attribute name
+                            [a-z0-9:_-]+  # attribute name
                         /xi
                     </match>
                 </context>
