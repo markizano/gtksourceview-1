@@ -30,7 +30,7 @@
 
 /* if the string is in UTF-8 use g_utf8_next_char(), else just
  * use +1. */
-#define NEXT_CHAR(re, s) (((regex)->compile_opts & PCRE_UTF8) ? \
+#define NEXT_CHAR(re, s) (((re)->compile_opts & PCRE_UTF8) ? \
 				g_utf8_next_char (s) : \
 				((s) + 1))
 
@@ -248,7 +248,7 @@ egg_regex_copy (const EggRegex *regex)
 {
   EggRegex *copy;
   gint res;
-  gint size;
+  gulong size;
   pcre *re;
 
   g_return_val_if_fail (regex != NULL, NULL);
@@ -1384,7 +1384,7 @@ expand_escape (EggRegex             *regex,
 {
   const gchar *q, *r;
   gint x, d, h, i;
-  gchar *error_detail;
+  const gchar *error_detail;
   gint base = 0;
   GError *tmp_error = NULL;
 

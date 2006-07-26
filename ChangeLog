@@ -1,3 +1,16 @@
+2006-07-26  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* acinclude.m4: do define EBCDIC to be 0, pcre wants it this way.
+	* gtksourceview/gtksourcecontextengine.c: 
+	(gtk_source_context_engine_attach_buffer): do not use enable_highlight
+	when detaching engine, just delete the tags.
+	(update_syntax): do not collect contexts from erased segments here, it's 
+	slow.
+	* gtksourceview/libegg/regex/eggregex.c: 
+	(NEXT_CHAR): use the argument.
+	(egg_regex_copy): made size be of type gulong, so pcre_fullinfo won't crash 
+	if sizeof(int) != sizeof(unsigned long).
+
 2006-07-25  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcelanguage-parser-2.c: do not strip regular

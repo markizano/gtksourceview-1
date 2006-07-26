@@ -32,9 +32,9 @@
 #include <errno.h>
 #include <string.h>
 
-#define ENABLE_DEBUG
+// #define ENABLE_DEBUG
 // #define ENABLE_PROFILE
-#define ENABLE_CHECK_TREE
+// #define ENABLE_CHECK_TREE
 
 #ifdef ENABLE_DEBUG
 #define DEBUG(x) (x)
@@ -1725,8 +1725,6 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 	/* Detach previous buffer if there is one. */
 	if (ce->priv->buffer)
 	{
-		enable_highlight (ce, FALSE);
-
 		g_signal_handlers_disconnect_by_func (ce->priv->buffer,
 						      (gpointer) buffer_notify_highlight_cb,
 						      ce);
@@ -1754,6 +1752,8 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 		ce->priv->invalid_region.start = NULL;
 		ce->priv->invalid_region.end = NULL;
 
+		/* this deletes tags from the tag table, therefore there is no need
+		 * in removing tags from the text (it may be very slow). */
 		destroy_tags_hash (ce);
 
 		if (ce->priv->refresh_region)
@@ -4333,7 +4333,6 @@ update_syntax (GtkSourceContextEngine *ce,
 
 	while (TRUE)
 	{
-		GSList *old_contexts;
 		LineInfo line;
 		gboolean next_line_invalid = FALSE;
 		gboolean need_invalidate_next = FALSE;
@@ -4346,11 +4345,7 @@ update_syntax (GtkSourceContextEngine *ce,
 		}
 
 		/* Analyze the line */
-		old_contexts = erase_segments (ce,
-					       line_start_offset,
-					       line_end_offset,
-					       TRUE,
-					       ce->priv->hint);
+		erase_segments (ce, line_start_offset, line_end_offset, FALSE, ce->priv->hint);
                 get_line_info (buffer, &line_start, &line_end, &line);
 
 		{
@@ -4385,8 +4380,6 @@ update_syntax (GtkSourceContextEngine *ce,
 			ce->priv->hint = state;
 
 		line_info_destroy (&line);
-		g_slist_foreach (old_contexts, (GFunc) context_unref, NULL);
-		g_slist_free (old_contexts);
 
 		gtk_text_region_add (ce->priv->refresh_region, &line_start, &line_end);
 		analyzed_end = line_end_offset;

@@ -136,8 +136,9 @@ if test x$USE_SYSTEM_PCRE = xno; then
     AC_DEFINE(SUPPORT_UTF8, , [SUPPORT_UTF8])
     AC_DEFINE(SUPPORT_UCP, , [SUPPORT_UCP])
 
-    #AC_DEFINE(EBCDIC, 0, [If you are compiling for a system that uses EBCDIC instead of ASCII dnl
-    #character codes, define this macro as 1.])
+    dnl pcre does "#if !EBCDIC", not "#ifndef EBCDIC"
+    AC_DEFINE(EBCDIC, 0, [If you are compiling for a system that uses EBCDIC instead of ASCII dnl
+    character codes, define this macro as 1.])
 
     # AC_ARG_ENABLE(stack-for-recursion,
     # [  --disable-stack-for-recursion  disable use of stack recursion when matching],
