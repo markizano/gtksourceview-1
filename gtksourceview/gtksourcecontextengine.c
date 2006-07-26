@@ -765,20 +765,27 @@ ensure_highlighted (GtkSourceContextEngine *ce,
  * @ce: a #GtkSourceContextEngine.
  * @start: the beginning of updated area.
  * @end: the end of updated area.
+ * @modify_refresh_region: whether updated area should be added to
+ * refresh_region.
  *
- * Marks the area as updated - adds it to refresh_region
- * and notifies view about it.
+ * Marks the area as updated - notifies view about it, and adds it to
+ * refresh_region if %modify_refresh_region is TRUE (update_syntax may
+ * process huge area though actually updated is couple of lines, so in
+ * that case update_syntax() takes care of refresh_region, and this
+ * function only notifies the view).
  */
 static void
 refresh_range (GtkSourceContextEngine *ce,
 	       const GtkTextIter      *start,
-	       const GtkTextIter      *end)
+	       const GtkTextIter      *end,
+	       gboolean                modify_refresh_region)
 {
 	GtkTextIter real_end;
 
 	g_return_if_fail (!gtk_text_iter_equal (start, end));
 
-	gtk_text_region_add (ce->priv->refresh_region, start, end);
+	if (modify_refresh_region)
+		gtk_text_region_add (ce->priv->refresh_region, start, end);
 
 	/* Here we need to make sure we do not make it redraw next line */
 	real_end = *end;
@@ -1578,7 +1585,7 @@ enable_highlight (GtkSourceContextEngine *ce,
 				    &start, &end);
 
 	if (enable)
-		refresh_range (ce, &start, &end);
+		refresh_range (ce, &start, &end, TRUE);
 	else
 		unhighlight_region (ce, &start, &end);
 }
@@ -4483,7 +4490,7 @@ update_syntax (GtkSourceContextEngine *ce,
 		install_idle_worker (ce);
 
 	gtk_text_iter_set_offset (&end_iter, analyzed_end);
-	refresh_range (ce, &start_iter, &end_iter);
+	refresh_range (ce, &start_iter, &end_iter, FALSE);
 
 	PROFILE (g_print ("analyzed %d chars from %d to %d in %fms\n",
 			  analyzed_end - start_offset, start_offset, analyzed_end,

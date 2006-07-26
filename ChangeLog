@@ -1,5 +1,12 @@
 2006-07-26  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c: 
+	(refresh_region): added extra parameter telling whether the area
+	should be added to refresh_region.
+	(update_syntax): only add actually changed lines to refresh_region.
+
+2006-07-26  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c: added context_freeze() and
 	context_thaw() which are used to avoid destroying and recreating contexts
 	in update_syntax, and to avoid collecting child contexts there, which is 
