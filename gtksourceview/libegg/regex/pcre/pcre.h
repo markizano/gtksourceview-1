@@ -229,6 +229,49 @@ typedef struct pcre_callout_block {
   /* ------------------------------------------------------------------ */
 } pcre_callout_block;
 
+
+#define pcre_malloc _egg_regex_pcre_malloc
+#define pcre_free _egg_regex_pcre_free
+#define pcre_stack_malloc _egg_regex_pcre_stack_malloc
+#define pcre_stack_free _egg_regex_pcre_stack_free
+#define pcre_callout _egg_regex_pcre_callout
+#define pcre_compile _egg_regex_pcre_compile
+#define pcre_compile2 _egg_regex_pcre_compile2
+#define pcre_config _egg_regex_pcre_config
+#define pcre_copy_named_substring _egg_regex_pcre_copy_named_substring
+#define pcre_copy_substring _egg_regex_pcre_copy_substring
+#define pcre_dfa_exec _egg_regex_pcre_dfa_exec
+#define pcre_exec _egg_regex_pcre_exec
+#define pcre_free_substring _egg_regex_pcre_free_substring
+#define pcre_free_substring_list _egg_regex_pcre_free_substring_list
+#define pcre_fullinfo _egg_regex_pcre_fullinfo
+#define pcre_get_named_substring _egg_regex_pcre_get_named_substring
+#define pcre_get_stringnumber _egg_regex_pcre_get_stringnumber
+#define pcre_get_stringtable_entries _egg_regex_pcre_get_stringtable_entries
+#define pcre_get_substring _egg_regex_pcre_get_substring
+#define pcre_get_substring_list _egg_regex_pcre_get_substring_list
+#define pcre_info _egg_regex_pcre_info
+#define pcre_maketables _egg_regex_pcre_maketables
+#define pcre_refcount _egg_regex_pcre_refcount
+#define pcre_study _egg_regex_pcre_study
+#define pcre_version _egg_regex_pcre_version
+#define _pcre_OP_lengths _egg_regex__pcre_OP_lengths
+#define _pcre_default_tables _egg_regex__pcre_default_tables
+#define _pcre_ord2utf8 _egg_regex__pcre_ord2utf8
+#define _pcre_try_flipped _egg_regex__pcre_try_flipped
+#define _pcre_ucp_findprop _egg_regex__pcre_ucp_findprop
+#define _pcre_ucp_othercase _egg_regex__pcre_ucp_othercase
+#define _pcre_utf8_table1 _egg_regex__pcre_utf8_table1
+#define _pcre_utf8_table1_size _egg_regex__pcre_utf8_table1_size
+#define _pcre_utf8_table2 _egg_regex__pcre_utf8_table2
+#define _pcre_utf8_table3 _egg_regex__pcre_utf8_table3
+#define _pcre_utf8_table4 _egg_regex__pcre_utf8_table4
+#define _pcre_utt _egg_regex__pcre_utt
+#define _pcre_utt_size _egg_regex__pcre_utt_size
+#define _pcre_valid_utf8 _egg_regex__pcre_valid_utf8
+#define _pcre_xclass _egg_regex__pcre_xclass
+
+
 /* Indirection for store get and free functions. These can be set to
 alternative malloc/free functions if required. Special ones are used in the
 non-recursive case for "frames". There is also an optional callout function

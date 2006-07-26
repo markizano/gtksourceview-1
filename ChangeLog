@@ -1,5 +1,21 @@
 2006-07-25  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/libegg/regex/pcre/AUTHORS:
+	* gtksourceview/libegg/regex/pcre/ChangeLog:
+	* gtksourceview/libegg/regex/pcre/COPYING:
+	* gtksourceview/libegg/regex/pcre/LICENSE:
+	* gtksourceview/libegg/regex/pcre/NEWS:
+	* gtksourceview/libegg/regex/pcre/README:
+	added pcre documentation files.
+
+	* gtksourceview/libegg/regex/pcre/pcre.h:
+	added bunch of #define's to prefix all exported pcre symbols
+	with _egg_regex_.
+	* gtksourceview/libegg/regex/pcre/pcre_chartables.c:
+	#include "pcre_internal.h" to pull those #define's.
+
+2006-07-25  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c: fixed bug with tags hash 
 	table - it g_slist_free'd values, and led to funny memory corruption.
 	* gtksourceview/gtksourcelanguage-parser-2.c: (replace_delimiter): 

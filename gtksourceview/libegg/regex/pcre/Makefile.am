@@ -30,23 +30,11 @@ libpcre_la_SOURCES =		\
 
 EXTRA_DIST =			\
 	ucptable.c		\
-	pcre_printint.src
-
-# EXTRA_DIST =	\
-# 	pcre_maketables.c \
-# 	dftables.c \
-# 	pcre_compile.c \
-# 	pcre_config.c \
-# 	pcre_dfa_exec.c \
-# 	pcre_exec.c \
-# 	pcre_fullinfo.c \
-# 	pcre_get.c \
-# 	pcre_globals.c \
-# 	pcre_info.c \
-# 	pcre_refcount.c \
-# 	pcre_study.c \
-# 	ucp_findchar.c \
-# 	ucp.h \
-# 	config.h \
-# 	pcre_internal.h \
-# 	pcre_scanner.h
+	pcre_printint.src	\
+	AUTHORS			\
+	ChangeLog		\
+	COPYING			\
+	CVS			\
+	LICENCE			\
+	NEWS			\
+	README
