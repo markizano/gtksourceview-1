@@ -1624,15 +1624,15 @@ idle_worker (GtkSourceContextEngine *ce)
 	update_syntax (ce, NULL, WORKER_TIME_SLICE);
 	CHECK_TREE (ce);
 
-	/* XXX */
-	if (ce->priv->highlight)
-	{
-		GtkTextIter start, end;
-		gtk_text_region_subtract_region (ce->priv->highlight_requests,
-						 ce->priv->refresh_region);
-		gtk_text_buffer_get_bounds (ce->priv->buffer, &start, &end);
-		ensure_highlighted (ce, &start, &end);
-	}
+// 	/* XXX */
+// 	if (ce->priv->highlight)
+// 	{
+// 		GtkTextIter start, end;
+// 		gtk_text_region_subtract_region (ce->priv->highlight_requests,
+// 						 ce->priv->refresh_region);
+// 		gtk_text_buffer_get_bounds (ce->priv->buffer, &start, &end);
+// 		ensure_highlighted (ce, &start, &end);
+// 	}
 
 	if (all_analyzed (ce))
 	{

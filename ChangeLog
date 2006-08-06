@@ -1,3 +1,13 @@
+2006-08-06  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/libegg/regex/eggregex.c:
+	(regex_new): initialize ref_count field;
+	(egg_regex_clear): set regex->delims to NULL after freeing it.
+	* gtksourceview/gtksourcecontextengine.c: 
+	(idle_worker): do not highlight upadted regions unless asked for it.
+	* gtksourceview/gtksourcelanguage-parser-2.c: do not crash in
+	debug messages.
+
 2006-07-26  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcecontextengine.c: 

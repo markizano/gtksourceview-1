@@ -24,7 +24,7 @@
 #include <config.h>
 #endif
 
-/*#define ENABLE_DEBUG*/
+// #define ENABLE_DEBUG
 
 #ifdef ENABLE_DEBUG
 #define DEBUG(x) x
@@ -120,7 +120,7 @@ static gboolean   file_parse                   (gchar                  *filename
 
 static EggRegexCompileFlags
 		  update_regex_flags	       (EggRegexCompileFlags flags,
-						gchar *option_name,
+						const gchar *option_name,
 						gboolean value);
 
 static gboolean   create_definition            (ParserState *parser_state,
@@ -140,8 +140,7 @@ static void       handle_default_regex_options_element
                                                 GError **error);
 static void       element_start                (ParserState *parser_state,
 						GError **error);
-static void       element_end                  (ParserState *parser_state,
-						GError **error);
+static void       element_end                  (ParserState *parser_state);
 static gboolean   replace_by_id                (const EggRegex *egg_regex,
                                                 const gchar *regex,
                                                 GString *expanded_regex,
@@ -252,10 +251,8 @@ lang_id_is_already_loaded (ParserState *parser_state, gchar *lang_id)
 	while (l != NULL)
 	{
 		loaded_lang = l->data;
-		DEBUG (g_message ("language '%s' is loaded", loaded_lang));
 		if (strcmp (loaded_lang, lang_id) == 0)
 		{
-			DEBUG (g_message ("language '%s' already loaded", lang_id));
 			return TRUE;
 		}
 		l = g_slist_next (l);
@@ -302,7 +299,7 @@ create_definition (ParserState *parser_state,
 	xmlFree (tmp);
 
 
-	DEBUG (g_message ("creating context %s, child of %s", id, parent_id));
+	DEBUG (g_message ("creating context %s, child of %s", id, parent_id ? parent_id : "(null)"));
 
 	/* Fetch the content of the sublements using the tree API on
 	 * the current node */
@@ -328,17 +325,20 @@ create_definition (ParserState *parser_state,
 			if (xmlStrcmp (BAD_CAST "extended", attribute->name) == 0)
 			{
 				flags = update_regex_flags (flags,
-					"extended", str_to_bool ((gchar *)tmp));
+							    "extended",
+							    str_to_bool ((gchar *)tmp));
 			}
 			else if (xmlStrcmp (BAD_CAST "case-insensitive", attribute->name) == 0)
 			{
 				flags = update_regex_flags (flags,
-					"case-insensitive", str_to_bool ((gchar *)tmp));
+							    "case-insensitive",
+							    str_to_bool ((gchar *)tmp));
 			}
 			else if (xmlStrcmp (BAD_CAST "dot-match-all", attribute->name) == 0)
 			{
 				flags = update_regex_flags (flags,
-					"dot-match-all", str_to_bool ((gchar *)tmp));
+							    "dot-match-all",
+							    str_to_bool ((gchar *)tmp));
 			}
 		}
 		/*flags = update_regex_flags (parser_state->regex_compile_flags,
@@ -453,9 +453,9 @@ create_definition (ParserState *parser_state,
 			child = child->next;
 	}
 
-	DEBUG (g_message ("start: '%s'", start));
-	DEBUG (g_message ("end: '%s'", end));
-	DEBUG (g_message ("match: '%s'", match));
+	DEBUG (g_message ("start: '%s'", start ? start : "(null)"));
+	DEBUG (g_message ("end: '%s'", end ? end : "(null)"));
+	DEBUG (g_message ("match: '%s'", match ? match : "(null)"));
 
 
 	if (tmp_error == NULL && start != NULL)
@@ -808,7 +808,9 @@ replace_by_id (const EggRegex *egg_regex,
 }
 
 static EggRegexCompileFlags
-update_regex_flags (EggRegexCompileFlags flags, gchar *option_name, gboolean value)
+update_regex_flags (EggRegexCompileFlags flags,
+		    const gchar         *option_name,
+		    gboolean             value)
 {
 	EggRegexCompileFlags single_flag;
 
@@ -905,7 +907,7 @@ expand_regex_vars (ParserState *parser_state, gchar *regex, gint len, GError **e
 	 * end regex.)
 	 * The sub pattern containing the id is the second.
 	 */
-	gchar *re = "(?<!\\\\)(\\\\\\\\)*\\\\%\\{([^@]*?)\\}";
+	const gchar *re = "(?<!\\\\)(\\\\\\\\)*\\\\%\\{([^@]*?)\\}";
 	gchar *expanded_regex;
 	EggRegex *egg_re;
 
@@ -992,7 +994,7 @@ expand_regex_delimiters (ParserState *parser_state,
 	 * The first block is needed to ensure that the sequence is
 	 * not escaped.
 	 */
-	gchar *re = "(?<!\\\\)(\\\\\\\\)*\\\\%(\\[|\\])";
+	const gchar *re = "(?<!\\\\)(\\\\\\\\)*\\\\%(\\[|\\])";
 	gchar *expanded_regex;
 	EggRegex *egg_re;
 
@@ -1118,7 +1120,7 @@ handle_define_regex_element (ParserState *parser_state,
 	xmlChar *tmp;
 	gchar *expanded_regex;
 	int i;
-	gchar *regex_options[] = {"extended", "case-insensitive", "dot-match-all", NULL};
+	const gchar *regex_options[] = {"extended", "case-insensitive", "dot-match-all", NULL};
 	EggRegexCompileFlags flags;
 	GError *tmp_error = NULL;
 
@@ -1235,7 +1237,9 @@ map_style (ParserState *parser_state,
 		mapped_style = style_id;
 
 	DEBUG (g_message ("mapping the style of '%s' to '%s' -> '%s'",
-			  style_id, map_to, mapped_style));
+			  style_id,
+			  map_to ? map_to : "(null)",
+			  mapped_style));
 
 	if (mapped_style)
 		g_hash_table_insert (parser_state->styles_mapping,
@@ -1386,7 +1390,7 @@ parse_style (ParserState *parser_state,
 		parse_language_with_id (parser_state, lang_id, &tmp_error);
 
 	DEBUG (g_message ("style %s (%s) to be mapped to '%s'",
-			  name, id, map_to));
+			  name, id, map_to ? (char*) map_to : "(null)"));
 
 	map_style (parser_state, id, (gchar*) map_to, &tmp_error);
 
@@ -1528,8 +1532,7 @@ element_start (ParserState *parser_state,
 }
 
 static void
-element_end (ParserState *parser_state,
-	     GError     **error)
+element_end (ParserState *parser_state)
 {
 	const xmlChar *name;
 	gchar *popped_id;
@@ -1631,7 +1634,7 @@ file_parse (gchar                     *filename,
 				element_start (parser_state, &tmp_error);
 				break;
 			case XML_READER_TYPE_END_ELEMENT:
-				element_end (parser_state, &tmp_error);
+				element_end (parser_state);
 				break;
 		}
 	}
