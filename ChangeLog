@@ -1,3 +1,39 @@
+2006-08-26  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcelanguage-parser-2.c: fixed crash
+	in create_definition(), added more checks for GError**
+	arguments here and there.
+	* gtksourceview/gtksourcecontextengine.c: removed debug_cb
+	callback.
+	* gtksourceview/gtksourcelanguage.c, 
+	gtksourceview/gtksourcelanguage-private.h: got rid of xmlChar*
+	nonsense; added hidden, brackets, line-comment, and block-comment 
+	attributes to lang files; Others, Others 2, and Others 3 styles are 
+	now defined explicitely by themes, since there's no def:others anymore.
+	* gtksourceview/gtksourcelanguagesmanager.[ch]: 
+	(gtk_source_languages_manager_get_available_style_schemes): no builtin 
+	scheme anymore.
+	* gtksourceview/gtksourcestylescheme.[ch]: removed default style scheme,
+	added GtkSourceStyleScheme::name property.
+	* gtksourceview/gtksourceview.c: (gtk_source_view_constructor) removed
+	default scheme assignment.
+	* gtksourceview/language-specs/c.lang: made all comments use single style
+	"comment"; made common-defines context use separate style; added brackets
+	and comments.
+	* gtksourceview/language-specs/cpp.lang: use 'keyword' and 'data-type' styles
+	from C lang file; added brackets and comments.
+	* gtksourceview/language-specs/def.lang: removed "others*" styles; set
+	hidden attribute.
+	* gtksourceview/language-specs/gvim.styles: added styles necessary to
+	avoid using def:others* in other lang files; and removed "others*" styles.
+	* gtksourceview/language-specs/javascript.lang, 
+	gtksourceview/language-specs/latex.lang: removed references to
+	def:others*.
+	* gtksourceview/language-specs/xml.lang: removed references to
+	def:others*; added brackets and comments.
+	* gtksourceview/language-specs/language2.rng: made "section" attribute optional,
+	added "hidden" attribute, added brackets, line-comment, block-comment elements.
+
 2006-08-06  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/libegg/regex/eggregex.c:

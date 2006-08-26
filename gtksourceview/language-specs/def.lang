@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<language id="def" _name="Defaults" version="2.0" section="FIXME">
+<language id="def" _name="Defaults" hidden="true" version="2.0">
     <styles>
         <style id="decimal"        _name="Decimal"/>
         <style id="base-n-integer" _name="Base-N Integer"/>
@@ -18,9 +18,9 @@
         <style id="character"      _name="Character"/>
         <style id="function"       _name="Function"/>
 
-        <style id="others"         _name="Others"/>
-        <style id="others2"        _name="Others 2"/>
-        <style id="others3"        _name="Others 3"/>
+<!--        <style id="others"         _name="Others"/>-->
+<!--        <style id="others2"        _name="Others 2"/>-->
+<!--        <style id="others3"        _name="Others 3"/>-->
         <style id="specials"       _name="Specials"/>
     </styles>
 

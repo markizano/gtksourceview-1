@@ -32,9 +32,9 @@
 #include <errno.h>
 #include <string.h>
 
-// #define ENABLE_DEBUG
-// #define ENABLE_PROFILE
-// #define ENABLE_CHECK_TREE
+#undef ENABLE_DEBUG
+#undef ENABLE_PROFILE
+#undef ENABLE_CHECK_TREE
 
 #ifdef ENABLE_DEBUG
 #define DEBUG(x) (x)
@@ -267,7 +267,7 @@ struct _SubPattern
  * from pcre need to be compared to line length, and adjusted when necessary.
  * Not using line terminator only means that \n can't be in patterns, it's not a
  * big deal: line end can't be highlighted anyway; if a rule needs to match it, it can
- * can use "$" as start and "^" as end.
+ * can use "$" as start and "^" as end (not in a single pattern, "$^" will never match).
  */
 #define NEXT_LINE_OFFSET(l_) ((l_)->start_at + (l_)->length + (l_)->eol_length)
 struct _LineInfo
@@ -386,7 +386,6 @@ static void		update_syntax		(GtkSourceContextEngine	*ce,
 						 const GtkTextIter	*end,
 						 gint			 time);
 static void		install_idle_worker	(GtkSourceContextEngine	*ce);
-static void		debug_cb		(GtkSourceContextEngine	*ce);
 
 
 /* MODIFICATIONS AND STUFF ------------------------------------------------ */
@@ -1731,9 +1730,6 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 		g_signal_handlers_disconnect_by_func (ce->priv->buffer,
 						      (gpointer) buffer_notify_highlight_cb,
 						      ce);
-		g_signal_handlers_disconnect_by_func (ce->priv->buffer,
-						      (gpointer) debug_cb,
-						      ce);
 
 		if (ce->priv->worker_handler)
 		{
@@ -1808,8 +1804,6 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 
 		g_signal_connect_swapped (buffer, "notify::highlight",
 					  G_CALLBACK (buffer_notify_highlight_cb), ce);
-		g_signal_connect_swapped (buffer, "debug",
-					  G_CALLBACK (debug_cb), ce);
 
 		install_idle_worker (ce);
 	}
@@ -4861,7 +4855,7 @@ _gtk_source_context_engine_add_sub_pattern (GtkSourceContextEngine  *ce,
 		where_num = (SubPatternWhere) -1;
 	}
 
-	if (where_num == -1)
+	if (where_num == (SubPatternWhere) -1)
 	{
 		g_set_error (error,
 			     GTK_SOURCE_CONTEXT_ENGINE_ERROR,
@@ -5197,53 +5191,3 @@ CHECK_SEGMENT_LIST (Segment *segment)
 	}
 }
 #endif /* ENABLE_CHECK_TREE */
-
-static GSList *
-segment_get_children (Segment *segment)
-{
-	GSList *list = NULL;
-	Segment *child;
-
-	for (child = segment->children; child; child = child->next)
-	{
-		list = g_slist_prepend (list, child);
-		list = g_slist_concat (list, segment_get_children (child));
-	}
-
-	return list;
-}
-
-static GSList *
-get_segments (GtkSourceContextEngine *ce)
-{
-	GSList *list = g_slist_prepend (NULL, ce->priv->root_segment);
-	list = g_slist_concat (list, segment_get_children (ce->priv->root_segment));
-	g_print ("%d segments\n", g_slist_length (list));
-	return list;
-}
-
-static void
-debug_cb (GtkSourceContextEngine *ce)
-{
-	gint i, len;
-	GSList *segments, *l;
-
-	len = gtk_text_buffer_get_char_count (ce->priv->buffer);
-	segments = get_segments (ce);
-
-	for (l = segments; l != NULL; l = l->next)
-	{
-		Segment *from = l->data;
-
-		for (i = 0; i < 100; ++i)
-		{
-			gint offset = g_random_int_range (0, len + 1);
-			get_segment_at_offset (ce, from, offset);
-		}
-
-		get_segment_at_offset (ce, from, 0);
-		get_segment_at_offset (ce, from, len);
-	}
-
-	g_slist_free (segments);
-}

@@ -7,16 +7,27 @@
             <attribute name="name"/>
             <attribute name="_name"/>
         </choice>
+
         <attribute name="id">
             <data type="string">
                 <param name="pattern">([a-zA-Z0-9_]|-)+</param>
             </data>
         </attribute>
+
         <attribute name="version"/>
-        <choice>
-            <attribute name="section"/>
-            <attribute name="_section"/>
-        </choice>
+
+        <optional>
+            <choice>
+                <attribute name="section"/>
+                <attribute name="_section"/>
+            </choice>
+        </optional>
+
+        <optional>
+            <attribute name="hidden">
+                <ref name="boolean-value"/>
+            </attribute>
+        </optional>
 
         <optional>
             <attribute name="mimetypes"/>
@@ -46,6 +57,23 @@
         </optional>
 
         <ref name="definitions" />
+
+        <optional>
+            <element name="brackets">
+                <text/>
+            </element>
+        </optional>
+        <optional>
+            <element name="line-comment">
+                <attribute name="start"/>
+            </element>
+        </optional>
+        <optional>
+            <element name="block-comment">
+                <attribute name="start"/>
+                <attribute name="end"/>
+            </element>
+        </optional>
     </element>
 </start>
 

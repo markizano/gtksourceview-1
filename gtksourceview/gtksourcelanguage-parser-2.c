@@ -24,7 +24,7 @@
 #include <config.h>
 #endif
 
-// #define ENABLE_DEBUG
+#undef ENABLE_DEBUG
 
 #ifdef ENABLE_DEBUG
 #define DEBUG(x) x
@@ -312,6 +312,12 @@ create_definition (ParserState *parser_state,
 	while (child != NULL)
 	{
 		xmlAttr *attribute;
+
+		if (child->type != XML_READER_TYPE_ELEMENT)
+		{
+			child = child->next;
+			continue;
+		}
 
 		/* FIXME: add PCRE_EXTRA support in EggRegex */
 		flags = parser_state->regex_compile_flags;
@@ -1028,6 +1034,7 @@ expand_regex (ParserState *parser_state,
 	gint len;
 
 	g_assert (parser_state != NULL);
+	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	if (regex == NULL)
 		return NULL;
@@ -1186,7 +1193,7 @@ handle_define_regex_element (ParserState *parser_state,
 
 static void
 handle_default_regex_options_element (ParserState *parser_state,
-			     GError **error)
+				      GError     **error)
 {
 	xmlChar *options;
 	int ret, type;
@@ -1229,6 +1236,8 @@ map_style (ParserState *parser_state,
 	   GError     **error)
 {
 	const gchar *mapped_style;
+
+	g_return_if_fail (error == NULL || *error == NULL);
 
 	if (map_to != NULL)
 		mapped_style = g_hash_table_lookup (parser_state->styles_mapping,
@@ -1298,8 +1307,9 @@ parse_language_with_id (ParserState *parser_state,
 {
 	GtkSourceLanguagesManager *lm;
 	GtkSourceLanguage *imported_language;
-
 	GError *tmp_error = NULL;
+
+	g_return_if_fail (error == NULL || *error == NULL);
 
 	lm = _gtk_source_language_get_languages_manager (parser_state->language);
 	imported_language = gtk_source_languages_manager_get_language_by_id (lm, lang_id);
@@ -1336,11 +1346,11 @@ parse_style (ParserState *parser_state,
 {
 	gchar *id;
 	xmlChar *name, *map_to;
-
 	xmlChar *tmp;
 	gchar *lang_id = NULL;
-
 	GError *tmp_error = NULL;
+
+	g_return_if_fail (error == NULL || *error == NULL);
 
 	tmp = xmlTextReaderGetAttribute (parser_state->reader,
 					 BAD_CAST "id");
@@ -1392,7 +1402,8 @@ parse_style (ParserState *parser_state,
 	DEBUG (g_message ("style %s (%s) to be mapped to '%s'",
 			  name, id, map_to ? (char*) map_to : "(null)"));
 
-	map_style (parser_state, id, (gchar*) map_to, &tmp_error);
+	if (!tmp_error)
+		map_style (parser_state, id, (gchar*) map_to, &tmp_error);
 
 	g_free (lang_id);
 	g_free (id);
@@ -1445,8 +1456,9 @@ handle_styles_element (ParserState *parser_state,
 {
 	int ret, type;
 	const xmlChar *tag_name;
-
 	GError *tmp_error = NULL;
+
+	g_return_if_fail (error == NULL || *error == NULL);
 
 	while (TRUE)
 	{
@@ -1561,6 +1573,8 @@ file_parse (gchar                     *filename,
 	int ret;
 	int fd;
 	GError *tmp_error = NULL;
+
+	g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
 
 	DEBUG (g_message ("loading file '%s'", filename));
 

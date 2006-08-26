@@ -3,26 +3,16 @@
           mimetypes="text/x-c;text/x-chdr;text/x-csrc"
           globs="*.c;*.h">
     <styles>
-        <style id="comment"           _name="Comment"
-                                      map-to="def:comment"/>
-        <style id="comment-multiline" _name="Multiline Comment"
-                                      map-to="def:comment"/>
-        <style id="error"             _name="Error"
-                                      map-to="def:error"/>
-        <style id="string"            _name="String"
-                                      map-to="def:string"/>
-        <style id="escape"            _name="Escape"
-                                      map-to="def:escape"/>
-        <style id="preprocessor"      _name="Preprocessor"
-                                      map-to="def:preprocessor"/>
-        <style id="included-file"     _name="Included File"
-                                      map-to="def:package"/>
-        <style id="char"              _name="Character"
-                                      map-to="def:string"/>
-        <style id="keyword"           _name="Keyword"
-                                      map-to="def:keyword"/>
-        <style id="data-type"         _name="Data Type"
-                                      map-to="def:data-type"/>
+        <style id="comment"           _name="Comment"           map-to="def:comment"/>
+        <style id="error"             _name="Error"             map-to="def:error"/>
+        <style id="string"            _name="String"            map-to="def:string"/>
+        <style id="escape"            _name="Escape"            map-to="def:escape"/>
+        <style id="preprocessor"      _name="Preprocessor"      map-to="def:preprocessor"/>
+        <style id="common-defines"    _name="Common defines"    map-to="def:preprocessor"/>
+        <style id="included-file"     _name="Included File"     map-to="def:package"/>
+        <style id="char"              _name="Character"         map-to="def:string"/>
+        <style id="keyword"           _name="Keyword"           map-to="def:keyword"/>
+        <style id="data-type"         _name="Data Type"         map-to="def:data-type"/>
     </styles>
 
     <definitions>
@@ -39,7 +29,7 @@
                     </include>
                 </context>
 
-                <context id="comment-multiline" style-ref="comment-multiline">
+                <context id="comment-multiline" style-ref="comment">
                     <start>\/\*</start>
                     <end>\*\/</end>
                     <include>
@@ -54,7 +44,7 @@
                 <!-- Preprocessor -->
                 <define-regex id="preproc-start">^\s*#\s*</define-regex>
 
-                <context id="if0-comment" style-ref="comment-multiline">
+                <context id="if0-comment" style-ref="comment">
                     <start>\%{preproc-start}if\s*0\b</start>
                     <end>\%{preproc-start}(endif|else|elif)\b</end>
                     <include>
@@ -153,6 +143,7 @@
                     <keyword>restrict</keyword>
                     <keyword>short</keyword>
                     <keyword>signed</keyword>
+                    <keyword>size_t</keyword>
                     <keyword>static</keyword>
                     <keyword>struct</keyword>
                     <keyword>typedef</keyword>
@@ -162,7 +153,7 @@
                     <keyword>volatile</keyword>
                 </context>
 
-                <context id="common-defines" style-ref="preprocessor">
+                <context id="common-defines" style-ref="common-defines">
                     <keyword>NULL</keyword>
                     <keyword>TRUE</keyword>
                     <keyword>FALSE</keyword>
@@ -179,4 +170,8 @@
             </include>
         </context>
     </definitions>
+
+    <brackets>(){}[]</brackets>
+    <line-comment start="//"/>
+    <block-comment start="/*" end="*/"/>
 </language>

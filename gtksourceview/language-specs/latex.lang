@@ -1,18 +1,12 @@
 <?xml version="1.0"?>
 <language id="latex" _name="LaTeX" version="2.0" _section="Markup" mimetypes="text/x-tex">
     <styles>
-        <style id="comment"            _name="Comment"
-                                       map-to="def:comment"/>
-        <style id="math"               _name="Math Mode"
-                                       map-to="def:comment"/>
-        <style id="include"            _name="Include"
-                                       map-to="def:preprocessor"/>
-        <style id="most-used-commands" _name="Command"
-                                       map-to="def:keyword"/>
-        <style id="command"            _name="Keyword"
-                                       map-to="def:others"/>
-        <style id="verbatim"           _name="Verbatim"
-                                       map-to="def:comment"/>
+        <style id="comment"            _name="Comment"    map-to="def:comment"/>
+        <style id="math"               _name="Math Mode"  map-to="def:comment"/>
+        <style id="include"            _name="Include"    map-to="def:package"/>
+        <style id="most-used-commands" _name="Command"    map-to="def:keyword"/>
+        <style id="command"            _name="Keyword"/> <!--map-to="def:others"-->
+        <style id="verbatim"           _name="Verbatim"   map-to="def:comment"/>
     </styles>
 
     <definitions>

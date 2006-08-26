@@ -29,13 +29,15 @@
 
 #define STYLE_TEXT		"text"
 #define STYLE_SELECTED		"text-selected"
-#define STYLE_BRACKETS		"brackets"
+#define STYLE_BRACKET_MATCH	"bracket-match"
+#define STYLE_BRACKET_MISMATCH	"bracket-mismatch"
 #define STYLE_CURSOR		"cursor"
 #define STYLE_CURRENT_LINE	"current-line"
 
 enum {
 	PROP_0,
-	PROP_ID
+	PROP_ID,
+	PROP_NAME
 };
 
 struct _GtkSourceStyleSchemePrivate
@@ -45,8 +47,6 @@ struct _GtkSourceStyleSchemePrivate
 	GtkSourceStyleScheme *parent;
 	GHashTable *styles;
 };
-
-static GtkSourceStyleScheme *default_scheme;
 
 G_DEFINE_TYPE (GtkSourceStyleScheme, gtk_source_style_scheme, G_TYPE_OBJECT)
 
@@ -82,6 +82,13 @@ gtk_source_style_scheme_set_property (GObject 	   *object,
 		g_free (tmp);
 		break;
 
+	    case PROP_NAME:
+		tmp = scheme->priv->name;
+		scheme->priv->name = g_strdup (g_value_get_string (value));
+		g_free (tmp);
+		g_object_notify (object, "name");
+		break;
+
 	    default:
 		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 		break;
@@ -100,6 +107,10 @@ gtk_source_style_scheme_get_property (GObject 	 *object,
 	{
 	    case PROP_ID:
 		    g_value_set_string (value, scheme->priv->id);
+		    break;
+
+	    case PROP_NAME:
+		    g_value_set_string (value, scheme->priv->name);
 		    break;
 
 	    default:
@@ -124,6 +135,14 @@ gtk_source_style_scheme_class_init (GtkSourceStyleSchemeClass *klass)
 							      _("Style scheme id"),
 							      NULL,
 							      G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+	g_object_class_install_property (object_class,
+					 PROP_NAME,
+					 g_param_spec_string ("name",
+						 	      _("Style scheme name"),
+							      _("Style scheme name"),
+							      NULL,
+							      G_PARAM_READWRITE));
 
 	g_type_class_add_private (object_class, sizeof (GtkSourceStyleSchemePrivate));
 }
@@ -150,17 +169,20 @@ gtk_source_style_scheme_get_name (GtkSourceStyleScheme *scheme)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme), NULL);
 	g_return_val_if_fail (scheme->priv->name != NULL, "");
-	return _(scheme->priv->name);
+	return scheme->priv->name;
 }
 
 GtkSourceStyleScheme *
-gtk_source_style_scheme_new (const gchar *id)
+gtk_source_style_scheme_new (const gchar *id,
+			     const gchar *name)
 {
 	GtkSourceStyleScheme *scheme;
 
 	g_return_val_if_fail (id != NULL, NULL);
+	g_return_val_if_fail (name != NULL, NULL);
 
-	scheme = g_object_new (GTK_TYPE_SOURCE_STYLE_SCHEME, "id", id, NULL);
+	scheme = g_object_new (GTK_TYPE_SOURCE_STYLE_SCHEME,
+			       "id", id, "name", name, NULL);
 
 	return scheme;
 }
@@ -186,11 +208,26 @@ gtk_source_style_scheme_get_style (GtkSourceStyleScheme *scheme,
 		return NULL;
 }
 
+void
+gtk_source_style_scheme_set_style (GtkSourceStyleScheme *scheme,
+				   const gchar          *name,
+				   const GtkSourceStyle *style)
+{
+	g_return_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme));
+	g_return_if_fail (name != NULL);
+
+	if (style != NULL)
+		g_hash_table_insert (scheme->priv->styles, g_strdup (name),
+				     gtk_source_style_copy (style));
+	else
+		g_hash_table_remove (scheme->priv->styles, name);
+}
+
 GtkSourceStyle *
 gtk_source_style_scheme_get_matching_brackets_style (GtkSourceStyleScheme *scheme)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme), NULL);
-	return gtk_source_style_scheme_get_style (scheme, STYLE_BRACKETS);
+	return gtk_source_style_scheme_get_style (scheme, STYLE_BRACKET_MATCH);
 }
 
 gboolean
@@ -213,106 +250,6 @@ gtk_source_style_scheme_get_current_line_color (GtkSourceStyleScheme *scheme,
 
 	gtk_source_style_free (style);
 	return ret;
-}
-
-static void
-add_style (GtkSourceStyleScheme *scheme,
-	   const char           *name,
-	   GtkSourceStyleMask    mask,
-	   const char           *foreground,
-	   const char           *background,
-	   gboolean              italic,
-	   gboolean              bold,
-	   gboolean              underline,
-	   gboolean              strikethrough)
-{
-	GtkSourceStyle *style;
-
-	style = gtk_source_style_new (mask);
-
-	if (mask & GTK_SOURCE_STYLE_USE_FOREGROUND)
-		gdk_color_parse (foreground, &style->foreground);
-	if (mask & GTK_SOURCE_STYLE_USE_BACKGROUND)
-		gdk_color_parse (background, &style->background);
-
-	style->italic = italic;
-	style->bold = bold;
-	style->underline = underline;
-	style->strikethrough = strikethrough;
-
-	g_hash_table_insert (scheme->priv->styles, g_strdup (name), style);
-}
-
-GtkSourceStyleScheme *
-_gtk_source_style_scheme_get_default (void)
-{
-	if (default_scheme)
-		return g_object_ref (default_scheme);
-
-	default_scheme = gtk_source_style_scheme_new ("default");
-	g_object_add_weak_pointer (G_OBJECT (default_scheme),
-				   (gpointer *) &default_scheme);
-
-#define ADD_FORE(name,color)					\
-	add_style (default_scheme, name,			\
-		   GTK_SOURCE_STYLE_USE_FOREGROUND,		\
-		   color, NULL, FALSE, FALSE, FALSE, FALSE)
-#define ADD_FORE_BOLD(name,color)				\
-	add_style (default_scheme, name,			\
-		   GTK_SOURCE_STYLE_USE_FOREGROUND |		\
-			GTK_SOURCE_STYLE_USE_BOLD,		\
-		   color, NULL, FALSE, TRUE, FALSE, FALSE)
-
-	ADD_FORE ("def:base-n-integer", "#FF00FF");
-	ADD_FORE ("def:character", "#FF00FF");
-	ADD_FORE ("def:comment", "#0000FF");
-	ADD_FORE_BOLD ("def:data-type", "#2E8B57");
-	ADD_FORE ("def:function", "#008A8C");
-	ADD_FORE ("def:decimal", "#FF00FF");
-	ADD_FORE ("def:floating-point", "#FF00FF");
-	ADD_FORE_BOLD ("def:keyword", "#A52A2A");
-	ADD_FORE ("def:preprocessor", "#A020F0");
-	ADD_FORE ("def:string", "#FF00FF");
-
-	add_style (default_scheme, "def:specials",
-		   GTK_SOURCE_STYLE_USE_FOREGROUND |
-			GTK_SOURCE_STYLE_USE_BACKGROUND,
-		   "#FFFFFF", "#FF0000", FALSE, FALSE, FALSE, FALSE);
-
-	ADD_FORE_BOLD ("def:others", "#2E8B57");
-	ADD_FORE ("def:others2", "#008B8B");
-	ADD_FORE ("def:others3", "#6A5ACD");
-
-	add_style (default_scheme, "def:net-address",
-		   GTK_SOURCE_STYLE_USE_FOREGROUND |
-			GTK_SOURCE_STYLE_USE_ITALIC |
-			GTK_SOURCE_STYLE_USE_UNDERLINE,
-		   "#0000FF", NULL, TRUE, FALSE, TRUE, FALSE);
-
-	add_style (default_scheme, "def:note",
-		   GTK_SOURCE_STYLE_USE_FOREGROUND |
-			GTK_SOURCE_STYLE_USE_BACKGROUND |
-			GTK_SOURCE_STYLE_USE_BOLD,
-		   "#0000FF", "#FFFF00", FALSE, TRUE, FALSE, FALSE);
-
-	add_style (default_scheme, "def:error",
-		   GTK_SOURCE_STYLE_USE_BACKGROUND |
-			GTK_SOURCE_STYLE_USE_BOLD,
-		   NULL, "#FF0000", FALSE, TRUE, FALSE, FALSE);
-
-	ADD_FORE_BOLD ("def:package", "#FF00FF");
-	ADD_FORE ("def:escape", "#9010D0");
-
-	add_style (default_scheme, STYLE_BRACKETS,
-		   GTK_SOURCE_STYLE_USE_BACKGROUND |
-			GTK_SOURCE_STYLE_USE_FOREGROUND |
-			GTK_SOURCE_STYLE_USE_BOLD,
-		   "white", "gray", FALSE, TRUE, FALSE, FALSE);
-
-#undef ADD_FORE
-#undef ADD_FORE_BOLD
-
-	return default_scheme;
 }
 
 static void
@@ -492,7 +429,7 @@ parse_style (const gchar     *element_name,
 }
 
 static void
-start_element (GMarkupParseContext *context,
+start_element (G_GNUC_UNUSED GMarkupParseContext *context,
 	       const gchar         *element_name,
 	       const gchar        **attribute_names,
 	       const gchar        **attribute_values,
@@ -517,16 +454,41 @@ start_element (GMarkupParseContext *context,
 
 		while (attribute_names && *attribute_names)
 		{
+			gboolean error_set = FALSE;
+
 			if (!strcmp (*attribute_names, "id"))
 			{
 				data->scheme->priv->id = g_strdup (*attribute_values);
 			}
+			else if (!strcmp (*attribute_names, "_name"))
+			{
+				if (data->scheme->priv->name)
+				{
+					g_set_error (error, ERROR_QUARK, 0,
+						     "duplicated name attribute");
+					error_set = TRUE;
+				}
+				else
+				{
+					data->scheme->priv->name = g_strdup (_(*attribute_values));
+				}
+			}
 			else if (!strcmp (*attribute_names, "name"))
 			{
-				data->scheme->priv->name = g_strdup (*attribute_values);
+				if (data->scheme->priv->name)
+				{
+					g_set_error (error, ERROR_QUARK, 0,
+						     "duplicated name attribute");
+					error_set = TRUE;
+				}
+				else
+				{
+					data->scheme->priv->name = g_strdup (*attribute_values);
+				}
 			}
 			else if (!strcmp (*attribute_names, "parent-scheme"))
 			{
+				/* XXX */
 				g_warning ("%s: implement me", G_STRLOC);
 			}
 			else
@@ -534,8 +496,11 @@ start_element (GMarkupParseContext *context,
 				g_set_error (error, ERROR_QUARK, 0,
 					     "unexpected attribute '%s' in element 'style-scheme'",
 					     *attribute_names);
-				return;
+				error_set = TRUE;
 			}
+
+			if (error_set)
+				return;
 
 			attribute_names++;
 			attribute_values++;
@@ -562,10 +527,10 @@ start_element (GMarkupParseContext *context,
 }
 
 static void
-end_element (GMarkupParseContext *context,
+end_element (G_GNUC_UNUSED GMarkupParseContext *context,
 	     const gchar         *element_name,
 	     gpointer             user_data,
-	     GError             **error)
+	     G_GNUC_UNUSED GError **error)
 {
 	ParserData *data = user_data;
 	if (!strcmp (element_name, "style-scheme"))

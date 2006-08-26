@@ -1,5 +1,5 @@
 /* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*-
- *  gtksourcestyle.h
+ *  gtksourcestylescheme.h
  *
  *  Copyright (C) 2003 - Paolo Maggi <paolo.maggi@polito.it>
  *
@@ -50,7 +50,8 @@ struct _GtkSourceStyleSchemeClass
 
 GType			 gtk_source_style_scheme_get_type	(void) G_GNUC_CONST;
 
-GtkSourceStyleScheme	*gtk_source_style_scheme_new		(const gchar          *id);
+GtkSourceStyleScheme	*gtk_source_style_scheme_new		(const gchar          *id,
+								 const gchar          *name);
 
 const gchar             *gtk_source_style_scheme_get_id         (GtkSourceStyleScheme *scheme);
 const gchar             *gtk_source_style_scheme_get_name       (GtkSourceStyleScheme *scheme);
@@ -63,12 +64,13 @@ GtkSourceStyle		*gtk_source_style_scheme_get_matching_brackets_style
 gboolean		 gtk_source_style_scheme_get_current_line_color
 								(GtkSourceStyleScheme *scheme,
 								 GdkColor             *color);
+void			 gtk_source_style_scheme_set_style	(GtkSourceStyleScheme *scheme,
+								 const gchar          *name,
+								 const GtkSourceStyle *style);
 
 void			 _gtk_source_style_scheme_apply		(GtkSourceStyleScheme *scheme,
 								 GtkWidget            *widget);
 GtkSourceStyleScheme	*_gtk_source_style_scheme_new_from_file (const gchar          *filename);
-/* Default style scheme */
-GtkSourceStyleScheme	*_gtk_source_style_scheme_get_default	(void);
 
 G_END_DECLS
 

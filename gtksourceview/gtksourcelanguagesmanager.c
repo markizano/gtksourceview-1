@@ -640,12 +640,6 @@ gtk_source_languages_manager_get_available_style_schemes (GtkSourceLanguagesMana
 	files = get_style_scheme_files (lm);
 	schemes = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
 
-	scheme = _gtk_source_style_scheme_get_default ();
-	lm->priv->style_schemes = g_slist_prepend (lm->priv->style_schemes, scheme);
-	g_hash_table_insert (schemes,
-			     g_strdup (gtk_source_style_scheme_get_id (scheme)),
-			     g_object_ref (scheme));
-
 	while (files)
 	{
 		gchar *filename = files->data;

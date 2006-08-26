@@ -3,26 +3,16 @@
           mimetypes="application/xml;text/xml;image/svg+xml,text/rdf"
           globs="*.xml;*.rdf;*.svg;*.rng;*.lang">
     <styles>
-        <style id="comment"           _name="Comment"
-                                      map-to="def:comment"/>
-        <style id="doctype"           _name="DOCTYPE"
-                                      map-to="def:preprocessor"/>
-        <style id="cdata-delim"       _name="CDATA Delimiters"
-                                      map-to="def:preprocessor"/>
-        <style id="processing-instruction" _name="Processing Instruction"
-                                      map-to="def:preprocessor"/>
-        <style id="attribute-name"    _name="Attribute Name"
-                                      map-to="def:others3"/>
-        <style id="attribute-value"   _name="Attribute Value"
-                                      map-to="def:string"/>
-        <style id="entity"            _name="Entity"
-                                      map-to="def:escape"/>
-        <style id="tags"              _name="Tag"
-                                      map-to="def:others2"/>
-        <style id="namespace"         _name="Namespace"
-                                      map-to="def:others"/>
-        <style id="error"             _name="Error"
-                                      map-to="def:error"/>
+        <style id="comment"                 _name="Comment"                 map-to="def:comment"/>
+        <style id="doctype"                 _name="DOCTYPE"                 map-to="def:preprocessor"/>
+        <style id="cdata-delim"             _name="CDATA Delimiters"        map-to="def:preprocessor"/>
+        <style id="processing-instruction"  _name="Processing Instruction"  map-to="def:preprocessor"/>
+        <style id="attribute-name"          _name="Attribute Name"/> <!--map-to="def:others3"-->
+        <style id="attribute-value"         _name="Attribute Value"         map-to="def:string"/>
+        <style id="entity"                  _name="Entity"                  map-to="def:escape"/>
+        <style id="tags"                    _name="Tag"/> <!--map-to="def:others2"-->
+        <style id="namespace"               _name="Namespace"/> <!--map-to="def:others"-->
+        <style id="error"                   _name="Error"                   map-to="def:error"/>
     </styles>
 
     <definitions>
@@ -149,4 +139,7 @@
             </include>
         </context>
     </definitions>
+
+    <brackets>&lt;&gt;</brackets>
+    <block-comment start="&lt;!--" end="-->"/>
 </language>

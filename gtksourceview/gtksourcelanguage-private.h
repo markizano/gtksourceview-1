@@ -30,24 +30,25 @@ G_BEGIN_DECLS
 struct _GtkSourceLanguagePrivate
 {
 	gchar			*lang_file_name;
-	/* this is allocated by libxml, it should be freed using xmlFree() */
 	gchar                   *translation_domain;
 
-	/* this is allocated by libxml, it should be freed using xmlFree() */
 	gchar			*id;
-
-	/* this is allocated by libxml, it should be freed using xmlFree() */
 	gchar			*name;
-	/* this is allocated by libxml, it should be freed using xmlFree() */
 	gchar			*section;
 
 	/* maps style names to default styles (e.g. "comment" to "def:comment") */
 	GHashTable		*styles;
 
 	gint                     version;
+	gboolean		 hidden;
 
 	GSList			*mime_types;
 	GSList			*globs;
+
+	gchar			*brackets;
+	gchar			*line_comment;
+	gchar			*block_comment_start;
+	gchar			*block_comment_end;
 
 	GtkSourceLanguagesManager *languages_manager;
 };

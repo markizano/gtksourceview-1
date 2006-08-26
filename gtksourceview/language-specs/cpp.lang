@@ -3,19 +3,14 @@
           mimetypes="text/x-c++;text/x-cpp;text/x-c-header;text/x-c++src;text/x-c++hdr"
           globs="*.cc;*.hh;*.cpp;*.hpp;*.cxx;*.hxx;*.C">
     <styles>
-        <style id="keyword"           _name="Keyword"
-                                      map-to="c:keyword"/>
-        <style id="data-type"         _name="Data Type"
-                                      map-to="c:data-type"/>
-        <style id="preprocessor"      _name="Preprocessor"
-                                      map-to="c:preprocessor"/>
+        <style id="common-defines"  _name="Common defines"  map-to="c:common-defines"/>
     </styles>
 
     <definitions>
         <context id="cpp">
             <include>
 
-                <context id="keywords" style-ref="keyword">
+                <context id="keywords" style-ref="c:keyword">
                     <keyword>and</keyword>
                     <keyword>and_eq</keyword>
                     <keyword>bitand</keyword>
@@ -48,7 +43,7 @@
                     <keyword>xor_eq</keyword>
                 </context>
 
-                <context id="types" style-ref="data-type">
+                <context id="types" style-ref="c:data-type">
                     <keyword>bool</keyword>
                     <keyword>class</keyword>
                     <keyword>explicit</keyword>
@@ -62,7 +57,7 @@
                     <keyword>wchar_t</keyword>
                 </context>
 
-                <context id="common-defines" style-ref="preprocessor">
+                <context id="common-defines" style-ref="common-defines">
                     <keyword>__STDC__</keyword>
                     <keyword>__cplusplus</keyword>
                 </context>
@@ -72,4 +67,8 @@
             </include>
         </context>
     </definitions>
+
+    <brackets>(){}[]</brackets>
+    <line-comment start="//"/>
+    <block-comment start="/*" end="*/"/>
 </language>

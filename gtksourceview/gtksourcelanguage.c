@@ -36,6 +36,7 @@
 #include "gtksourcelanguage.h"
 #include "gtksourceview-marshal.h"
 
+#define DEFAULT_SECTION _("Others")
 
 G_DEFINE_TYPE (GtkSourceLanguage, gtk_source_language, G_TYPE_OBJECT)
 
@@ -76,10 +77,9 @@ _gtk_source_language_new_from_file (const gchar			*filename,
 				    GtkSourceLanguagesManager	*lm)
 {
 	GtkSourceLanguage *lang = NULL;
-
 	xmlTextReaderPtr reader = NULL;
 	gint ret;
-	int fd;
+	gint fd;
 
 	g_return_val_if_fail (filename != NULL, NULL);
 	g_return_val_if_fail (lm != NULL, NULL);
@@ -105,18 +105,15 @@ _gtk_source_language_new_from_file (const gchar			*filename,
 
 				if (xmlStrcmp (name, BAD_CAST "language") == 0)
 				{
-
 					lang = process_language_node (reader, filename);
-
 					ret = 0;
 				}
 
 				xmlFree (name);
 			}
 
-			if (ret != 0)
+			if (ret == 1)
 				ret = xmlTextReaderRead (reader);
-
 		}
 
 		xmlFreeTextReader (reader);
@@ -163,17 +160,19 @@ gtk_source_language_finalize (GObject *object)
 	if (lang->priv != NULL)
 	{
 		g_free (lang->priv->lang_file_name);
-
-		xmlFree (lang->priv->translation_domain);
-		xmlFree (lang->priv->name);
-		xmlFree (lang->priv->section);
-		xmlFree (lang->priv->id);
-
+		g_free (lang->priv->translation_domain);
+		g_free (lang->priv->name);
+		g_free (lang->priv->section);
+		g_free (lang->priv->id);
 		slist_deep_free (lang->priv->mime_types);
 		slist_deep_free (lang->priv->globs);
 		g_hash_table_destroy (lang->priv->styles);
-
+		g_free (lang->priv->line_comment);
+		g_free (lang->priv->block_comment_start);
+		g_free (lang->priv->block_comment_end);
+		g_free (lang->priv->brackets);
 		g_free (lang->priv);
+		lang->priv = NULL;
 	}
 
 	G_OBJECT_CLASS (gtk_source_language_parent_class)->finalize (object);
@@ -192,19 +191,145 @@ parse_mime_types_or_globs (xmlTextReaderPtr reader,
 	if (attr == NULL)
 		return NULL;
 
-	mtl = g_strsplit ((gchar*) attr, ";", 0);
+	mtl = g_strsplit_set ((gchar*) attr, ";,", 0);
 
 	for (i = 0; mtl[i] != NULL; i++)
-	{
 		/* steal the strings from the array */
 		list = g_slist_prepend (list, mtl[i]);
-
-	}
 
 	g_free (mtl);
 	xmlFree (attr);
 
 	return g_slist_reverse (list);
+}
+
+static gboolean
+string_to_bool (const gchar *string)
+{
+	if (!g_ascii_strcasecmp (string, "yes") ||
+	    !g_ascii_strcasecmp (string, "true") ||
+	    !g_ascii_strcasecmp (string, "1"))
+		return TRUE;
+	else if (!g_ascii_strcasecmp (string, "no") ||
+		 !g_ascii_strcasecmp (string, "false") ||
+		 !g_ascii_strcasecmp (string, "0"))
+		return FALSE;
+	else
+		g_return_val_if_reached (FALSE);
+}
+
+static void
+process_brackets_node (xmlTextReaderPtr   reader,
+		       GtkSourceLanguage *language)
+{
+	xmlNode *node;
+
+	node = xmlTextReaderCurrentNode (reader);
+	g_return_if_fail (node != NULL);
+	g_return_if_fail (node->children != NULL);
+
+	language->priv->brackets = g_strdup ((gchar*) node->children->content);
+}
+
+static gboolean
+get_attribute (xmlTextReaderPtr   reader,
+	       const gchar       *element,
+	       const gchar       *attribute,
+	       gchar            **dest)
+{
+	xmlChar *tmp = xmlTextReaderGetAttribute (reader, BAD_CAST attribute);
+
+	if (!tmp)
+	{
+		g_warning ("missing %s attribute in %s element",
+			   attribute, element);
+		return FALSE;
+	}
+	else
+	{
+		*dest = g_strdup ((gchar*) tmp);
+		xmlFree (tmp);
+		return TRUE;
+	}
+}
+
+static void
+process_brackets_and_comments (xmlTextReaderPtr   reader,
+			       GtkSourceLanguage *language)
+{
+	gint ret;
+	gboolean brackets_done = FALSE;
+	gboolean line_comment_done = FALSE;
+	gboolean block_comment_done = FALSE;
+
+	ret = xmlTextReaderRead (reader);
+
+	while (ret == 1)
+	{
+		if (xmlTextReaderNodeType (reader) == 1)
+		{
+			xmlChar *name;
+
+			name = xmlTextReaderName (reader);
+
+			if (!xmlStrcmp (name, BAD_CAST "brackets"))
+			{
+				if (brackets_done)
+				{
+					g_warning ("duplicated %s element", name);
+					ret = 0;
+				}
+				else
+				{
+					process_brackets_node (reader, language);
+					brackets_done = TRUE;
+				}
+			}
+			else if (!xmlStrcmp (name, BAD_CAST "line-comment"))
+			{
+				if (line_comment_done)
+				{
+					g_warning ("duplicated %s element", name);
+					ret = 0;
+				}
+				else
+				{
+					if (!get_attribute (reader, "line-comment", "start",
+							    &language->priv->line_comment))
+						ret = 0;
+					else
+						line_comment_done = TRUE;
+				}
+			}
+			else if (!xmlStrcmp (name, BAD_CAST "block-comment"))
+			{
+				if (block_comment_done)
+				{
+					g_warning ("duplicated %s element", name);
+					ret = 0;
+				}
+				else
+				{
+					if (!get_attribute (reader, "block-comment", "start",
+							    &language->priv->block_comment_start))
+						ret = 0;
+					else if (!get_attribute (reader, "block-comment", "end",
+								 &language->priv->block_comment_end))
+						ret = 0;
+					else
+						block_comment_done = TRUE;
+				}
+			}
+
+			if (brackets_done && line_comment_done && block_comment_done)
+				ret = 0;
+
+			xmlFree (name);
+		}
+
+		if (ret == 1)
+			ret = xmlTextReaderRead (reader);
+	}
 }
 
 static GtkSourceLanguage *
@@ -219,113 +344,106 @@ process_language_node (xmlTextReaderPtr reader, const gchar *filename)
 
 	lang->priv->lang_file_name = g_strdup (filename);
 
-	lang->priv->translation_domain =
-		(gchar*) xmlTextReaderGetAttribute (reader,
-						   BAD_CAST "translation-domain");
-	if (lang->priv->translation_domain == NULL)
-	{
-		/* if the attribute "translation-domain" exists then
-		 * lang->priv->translation_domain is a xmlChar so it must always
-		 * be a xmlChar, this is why xmlStrdup() is used instead of
-		 * g_strdup() */
-		lang->priv->translation_domain = (gchar*) xmlStrdup (BAD_CAST GETTEXT_PACKAGE);
-	}
+	tmp = xmlTextReaderGetAttribute (reader, BAD_CAST "translation-domain");
+	if (tmp != NULL)
+		lang->priv->translation_domain = g_strdup ((gchar*) tmp);
+	else
+		lang->priv->translation_domain = g_strdup (GETTEXT_PACKAGE);
+	xmlFree (tmp);
+
+	tmp = xmlTextReaderGetAttribute (reader, BAD_CAST "hidden");
+	if (tmp != NULL)
+		lang->priv->hidden = string_to_bool ((gchar*) tmp);
+	else
+		lang->priv->hidden = FALSE;
+	xmlFree (tmp);
 
 	tmp = xmlTextReaderGetAttribute (reader, BAD_CAST "_name");
 	if (tmp == NULL)
 	{
-		lang->priv->name = (gchar*) xmlTextReaderGetAttribute (reader,
-								       BAD_CAST "name");
-		untranslated_name = xmlStrdup (BAD_CAST lang->priv->name);
-		if (lang->priv->name == NULL)
+		tmp = xmlTextReaderGetAttribute (reader, BAD_CAST "name");
+
+		if (tmp == NULL)
 		{
 			g_warning ("Impossible to get language name from file '%s'",
 				   filename);
-
 			g_object_unref (lang);
 			return NULL;
 		}
+
+		lang->priv->name = g_strdup ((char*) tmp);
+		untranslated_name = tmp;
 	}
 	else
 	{
+		lang->priv->name = g_strdup (dgettext (lang->priv->translation_domain, (gchar*) tmp));
 		untranslated_name = tmp;
-		/* if tmp is NULL then lang->priv->name is a xmlChar so it must
-		 * always be a xmlChar, this is why xmlStrdup() is used instead
-		 * of g_strdup() */
-		lang->priv->name = (gchar*) xmlStrdup (BAD_CAST dgettext (lang->priv->translation_domain,
-									  (gchar*) tmp));
 	}
 
 	tmp = xmlTextReaderGetAttribute (reader, BAD_CAST "id");
 	if (tmp != NULL)
 	{
-		lang->priv->id = (gchar*) tmp;
-		xmlFree (untranslated_name);
+		lang->priv->id = g_ascii_strdown ((gchar*) tmp, -1);
 	}
 	else
 	{
-		lang->priv->id = (gchar*) untranslated_name;
+		lang->priv->id = g_ascii_strdown ((gchar*) untranslated_name, -1);
 	}
+	xmlFree (tmp);
+	xmlFree (untranslated_name);
 
 	tmp = xmlTextReaderGetAttribute (reader, BAD_CAST "_section");
 	if (tmp == NULL)
 	{
-		/* FIXME put langs without section into Others or something */
-		lang->priv->section = (gchar*) xmlTextReaderGetAttribute (reader, BAD_CAST "section");
-		if (lang->priv->section == NULL)
-		{
-			g_warning ("Impossible to get language section from file '%s'",
-				   filename);
+		tmp = xmlTextReaderGetAttribute (reader, BAD_CAST "section");
 
-			g_object_unref (lang);
-			return NULL;
-		}
+		if (tmp == NULL)
+			lang->priv->section = g_strdup (DEFAULT_SECTION);
+		else
+			lang->priv->section = g_strdup ((char*) tmp);
+
+		xmlFree (tmp);
 	}
 	else
 	{
-		/* if tmp is NULL then lang->priv->section is a xmlChar so it
-		 * must always be a xmlChar, this is why xmlStrdup() is used
-		 * instead of g_strdup() */
-		lang->priv->section = (gchar*) xmlStrdup (BAD_CAST dgettext (lang->priv->translation_domain,
-									     (gchar*) tmp));
+		lang->priv->section = g_strdup (dgettext (lang->priv->translation_domain, (gchar*) tmp));
 		xmlFree (tmp);
 	}
 
 	version = xmlTextReaderGetAttribute (reader, BAD_CAST "version");
+
 	if (version == NULL)
 	{
 		g_warning ("Impossible to get version number from file '%s'",
 			   filename);
-
 		g_object_unref (lang);
 		return NULL;
 	}
+
+	if (xmlStrcmp (version , BAD_CAST "1.0") == 0)
+	{
+		lang->priv->version = GTK_SOURCE_LANGUAGE_VERSION_1_0;
+	}
+	else if (xmlStrcmp (version, BAD_CAST "2.0") == 0)
+	{
+		lang->priv->version = GTK_SOURCE_LANGUAGE_VERSION_2_0;
+	}
 	else
 	{
-		if (xmlStrcmp (version , BAD_CAST "1.0") == 0)
-		{
-			lang->priv->version = GTK_SOURCE_LANGUAGE_VERSION_1_0;
-		}
-		else if (xmlStrcmp (version, BAD_CAST "2.0") == 0)
-		{
-			lang->priv->version = GTK_SOURCE_LANGUAGE_VERSION_2_0;
-		}
-		else
-		{
-			g_warning ("Usupported language spec version '%s' in file '%s'",
-				   (gchar*) version, filename);
-
-			xmlFree (version);
-
-			g_object_unref (lang);
-			return NULL;
-		}
-
+		g_warning ("Usupported language spec version '%s' in file '%s'",
+			   (gchar*) version, filename);
 		xmlFree (version);
+		g_object_unref (lang);
+		return NULL;
 	}
+
+	xmlFree (version);
 
 	lang->priv->mime_types = parse_mime_types_or_globs (reader, "mimetypes");
 	lang->priv->globs = parse_mime_types_or_globs (reader, "globs");
+
+	if (lang->priv->version == GTK_SOURCE_LANGUAGE_VERSION_2_0)
+		process_brackets_and_comments (reader, lang);
 
 	return lang;
 }
@@ -442,90 +560,6 @@ _gtk_source_language_get_languages_manager (GtkSourceLanguage *language)
 	return language->priv->languages_manager;
 }
 
-// static GSList *
-// get_mime_types_or_extensions_from_file (GtkSourceLanguage *language,
-// 					const char        *what)
-// {
-// 	xmlTextReaderPtr reader = NULL;
-// 	gint ret;
-// 	GSList *list = NULL;
-// 	int fd;
-//
-// 	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
-// 	g_return_val_if_fail (language->priv->lang_file_name != NULL, NULL);
-//
-// 	/*
-// 	 * Use fd instead of filename so that it's utf8 safe on w32.
-// 	 */
-// 	fd = g_open (language->priv->lang_file_name, O_RDONLY, 0);
-// 	if (fd != -1)
-// 		reader = xmlReaderForFd (fd, language->priv->lang_file_name, NULL, 0);
-//
-// 	if (reader != NULL)
-// 	{
-//         	ret = xmlTextReaderRead (reader);
-//
-//         	while (ret == 1)
-// 		{
-// 			if (xmlTextReaderNodeType (reader) == 1)
-// 			{
-// 				xmlChar *name;
-//
-// 				name = xmlTextReaderName (reader);
-//
-// 				if (xmlStrcmp (name, BAD_CAST "language") == 0)
-// 				{
-// 					gchar *attr;
-//
-// 					attr = (gchar*) xmlTextReaderGetAttribute (reader,
-// 										   BAD_CAST what);
-// 					ret = 0;
-//
-// 					if (attr != NULL)
-// 					{
-// 						gchar **mtl;
-// 						gint i;
-//
-// 						mtl = g_strsplit (attr, ";", 0);
-//
-// 						for (i = 0; mtl[i] != NULL; i++)
-// 						{
-// 							/* steal the strings from the array */
-// 							list = g_slist_prepend (list, mtl[i]);
-// 						}
-//
-// 						g_free (mtl);
-// 						xmlFree (attr);
-//
-// 						ret = 0;
-// 					}
-// 				}
-//
-// 				xmlFree (name);
-// 			}
-//
-// 			if (ret != 0)
-// 				ret = xmlTextReaderRead (reader);
-// 		}
-//
-// 		xmlFreeTextReader (reader);
-// 		close (fd);
-//
-// 		if (ret != 0)
-// 		{
-// 	            g_warning("Failed to parse '%s'", language->priv->lang_file_name);
-// 		    return NULL;
-// 		}
-//         }
-// 	else
-// 	{
-// 		g_warning("Unable to open '%s'", language->priv->lang_file_name);
-//
-//     	}
-//
-// 	return list;
-// }
-
 /* Highlighting engine creation ------------------------------------------ */
 
 void
@@ -545,9 +579,6 @@ _gtk_source_language_define_language_styles (GtkSourceLanguage *lang)
 	ADD_ALIAS ("String", "def:string");
 	ADD_ALIAS ("Specials", "def:specials");
 	ADD_ALIAS ("Data Type", "def:data-type");
-	ADD_ALIAS ("Others", "def:others");
-	ADD_ALIAS ("Others 2", "def:others2");
-	ADD_ALIAS ("Others 3", "def:others3");
 
 #undef ADD_ALIAS
 }

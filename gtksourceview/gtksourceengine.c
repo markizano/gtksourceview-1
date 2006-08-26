@@ -38,7 +38,7 @@ _gtk_source_engine_class_init (GtkSourceEngineClass *klass)
 
 
 static void
-_gtk_source_engine_init (GtkSourceEngine *engine)
+_gtk_source_engine_init (G_GNUC_UNUSED GtkSourceEngine *engine)
 {
 }
 
