@@ -1,5 +1,15 @@
 2006-08-26  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/language-specs/check.sh: new file, script for validating
+	lang files.
+	* gtksourceview/language-specs/styles.rng: new file, RNG schema for style scheme
+	files.
+	* gtksourceview/language-specs/yacc.lang: new file, Yacc lang file.
+	* gtksourceview/language-specs/Makefile.am: added those files; removed
+	"schemas" directory, install everything into language-specs dir.
+
+2006-08-26  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcelanguage-parser-2.c: fixed crash
 	in create_definition(), added more checks for GError**
 	arguments here and there.

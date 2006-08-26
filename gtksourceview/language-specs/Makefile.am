@@ -1,8 +1,6 @@
 RNG =				\
-	language2.rng
-
-SCHEMAS = 			\
-	language.dtd
+	language2.rng		\
+	styles.rng
 
 LANGUAGES =			\
 	def.lang		\
@@ -43,12 +41,9 @@ LANGUAGES =			\
 	vbnet.lang		\
 	verilog.lang		\
 	vhdl.lang		\
-	xml.lang
-
-EXTRA_DIST = $(SCHEMAS) $(LANGUAGES) $(RNG)
+	xml.lang		\
+	yacc.lang
 
 languagesdir = $(datadir)/gtksourceview-2.0/language-specs
-languages_DATA = $(LANGUAGES) $(RNG)
-
-schemasdir = $(datadir)/gtksourceview-2.0/schemas
-schemas_DATA = $(SCHEMAS)
+languages_DATA = $(LANGUAGES) $(RNG) check.sh language.dtd
+EXTRA_DIST = $(languages_DATA)
