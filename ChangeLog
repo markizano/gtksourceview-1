@@ -1,5 +1,19 @@
 2006-08-26  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/language-specs/convert.py, 
+	gtksourceview/language-specs/convert.sh: a script to convert old lang files
+	to the new format.
+	* gtksourceview/language-specs/c.lang: 'typedef' is a keyword, not a type.
+	* gtksourceview/language-specs/def.lang: added 'shebang' rule.
+	* gtksourceview/language-specs/gvim.styles: added 'def:shebang' style.
+	* gtksourceview/language-specs/language2.rng: added 'first-line-only' attribute.
+	* gtksourceview/gtksourcecontextengine.[ch],
+	gtksourceview/gtksourcelanguage-parser-*.c: introduced GtkSourceContextMatchOptions
+	which are passed to _gtk_source_context_engine_define_context(), added 
+	first-line-only attribute for contexts.
+
+2006-08-26  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/language-specs/check.sh: new file, script for validating
 	lang files.
 	* gtksourceview/language-specs/styles.rng: new file, RNG schema for style scheme
