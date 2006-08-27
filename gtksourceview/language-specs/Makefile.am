@@ -1,7 +1,3 @@
-RNG =				\
-	language2.rng		\
-	styles.rng
-
 LANGUAGES =			\
 	def.lang		\
 	ada.lang		\
@@ -44,6 +40,13 @@ LANGUAGES =			\
 	xml.lang		\
 	yacc.lang
 
+STYLES =			\
+	gvim.styles
+
 languagesdir = $(datadir)/gtksourceview-2.0/language-specs
-languages_DATA = $(LANGUAGES) $(RNG) check.sh language.dtd
-EXTRA_DIST = $(languages_DATA)
+languages_DATA = $(LANGUAGES) language2.rng check.sh convert.py language.dtd
+
+stylesdir = $(datadir)/gtksourceview-2.0/styles
+styles_DATA = $(STYLES) styles.rng
+
+EXTRA_DIST = $(languages_DATA) $(styles_DATA)

@@ -152,6 +152,7 @@ struct _ContextDefinition
 
 	/* Sub patterns (list of SubPatternDefinition pointers.) */
 	GSList			*sub_patterns;
+	guint			 n_sub_patterns;
 
 	/* Union of every regular expression we can find from this
 	 * context. */
@@ -176,6 +177,9 @@ struct _SubPatternDefinition
 #endif
 	gchar			*style;
 	SubPatternWhere		 where;
+
+	/* index in the ContextDefinition's list */
+	guint			 index;
 
 	union
 	{
@@ -214,7 +218,7 @@ struct _Context
 	Regex			*reg_all;
 
 	GtkTextTag		*tag;
-	GSList			*subpattern_tags;
+	GtkTextTag	       **subpattern_tags;
 
 	guint			 ref_count;
 	guint                    frozen : 1;
@@ -287,8 +291,6 @@ struct _LineInfo
 	/* Character length of line terminator, or 0 if it's the
 	 * last line in buffer. */
 	gint			 eol_length;
-	/* Line number in the buffer */
-	gint			 line_no;
 };
 
 struct _InvalidRegion
@@ -395,7 +397,7 @@ static void		update_syntax		(GtkSourceContextEngine	*ce,
 						 const GtkTextIter	*end,
 						 gint			 time);
 static void		install_idle_worker	(GtkSourceContextEngine	*ce);
-static gboolean		first_update_callback	(GtkSourceContextEngine	*ce);
+static void		install_first_update	(GtkSourceContextEngine	*ce);
 
 
 /* MODIFICATIONS AND STUFF ------------------------------------------------ */
@@ -429,6 +431,9 @@ unhighlight_region (GtkSourceContextEngine *ce,
 		GtkTextBuffer *buffer;
 		const GtkTextIter *start, *end;
 	} data = {ce->priv->buffer, start, end};
+
+	if (gtk_text_iter_equal (start, end))
+		return;
 
 	g_hash_table_foreach (ce->priv->tags, (GHFunc) unhighlight_region_cb, &data);
 }
@@ -579,39 +584,21 @@ get_tag_for_parent (GtkSourceContextEngine *ce,
 static GtkTextTag *
 get_subpattern_tag (GtkSourceContextEngine *ce,
 		    Context                *context,
-		    SubPatternDefinition   *sp_def,
-		    guint                   index)
+		    SubPatternDefinition   *sp_def)
 {
-	GtkTextTag *tag;
-
 	if (!sp_def->style)
 		return NULL;
 
-	if (context->subpattern_tags &&
-	    (tag = g_slist_nth_data (context->subpattern_tags, index)))
-	{
-		return tag;
-	}
-
-	tag = get_tag_for_parent (ce, sp_def->style, context);
-	g_return_val_if_fail (tag != NULL, NULL);
+	g_assert (sp_def->index < context->definition->n_sub_patterns);
 
 	if (!context->subpattern_tags)
-	{
-		guint i, n;
-		n = g_slist_length (context->definition->sub_patterns);
-		for (i = 0; i < n; ++i)
-			context->subpattern_tags =
-				g_slist_prepend (context->subpattern_tags,
-						 i == n - index - 1 ? tag : NULL);
-	}
-	else
-	{
-		GSList *link = g_slist_nth (context->subpattern_tags, index);
-		link->data = tag;
-	}
+		context->subpattern_tags = g_new0 (GtkTextTag*, context->definition->n_sub_patterns);
 
-	return tag;
+	if (!context->subpattern_tags[sp_def->index])
+		context->subpattern_tags[sp_def->index] = get_tag_for_parent (ce, sp_def->style, context);
+
+	g_return_val_if_fail (context->subpattern_tags[sp_def->index] != NULL, NULL);
+	return context->subpattern_tags[sp_def->index];
 }
 
 static GtkTextTag *
@@ -661,7 +648,7 @@ apply_tags (GtkSourceContextEngine *ce,
 	{
 		if (sp->start_at >= start_offset && sp->end_at <= end_offset)
 		{
-			tag = get_subpattern_tag (ce, segment->context, sp->definition, i);
+			tag = get_subpattern_tag (ce, segment->context, sp->definition);
 			gtk_text_buffer_get_iter_at_offset (ce->priv->buffer, &start_iter,
 							    MAX (start_offset, sp->start_at));
 			gtk_text_buffer_get_iter_at_offset (ce->priv->buffer, &end_iter,
@@ -791,7 +778,8 @@ refresh_range (GtkSourceContextEngine *ce,
 {
 	GtkTextIter real_end;
 
-	g_return_if_fail (!gtk_text_iter_equal (start, end));
+	if (gtk_text_iter_equal (start, end))
+		return;
 
 	if (modify_refresh_region)
 		gtk_text_region_add (ce->priv->refresh_region, start, end);
@@ -1233,19 +1221,7 @@ invalidate_region (GtkSourceContextEngine *ce,
 
 	CHECK_TREE (ce);
 
-	if (!ce->priv->first_update)
-	{
-		if (ce->priv->incremental_update)
-		{
-			g_source_remove (ce->priv->incremental_update);
-			ce->priv->incremental_update = 0;
-		}
-
-		ce->priv->first_update =
-			g_idle_add_full (FIRST_UPDATE_PRIORITY,
-					 (GSourceFunc) first_update_callback,
-					 ce, NULL);
-	}
+	install_first_update (ce);
 
 	return TRUE;
 }
@@ -1643,8 +1619,19 @@ gtk_source_context_engine_update_highlight (GtkSourceEngine   *engine,
 	}
 	else
 	{
-		gtk_text_region_add (ce->priv->highlight_requests, start, end);
-		install_idle_worker (ce);
+		if (gtk_text_iter_get_line (start) >= invalid_line)
+		{
+			gtk_text_region_add (ce->priv->highlight_requests, start, end);
+		}
+		else
+		{
+			GtkTextIter valid_end = *start;
+			gtk_text_iter_set_line (&valid_end, invalid_line);
+			ensure_highlighted (ce, start, &valid_end);
+			gtk_text_region_add (ce->priv->highlight_requests, &valid_end, end);
+		}
+
+		install_first_update (ce);
 	}
 }
 
@@ -1744,6 +1731,23 @@ install_idle_worker (GtkSourceContextEngine *ce)
 					 (GSourceFunc) idle_worker, ce, NULL);
 }
 
+static void
+install_first_update (GtkSourceContextEngine *ce)
+{
+	if (!ce->priv->first_update)
+	{
+		if (ce->priv->incremental_update)
+		{
+			g_source_remove (ce->priv->incremental_update);
+			ce->priv->incremental_update = 0;
+		}
+
+		ce->priv->first_update =
+			g_idle_add_full (FIRST_UPDATE_PRIORITY,
+					 (GSourceFunc) first_update_callback,
+					 ce, NULL);
+	}
+}
 
 /* GtkSourceContextEngine class ------------------------------------------- */
 
@@ -1886,7 +1890,7 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 		g_signal_connect_swapped (buffer, "notify::highlight",
 					  G_CALLBACK (buffer_notify_highlight_cb), ce);
 
-		install_idle_worker (ce);
+		install_first_update (ce);
 	}
 }
 
@@ -2112,9 +2116,7 @@ sub_pattern_to_int (const gchar *name)
 	errno = 0;
 	number = g_ascii_strtoull (name, &end_name, 10);
 
-	if (errno || number > G_MAXINT || *end_name)
-		return -1;
-
+	g_return_val_if_fail (!errno && number < G_MAXINT && !*end_name, -1);
 	return number;
 }
 
@@ -2740,7 +2742,7 @@ context_unref (Context *context)
 
 	regex_unref (context->end);
 	regex_unref (context->reg_all);
-	g_slist_free (context->subpattern_tags); /* XXX */
+	g_free (context->subpattern_tags);
 	g_free (context);
 }
 
@@ -3438,7 +3440,7 @@ next_segment (GtkSourceContextEngine  *ce,
 			if (!child_def->extend_parent && context_end_found)
 				try_this = FALSE;
 
-			if (child_def->first_line_only && line->line_no == 0)
+			if (child_def->first_line_only && line->start_at != 0)
 				try_this = FALSE;
 
 			if (try_this)
@@ -3621,7 +3623,6 @@ get_line_info (GtkTextBuffer     *buffer,
 
 	line->text = gtk_text_buffer_get_slice (buffer, line_start, line_end, TRUE);
 	line->start_at = gtk_text_iter_get_offset (line_start);
-	line->line_no = gtk_text_iter_get_line (line_start);
 
 	if (!gtk_text_iter_starts_line (line_end))
 	{
@@ -4685,6 +4686,7 @@ context_definition_new (const gchar        *id,
 	definition->first_line_only = (options & GTK_SOURCE_CONTEXT_FIRST_LINE_ONLY) != 0;
 	definition->children = NULL;
 	definition->sub_patterns = NULL;
+	definition->n_sub_patterns = 0;
 
 	/* Main contexts (i.e. the contexts with id "language:language")
 	 * should have extend-parent="true" and end-at-line-end="false". */
@@ -4973,7 +4975,8 @@ _gtk_source_context_engine_add_sub_pattern (GtkSourceContextEngine  *ce,
 		sp_def->u.num = number;
 	}
 
-	parent->sub_patterns = g_slist_prepend (parent->sub_patterns, sp_def);
+	parent->sub_patterns = g_slist_append (parent->sub_patterns, sp_def);
+	sp_def->index = parent->n_sub_patterns++;
 
 	return TRUE;
 }

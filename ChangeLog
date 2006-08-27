@@ -1,5 +1,21 @@
 2006-08-27  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/language-specs/Makefile.am: install style scheme into
+	$prefix/gtksourceview-2.0/styles dir.
+	* gtksourceview/gtksourcecontextengine.c: fixed subpatterns handling
+	(subpatterns tags were applied randomly); 
+	made high-priority one-time idle called more often, which hopefully
+	make it look nicer;
+	(gtk_source_context_engine_update_highlight): highlight as much as possible
+	even if some part of requested area is not analyzed yet.
+	* gtksourceview/gtksourcelanguage-parser-2.c: fixed two leaks.
+	* gtksourceview/gtksourcelanguagesmanager.c, 
+	gtksourceview/gtksourcestylescheme.h, 
+	gtksourceview/gtksourceview.c: _gtk_source_style_scheme_get_default() -
+	temporary workaround for no-builtin-scheme thing.
+
+2006-08-27  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/language-specs/c.lang: moved 'struct' and 'enum' from
 	types to keywords; match floats before decimals since first match always
 	wins.

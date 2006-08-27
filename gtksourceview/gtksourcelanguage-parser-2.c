@@ -561,6 +561,7 @@ add_ref (ParserState *parser_state, gchar *ref, GError **error)
 			}
 		}
 		ref_id = g_strdup (ref);
+		g_free (lang_id);
 	}
 	else
 	{
@@ -678,15 +679,21 @@ handle_context_element (ParserState *parser_state,
 	}
 	else
 	{
+		char *freeme = NULL;
+
 		tmp = xmlTextReaderGetAttribute (parser_state->reader, BAD_CAST "id");
 		if (tmp == NULL)
-			tmp = xmlStrdup (BAD_CAST generate_new_id (parser_state));
+		{
+			freeme = generate_new_id (parser_state);
+			tmp = xmlStrdup (BAD_CAST freeme);
+		}
 
-		if (id_is_decorated ((gchar *)tmp, NULL))
-			id = g_strdup ((gchar *)tmp);
+		if (id_is_decorated ((gchar*) tmp, NULL))
+			id = g_strdup ((gchar*) tmp);
 		else
-			id = decorate_id (parser_state, (gchar *)tmp);
+			id = decorate_id (parser_state, (gchar*) tmp);
 
+		g_free (freeme);
 		xmlFree (tmp);
 
 		if (parser_state->engine != NULL)

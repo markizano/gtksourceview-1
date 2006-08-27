@@ -650,6 +650,17 @@ gtk_source_view_constructor (GType                  type,
 									    construct_param);
 	view = GTK_SOURCE_VIEW (object);
 
+	if (!view->priv->style_scheme)
+	{
+		GtkSourceStyleScheme *scheme = _gtk_source_style_scheme_get_default ();
+
+		if (scheme)
+		{
+			gtk_source_view_set_style_scheme (view, scheme);
+			g_object_unref (scheme);
+		}
+	}
+
 	set_source_buffer (view, gtk_text_view_get_buffer (GTK_TEXT_VIEW (view)));
 
 	return object;
@@ -701,6 +712,17 @@ highlight_updated_cb (GtkSourceBuffer *buffer,
 	updated_rect.x = visible_rect.x;
 	updated_rect.width = visible_rect.width;
 
+	DEBUG ({
+		g_print ("> highlight_updated start\n");
+		g_print ("    lines udpated: %d - %d\n",
+			 gtk_text_iter_get_line (start),
+			 gtk_text_iter_get_line (end));
+		g_print ("    visible area: %d - %d\n",
+			 visible_rect.y, visible_rect.y + visible_rect.height);
+		g_print ("    updated area: %d - %d\n",
+			 updated_rect.y, updated_rect.y + updated_rect.height);
+	});
+
 	/* intersect both rectangles to see whether we need to queue a redraw */
 	if (gdk_rectangle_intersect (&updated_rect, &visible_rect, &redraw_rect))
 	{
@@ -716,12 +738,21 @@ highlight_updated_cb (GtkSourceBuffer *buffer,
 		widget_rect.width = redraw_rect.width;
 		widget_rect.height = redraw_rect.height;
 
+		DEBUG ({
+			g_print ("    invalidating: %d - %d\n",
+				 widget_rect.y, widget_rect.y + widget_rect.height);
+		});
+
 		gtk_widget_queue_draw_area (GTK_WIDGET (text_view),
 					    widget_rect.x,
 					    widget_rect.y,
 					    widget_rect.width,
 					    widget_rect.height);
 	}
+
+	DEBUG ({
+		g_print ("> highlight_updated end\n");
+	});
 }
 
 static void
@@ -1361,6 +1392,10 @@ gtk_source_view_expose (GtkWidget      *widget,
 	GtkTextView *text_view;
 	gboolean event_handled;
 
+	DEBUG ({
+		g_print ("> gtk_source_view_expose start\n");
+	});
+
 	view = GTK_SOURCE_VIEW (widget);
 	text_view = GTK_TEXT_VIEW (widget);
 
@@ -1382,6 +1417,14 @@ gtk_source_view_expose (GtkWidget      *widget,
 					     visible_rect.y
 					     + visible_rect.height, NULL);
 		gtk_text_iter_forward_line (&iter2);
+
+		DEBUG ({
+			g_print ("    exposed area: %d - %d\n", visible_rect.y,
+				 visible_rect.y + visible_rect.height);
+			g_print ("    lines to update: %d - %d\n",
+				 gtk_text_iter_get_line (&iter1),
+				 gtk_text_iter_get_line (&iter2));
+		});
 
 		/* FIXME: is "It generates new expose event" part true? */
 		/* Sometimes, until lines in GtkTextView are calculated, get_visible_rect
@@ -1590,6 +1633,10 @@ gtk_source_view_expose (GtkWidget      *widget,
 			});
 		}
 	}
+
+	DEBUG ({
+		g_print ("> gtk_source_view_expose end\n");
+	});
 
 	return event_handled;
 }
