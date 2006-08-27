@@ -1,3 +1,16 @@
+2006-08-27  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/language-specs/c.lang: moved 'struct' and 'enum' from
+	types to keywords; match floats before decimals since first match always
+	wins.
+	* gtksourceview/language-specs/javascript.lang: same thing for floats
+	and decimals.
+	* gtksourceview/gtksourcecontextengine.c: after buffer changed install
+	one-time idle with high priority which hopefully updates everything,
+	to make it look nice when editing.
+	* gtksourceview/gtksourcebuffer.c: removed 'debug' signal.
+	* tests/test-widget.c: do not set font size.
+
 2006-08-26  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/language-specs/convert.py, 

@@ -853,7 +853,7 @@ create_view_window (GtkSourceBuffer *buffer, GtkSourceView *from)
 	gtk_box_pack_start (GTK_BOX (vbox), pos_label, FALSE, FALSE, 0);
 
 	/* setup view */
-	font_desc = pango_font_description_from_string ("monospace 10");
+	font_desc = pango_font_description_from_string ("monospace");
 	if (font_desc != NULL)
 	{
 		gtk_widget_modify_font (view, font_desc);

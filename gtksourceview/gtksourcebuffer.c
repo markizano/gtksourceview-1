@@ -65,7 +65,6 @@ enum {
 	CAN_REDO,
 	HIGHLIGHT_UPDATED,
 	MARKER_UPDATED,
-	DEBUG,
 	LAST_SIGNAL
 };
 
@@ -244,15 +243,6 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 			  G_TYPE_NONE,
 			  1,
 			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE);
-
-	buffer_signals[DEBUG] =
-	    g_signal_new ("debug",
-			  G_OBJECT_CLASS_TYPE (object_class),
-			  G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION,
-			  G_STRUCT_OFFSET (GtkSourceBufferClass, debug),
-			  NULL, NULL,
-			  _gtksourceview_marshal_VOID__VOID,
-			  G_TYPE_NONE, 0);
 }
 
 static void

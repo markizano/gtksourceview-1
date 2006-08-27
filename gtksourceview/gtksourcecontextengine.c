@@ -56,8 +56,11 @@
 /* Regex used to match "\%{...@start}". */
 #define START_REF_REGEX "(?<!\\\\)(\\\\\\\\)*\\\\%\\{(.*?)@start\\}"
 
+#define FIRST_UPDATE_PRIORITY		G_PRIORITY_HIGH_IDLE
+#define INCREMENTAL_UPDATE_PRIORITY	GTK_TEXT_VIEW_PRIORITY_VALIDATE
 /* In milliseconds. */
-#define WORKER_TIME_SLICE	30
+#define FIRST_UPDATE_TIME_SLICE		10
+#define INCREMENTAL_UPDATE_TIME_SLICE	30
 
 #define GTK_SOURCE_CONTEXT_ENGINE_ERROR (gtk_source_context_engine_error_quark ())
 
@@ -326,7 +329,8 @@ struct _GtkSourceContextEnginePrivate
 	GSList			*invalid;
 	InvalidRegion		 invalid_region;
 
-	guint			 worker_handler;
+	guint			 first_update;
+	guint			 incremental_update;
 
 	/* Views highlight requests. */
 	GtkTextRegion		*highlight_requests;
@@ -391,6 +395,7 @@ static void		update_syntax		(GtkSourceContextEngine	*ce,
 						 const GtkTextIter	*end,
 						 gint			 time);
 static void		install_idle_worker	(GtkSourceContextEngine	*ce);
+static gboolean		first_update_callback	(GtkSourceContextEngine	*ce);
 
 
 /* MODIFICATIONS AND STUFF ------------------------------------------------ */
@@ -1228,7 +1233,19 @@ invalidate_region (GtkSourceContextEngine *ce,
 
 	CHECK_TREE (ce);
 
-	install_idle_worker (ce);
+	if (!ce->priv->first_update)
+	{
+		if (ce->priv->incremental_update)
+		{
+			g_source_remove (ce->priv->incremental_update);
+			ce->priv->incremental_update = 0;
+		}
+
+		ce->priv->first_update =
+			g_idle_add_full (FIRST_UPDATE_PRIORITY,
+					 (GSourceFunc) first_update_callback,
+					 ce, NULL);
+	}
 
 	return TRUE;
 }
@@ -1596,10 +1613,10 @@ update_tree (GtkSourceContextEngine *ce)
    start iter of the line it doesn't care about (and vice versa
    in update_syntax) */
 static void
-gtk_source_context_engine_update_highlight (GtkSourceEngine *engine,
-					    const GtkTextIter      *start,
-					    const GtkTextIter      *end,
-					    gboolean                synchronous)
+gtk_source_context_engine_update_highlight (GtkSourceEngine   *engine,
+					    const GtkTextIter *start,
+					    const GtkTextIter *end,
+					    gboolean           synchronous)
 {
 	gint invalid_line;
 	gint end_line;
@@ -1681,26 +1698,33 @@ idle_worker (GtkSourceContextEngine *ce)
 	g_return_val_if_fail (ce->priv->buffer != NULL, FALSE);
 
 	/* analyze batch of text */
-	update_syntax (ce, NULL, WORKER_TIME_SLICE);
+	update_syntax (ce, NULL, INCREMENTAL_UPDATE_TIME_SLICE);
 	CHECK_TREE (ce);
-
-// 	/* XXX */
-// 	if (ce->priv->highlight)
-// 	{
-// 		GtkTextIter start, end;
-// 		gtk_text_region_subtract_region (ce->priv->highlight_requests,
-// 						 ce->priv->refresh_region);
-// 		gtk_text_buffer_get_bounds (ce->priv->buffer, &start, &end);
-// 		ensure_highlighted (ce, &start, &end);
-// 	}
 
 	if (all_analyzed (ce))
 	{
-		ce->priv->worker_handler = 0;
+		ce->priv->incremental_update = 0;
 		return FALSE;
 	}
 
 	return TRUE;
+}
+
+static gboolean
+first_update_callback (GtkSourceContextEngine *ce)
+{
+	g_return_val_if_fail (ce->priv->buffer != NULL, FALSE);
+
+	/* analyze batch of text */
+	update_syntax (ce, NULL, FIRST_UPDATE_TIME_SLICE);
+	CHECK_TREE (ce);
+
+	ce->priv->first_update = 0;
+
+	if (!all_analyzed (ce))
+		install_idle_worker (ce);
+
+	return FALSE;
 }
 
 /**
@@ -1714,15 +1738,10 @@ idle_worker (GtkSourceContextEngine *ce)
 static void
 install_idle_worker (GtkSourceContextEngine *ce)
 {
-	if (!ce->priv->worker_handler)
-	{
-		/* Use the text view validation priority to get
-		 * highlighted text even before complete validation of
-		 * the buffer. */
-		ce->priv->worker_handler =
-			g_idle_add_full (GTK_TEXT_VIEW_PRIORITY_VALIDATE,
+	if (!ce->priv->first_update && !ce->priv->incremental_update)
+		ce->priv->incremental_update =
+			g_idle_add_full (INCREMENTAL_UPDATE_PRIORITY,
 					 (GSourceFunc) idle_worker, ce, NULL);
-	}
 }
 
 
@@ -1792,11 +1811,12 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 						      (gpointer) buffer_notify_highlight_cb,
 						      ce);
 
-		if (ce->priv->worker_handler)
-		{
-			g_source_remove (ce->priv->worker_handler);
-			ce->priv->worker_handler = 0;
-		}
+		if (ce->priv->first_update)
+			g_source_remove (ce->priv->first_update);
+		if (ce->priv->incremental_update)
+			g_source_remove (ce->priv->incremental_update);
+		ce->priv->first_update = 0;
+		ce->priv->incremental_update = 0;
 
 		segment_destroy (ce, ce->priv->root_segment);
 		context_unref (ce->priv->root_context);
@@ -1919,7 +1939,8 @@ gtk_source_context_engine_finalize (GObject *object)
 	g_assert (!ce->priv->tags);
 	g_assert (!ce->priv->root_context);
 	g_assert (!ce->priv->root_segment);
-	g_assert (!ce->priv->worker_handler);
+	g_assert (!ce->priv->first_update);
+	g_assert (!ce->priv->incremental_update);
 
 	g_hash_table_destroy (ce->priv->definitions);
 	g_free (ce->priv->id);
