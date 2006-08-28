@@ -1,13 +1,14 @@
 LANGUAGES =			\
-	def.lang		\
 	ada.lang		\
+	automake.lang		\
 	c.lang			\
 	changelog.lang		\
+	cpp.lang		\
 	csharp.lang		\
 	css.lang		\
-	cpp.lang		\
-	diff.lang		\
+	def.lang		\
 	desktop.lang		\
+	diff.lang		\
 	fortran.lang		\
 	gtkrc.lang		\
 	haskell.lang		\

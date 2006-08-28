@@ -1,5 +1,28 @@
 2006-08-27  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/language-specs/automake.lang,
+	gtksourceview/language-specs/check.sh,
+	gtksourceview/language-specs/Makefile.am: new lang file for
+	Makefile.am.
+	* gtksourceview/language-specs/c.lang: override style for
+	line-continue in macros; use def:string context.
+	* gtksourceview/language-specs/def.lang: renamed 'c-style-escape'
+	to 'escape', it's not really 'C style';
+	added 'escape' style to 'line-continue' context;
+	added 'string' and 'single-quoted-string' contexts.
+	* gtksourceview/language-specs/javascript.lang: replaced 
+	def:c-style-escape with def:escape.
+	* gtksourceview/language-specs/language2.rng: added optional
+	style-ref and ignore-style attributes to <context ref=""> tags.
+	* gtksourceview/gtksourcecontextengine.[ch],
+	gtksourceview/gtksourcelanguage-parser-2.c: made it possible to
+	override style from referenced context: 
+	<context ref="some-context" style-ref="some-style"> means "use
+	context some-context with style some-style", and ignore-style
+	attribute means "use no style in this context".
+
+2006-08-27  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/language-specs/Makefile.am: install style scheme into
 	$prefix/gtksourceview-2.0/styles dir.
 	* gtksourceview/gtksourcecontextengine.c: fixed subpatterns handling

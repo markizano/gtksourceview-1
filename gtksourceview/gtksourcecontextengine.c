@@ -99,7 +99,8 @@ typedef enum {
 	GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_REF,
 	GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_WHERE,
 	GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_START_REF,
-	GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_REGEX
+	GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_REGEX,
+	GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_STYLE
 } GtkSourceContextEngineError;
 
 typedef enum {
@@ -649,11 +650,15 @@ apply_tags (GtkSourceContextEngine *ce,
 		if (sp->start_at >= start_offset && sp->end_at <= end_offset)
 		{
 			tag = get_subpattern_tag (ce, segment->context, sp->definition);
-			gtk_text_buffer_get_iter_at_offset (ce->priv->buffer, &start_iter,
-							    MAX (start_offset, sp->start_at));
-			gtk_text_buffer_get_iter_at_offset (ce->priv->buffer, &end_iter,
-							    MIN (end_offset, sp->end_at));
-			gtk_text_buffer_apply_tag (ce->priv->buffer, tag, &start_iter, &end_iter);
+
+			if (tag)
+			{
+				gtk_text_buffer_get_iter_at_offset (ce->priv->buffer, &start_iter,
+								    MAX (start_offset, sp->start_at));
+				gtk_text_buffer_get_iter_at_offset (ce->priv->buffer, &end_iter,
+								    MIN (end_offset, sp->end_at));
+				gtk_text_buffer_apply_tag (ce->priv->buffer, tag, &start_iter, &end_iter);
+			}
 		}
 	}
 
@@ -4591,6 +4596,27 @@ out:
 
 /* DEFINITIONS MANAGEMENT ------------------------------------------------- */
 
+static DefinitionChild *
+definition_child_new (ContextDefinition *definition,
+		      ContextDefinition *child_def,
+		      gboolean           is_ref_all)
+{
+	DefinitionChild *ch = g_new0 (DefinitionChild, 1);
+
+	ch->is_ref_all = is_ref_all;
+	ch->definition = child_def;
+
+	definition->children = g_slist_append (definition->children, ch);
+
+	return ch;
+}
+
+static void
+definition_child_free (DefinitionChild *ch)
+{
+	g_free (ch);
+}
+
 static ContextDefinition *
 context_definition_new (const gchar        *id,
 			ContextType         type,
@@ -4690,7 +4716,7 @@ context_definition_new (const gchar        *id,
 
 	/* Main contexts (i.e. the contexts with id "language:language")
 	 * should have extend-parent="true" and end-at-line-end="false". */
-	if (!parent && egg_regex_match_simple ("(.+):\\1", id, 0, 0))
+	if (!parent && egg_regex_match_simple ("^(.+):\\1$", id, 0, 0))
 	{
 		if (definition->end_at_line_end)
 		{
@@ -4710,6 +4736,80 @@ context_definition_new (const gchar        *id,
 	}
 
 	return definition;
+}
+
+static GtkSourceContextMatchOptions
+context_definition_get_options (ContextDefinition *definition)
+{
+	GtkSourceContextMatchOptions options = 0;
+
+	if (definition->extend_parent)
+		options |= GTK_SOURCE_CONTEXT_EXTEND_PARENT;
+	if (definition->end_at_line_end)
+		options |= GTK_SOURCE_CONTEXT_END_AT_LINE_END;
+	if (definition->first_line_only)
+		options |= GTK_SOURCE_CONTEXT_FIRST_LINE_ONLY;
+
+	return options;
+}
+
+static ContextDefinition *
+context_definition_copy (GtkSourceContextEngine *ce,
+			 ContextDefinition      *definition,
+			 ContextDefinition      *parent,
+			 const char             *style,
+			 GError                **error)
+{
+	ContextDefinition *copy;
+	gchar *id;
+	GtkSourceContextMatchOptions options;
+	const gchar *match = NULL;
+	const gchar *start = NULL, *end = NULL;
+
+	switch (definition->type)
+	{
+		case CONTEXT_TYPE_SIMPLE:
+			match = regex_get_pattern (definition->u.match);
+			break;
+		case CONTEXT_TYPE_CONTAINER:
+			if (definition->u.start_end.start)
+				start = regex_get_pattern (definition->u.start_end.start);
+			if (definition->u.start_end.end)
+				end = regex_get_pattern (definition->u.start_end.end);
+			break;
+		default:
+			g_return_val_if_reached (NULL);
+	}
+
+	DEBUG ({
+		g_print ("match: %s\n", match ? match : "(null)");
+		g_print ("start: %s\n", start ? start : "(null)");
+		g_print ("end: %s\n", end ? end : "(null)");
+	});
+
+	id = g_strdup_printf ("%s@%s@%s", ce->priv->id, parent->id, definition->id);
+
+	if (g_hash_table_lookup (ce->priv->definitions, id) != NULL)
+	{
+		guint i = 1;
+		while (TRUE)
+		{
+			g_free (id);
+			id = g_strdup_printf ("%s@%s@%s@%d", ce->priv->id, parent->id, definition->id, i);
+			if (g_hash_table_lookup (ce->priv->definitions, id) == NULL)
+				break;
+			++i;
+		}
+	}
+
+	options = context_definition_get_options (definition);
+
+	copy = context_definition_new (id, definition->type, parent,
+				       match, start, end,
+				       style, options, error);
+
+	g_free (id);
+	return copy;
 }
 
 static void
@@ -4750,7 +4850,7 @@ context_definition_free (ContextDefinition *definition)
 	g_free (definition->style);
 	regex_unref (definition->reg_all);
 
-	g_slist_foreach (definition->children, (GFunc) g_free, NULL);
+	g_slist_foreach (definition->children, (GFunc) definition_child_free, NULL);
 	g_slist_free (definition->children);
 	g_free (definition);
 }
@@ -4800,18 +4900,6 @@ definition_iter_next (DefinitionsIter *iter)
 			return definition;
 		}
 	}
-}
-
-static DefinitionChild *
-definition_child_new (ContextDefinition *definition,
-		      ContextDefinition *child_def,
-		      gboolean           is_ref_all)
-{
-	DefinitionChild *ch = g_new0 (DefinitionChild, 1);
-	ch->is_ref_all = is_ref_all;
-	ch->definition = child_def;
-	definition->children = g_slist_append (definition->children, ch);
-	return ch;
 }
 
 gboolean
@@ -4982,11 +5070,13 @@ _gtk_source_context_engine_add_sub_pattern (GtkSourceContextEngine  *ce,
 }
 
 gboolean
-_gtk_source_context_engine_add_ref (GtkSourceContextEngine  *ce,
-				    const gchar             *parent_id,
-				    const gchar             *ref_id,
-				    gboolean                 all,
-				    GError                 **error)
+_gtk_source_context_engine_add_ref (GtkSourceContextEngine    *ce,
+				    const gchar               *parent_id,
+				    const gchar               *ref_id,
+				    GtkSourceContextRefOptions options,
+				    const gchar               *style,
+				    gboolean                   all,
+				    GError                   **error)
 {
 	ContextDefinition *parent;
 	ContextDefinition *ref;
@@ -4994,6 +5084,16 @@ _gtk_source_context_engine_add_ref (GtkSourceContextEngine  *ce,
 	g_return_val_if_fail (parent_id != NULL, FALSE);
 	g_return_val_if_fail (ref_id != NULL, FALSE);
 	g_return_val_if_fail (GTK_IS_SOURCE_CONTEXT_ENGINE (ce), FALSE);
+
+	if (all && (options & (GTK_SOURCE_CONTEXT_IGNORE_STYLE | GTK_SOURCE_CONTEXT_OVERRIDE_STYLE)))
+	{
+		g_set_error (error,
+			     GTK_SOURCE_CONTEXT_ENGINE_ERROR,
+			     GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_STYLE,
+			     "can't override style for '%s' reference",
+			     ref_id);
+		return FALSE;
+	}
 
 	/* If the id is already present in the hashtable it is a duplicate,
 	 * so we report the error (probably there is a duplicate id in the
@@ -5033,6 +5133,16 @@ _gtk_source_context_engine_add_ref (GtkSourceContextEngine  *ce,
 		return FALSE;
 	}
 
+	if (options & (GTK_SOURCE_CONTEXT_IGNORE_STYLE | GTK_SOURCE_CONTEXT_OVERRIDE_STYLE))
+	{
+		ref = context_definition_copy (ce, ref, parent, style, error);
+
+		if (!ref)
+			return FALSE;
+
+		g_hash_table_insert (ce->priv->definitions, g_strdup (ref->id), ref);
+	}
+
 	definition_child_new (parent, ref, all);
 
 	return TRUE;
@@ -5050,14 +5160,14 @@ add_escape_ref (ContextDefinition      *definition,
 
 	_gtk_source_context_engine_add_ref (ce, definition->id,
 					    "gtk-source-context-engine-escape",
-					    FALSE, &error);
+					    0, NULL, FALSE, &error);
 
 	if (error)
 		goto out;
 
 	_gtk_source_context_engine_add_ref (ce, definition->id,
 					    "gtk-source-context-engine-line-escape",
-					    FALSE, &error);
+					    0, NULL, FALSE, &error);
 
 out:
 	if (error)
