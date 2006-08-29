@@ -1,5 +1,10 @@
 2006-08-29  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcelanguage-parser-1.c: remove trailing
+	\n from patterns.
+
+2006-08-29  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* configure.in, gtksourceview/Makefile.am,
 	gtksourceview/gtksourceprintjob.c: made it use gnomeprint
 	again.
