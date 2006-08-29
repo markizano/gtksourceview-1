@@ -1,3 +1,9 @@
+2006-08-28  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcecontextengine.c: (sub_pattern_to_int):
+	g_return_val_if_fail() is wrong here, since named pattern don't
+	get a number.
+
 2006-08-27  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/language-specs/automake.lang,
