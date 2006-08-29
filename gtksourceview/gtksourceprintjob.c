@@ -378,7 +378,7 @@ gtk_source_print_job_class_init (GtkSourcePrintJobClass *klass)
 			  G_SIGNAL_RUN_LAST,
 			  G_STRUCT_OFFSET (GtkSourcePrintJobClass, begin_page),
 			  NULL, NULL,
-			  gtksourceview_marshal_VOID__VOID,
+			  _gtksourceview_marshal_VOID__VOID,
 			  G_TYPE_NONE, 
 			  0);
 	print_job_signals [FINISHED] =
@@ -387,7 +387,7 @@ gtk_source_print_job_class_init (GtkSourcePrintJobClass *klass)
 			  G_SIGNAL_RUN_FIRST,
 			  G_STRUCT_OFFSET (GtkSourcePrintJobClass, finished),
 			  NULL, NULL,
-			  gtksourceview_marshal_VOID__VOID,
+			  _gtksourceview_marshal_VOID__VOID,
 			  G_TYPE_NONE, 
 			  0);
 }

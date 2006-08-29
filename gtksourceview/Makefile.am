@@ -13,7 +13,8 @@ INCLUDES = 				\
 	-I$(srcdir)/libegg/regex 	\
 	$(DEPRECATED_FLAGS)		\
 	$(WARN_CFLAGS) 			\
-	$(DEP_CFLAGS)
+	$(DEP_CFLAGS)			\
+	$(GNOMEPRINT_CFLAGS)
 
 BUILT_SOURCES = 			\
 	gtksourceview-marshal.c 	\
@@ -61,8 +62,13 @@ libgtksourceview_2_0_la_SOURCES = 	\
 	$(libgtksourceview_headers)	\
 	$(BUILT_SOURCES)
 
+if HAVE_GNOMEPRINT
+libgtksourceview_headers += gtksourceprintjob.h
+libgtksourceview_2_0_la_SOURCES += gtksourceprintjob.c gtksourceprintjob.h
+endif
 
-libgtksourceview_2_0_la_LIBADD = $(DEP_LIBS) $(EGGREGEX_LIBS)
+
+libgtksourceview_2_0_la_LIBADD = $(DEP_LIBS) $(EGGREGEX_LIBS) $(GNOMEPRINT_LIBS)
 
 libgtksourceview_2_0_la_LDFLAGS = -no-undefined -export-symbols-regex "^gtk_source_.*"
 

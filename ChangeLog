@@ -1,3 +1,9 @@
+2006-08-29  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* configure.in, gtksourceview/Makefile.am,
+	gtksourceview/gtksourceprintjob.c: made it use gnomeprint
+	again.
+
 2006-08-28  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/language-specs/automake.lang: removed.
