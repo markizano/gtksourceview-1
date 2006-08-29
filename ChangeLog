@@ -1,5 +1,11 @@
 2006-08-28  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/language-specs/changelog.lang,
+	gtksourceview/language-specs/check.sh: converted changelog lang
+	file to new format.
+
+2006-08-28  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c: (sub_pattern_to_int):
 	g_return_val_if_fail() is wrong here, since named pattern don't
 	get a number.
