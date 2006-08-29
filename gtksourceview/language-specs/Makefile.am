@@ -1,6 +1,5 @@
 LANGUAGES =			\
 	ada.lang		\
-	automake.lang		\
 	c.lang			\
 	changelog.lang		\
 	cpp.lang		\

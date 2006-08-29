@@ -1,5 +1,14 @@
 2006-08-28  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/language-specs/automake.lang: removed.
+	* gtksourceview/language-specs/makefile.lang: made it better.
+	* gtksourceview/language-specs/def.lang: added more stuff to
+	reuse in other langs.
+	* gtksourceview/gtksourcecontextengine.c: fixed handling of 
+	zero-length segments.
+
+2006-08-28  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/language-specs/changelog.lang,
 	gtksourceview/language-specs/check.sh: converted changelog lang
 	file to new format.
