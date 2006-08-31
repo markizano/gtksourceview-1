@@ -1,3 +1,33 @@
+2006-08-31  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcecontextengine.c: added hint2 member
+	to GtkSourceContextEnginePrivate, to be used in all functions
+	that accept in-out hint parameter, so it doesn't crash if 
+	the hint got deleted.
+	(gtk_source_context_engine_attach_buffer): more NULL checks,
+	so it doesn't abort with invalid language.
+	(segment_destroy), (segment_remove): check ce->priv->hint2.
+	* gtksourceview/gtksourcelanguage.c: 
+	(_gtk_source_language_new_from_file): do not crash on invalid lang files.
+	* gtksourceview/gtksourcelanguage-parser-2.c: removed GError** member
+	from ParserState, it's needed only in one place, and doesn't have anything
+	to do with parser state proper.
+	(add_ref): if an error happened in another lang file, tell about file
+	in error message.
+	(handle_language_element): do not try to print NULL.
+	(replace_by_id), (expand_regex_vars): wrap GError** which is needed
+	by replace_by_id into an aux structure, and pass it as user data.
+	(handle_styles_element): removed xmlTextReaderIsValid call.
+	(text_reader_error_func), (file_parse): use xmlTextReaderSetErrorHandler
+	to get error messages from the xml parser.
+	* gtksourceview/language-specs/html.lang: use styles from xml.lang, and
+	do not make whole <tag stuff="blah"> thing bold.
+	* gtksourceview/language-specs/m4.lang: new file. Nothing special yet, 
+	just includes stuff from sh.lang.
+	* gtksourceview/language-specs/sh.lang, gtksourceview/language-specs/sh.lang: 
+	converted to new format.
+	* gtksourceview/language-specs/makefile.lang: added line-comment element.
+
 2006-08-29  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcelanguage-parser-1.c: remove trailing
