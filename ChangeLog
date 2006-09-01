@@ -1,5 +1,21 @@
 2006-08-31  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcestylescheme.c (parse_style): parse use-style
+	attribute.
+	* gtksourceview/gtksourceview.c (gtk_source_view_expose): the trick
+	with MANY_LINES doesn't work.
+	* gtksourceview/language-specs/styles.rng: added use-style attribute.
+	* gtksourceview/language-specs/diff.lang: converted to new format.
+	* gtksourceview/language-specs/gvim.styles,
+	gtksourceview/language-specs/c.lang,
+	gtksourceview/language-specs/def.lang,
+	gtksourceview/language-specs/latex.lang,
+	gtksourceview/language-specs/python.lang,
+	gtksourceview/language-specs/xml.lang: removed default styles that do
+	not make sense for most languages, e.g. def:preprocessor.
+
+2006-08-31  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c: added hint2 member
 	to GtkSourceContextEnginePrivate, to be used in all functions
 	that accept in-out hint parameter, so it doesn't crash if 
