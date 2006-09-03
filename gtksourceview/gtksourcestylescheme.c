@@ -522,7 +522,7 @@ start_element (G_GNUC_UNUSED GMarkupParseContext *context,
 			}
 			else if (!strcmp (*attribute_names, "parent-scheme"))
 			{
-				/* XXX */
+				/* FIXME are we going to use parent schemes? */
 				g_warning ("%s: implement me", G_STRLOC);
 			}
 			else

@@ -1,5 +1,24 @@
 2006-09-03  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c:
+	commented UPDATE_PRIORITY and UPDATE_TIME_SLICE constants;
+	made CHECK_* macros and made corresponding function names lowercase;
+	Removed some XXX comments, changed some FIXME's.
+	* gtksourceview/gtksourcelanguage-parser-1.c:
+	(build_keyword_list): removed keyword number limit and added a TODO there;
+	removed language_strconvescape; removed old commented out code;
+	(_gtk_source_language_file_parse_version1): check lang file version in
+	* gtksourceview/gtksourcelanguage-parser-2.c:
+	(create_definition): added a TODO about big keyword lists;
+	removed old commented out code.
+	* gtksourceview/gtksourcestylescheme.c: replaced XXX with FIXME (more 
+	informative one).
+	* gtksourceview/gtktextregion.c,
+	 gtksourceview/gtktextregion.h: removed gtk_text_region_subtract_region,
+	it's not needed anymore.
+
+2006-09-03  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c,
 	gtksourceview/gtksourcelanguage-parser-1.c
 	gtksourceview/gtksourcelanguage-parser-2.c

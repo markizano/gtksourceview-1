@@ -420,6 +420,9 @@ create_definition (ParserState *parser_state,
 			 * in a single string */
 			while (TRUE)
 			{
+				/* TODO: check how pcre works with huge keyword lists,
+				 * and split big lists if needed, like in the old engine. */
+
 				/* TODO: this could be done destructively,
 				 * modifing the string in place without the
 				 * copy */
@@ -1332,44 +1335,6 @@ map_style (ParserState *parser_state,
 			     "unable to map style '%s' to '%s'",
 			     style_id, map_to);
 }
-
-
-
-// static GtkTextTag *
-// create_tag (ParserState *parser_state,
-// 		gchar *id,
-// 		gchar *name,
-// 		gchar *default_style,
-// 		GError **error)
-// {
-// 	GtkTextTag *tag;
-// 	GtkSourceTagStyle *ts = NULL;
-//
-// 	g_return_val_if_fail (parser_state != NULL, NULL);
-// 	g_return_val_if_fail (id != NULL, NULL);
-// 	g_return_val_if_fail (name != NULL, NULL);
-//
-// 	DEBUG (g_message ("new tag id '%s', name '%s'", id, name));
-//
-// 	tag = gtk_source_tag_new (name, id);
-//
-// 	DEBUG (g_message ("mapping the style of '%s' to '%s'",
-// 				id, default_style));
-//
-// 	if (default_style != NULL)
-// 	{
-// 		ts = gtk_source_language_get_tag_style (parser_state->language,
-// 				default_style);
-// 	}
-//
-// 	if (ts != NULL)
-// 	{
-// 		gtk_source_tag_set_style (GTK_SOURCE_TAG (tag), ts);
-// 		gtk_source_tag_style_free (ts);
-// 	}
-//
-// 	return tag;
-// }
 
 static void
 parse_language_with_id (ParserState *parser_state,

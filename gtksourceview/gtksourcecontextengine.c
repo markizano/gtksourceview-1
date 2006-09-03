@@ -53,10 +53,17 @@
 /* Regex used to match "\%{...@start}". */
 #define START_REF_REGEX "(?<!\\\\)(\\\\\\\\)*\\\\%\\{(.*?)@start\\}"
 
+/* Priority of one-time idle that is installed after buffer is modified. */
 #define FIRST_UPDATE_PRIORITY		G_PRIORITY_HIGH_IDLE
-#define INCREMENTAL_UPDATE_PRIORITY	GTK_TEXT_VIEW_PRIORITY_VALIDATE
-/* In milliseconds. */
+/* Maximal amount of time allowed to spent in this first idle. Should be
+ * small enough, since in worst case we block ui for this time after each keypress.
+ */
 #define FIRST_UPDATE_TIME_SLICE		10
+/* Priority of long running idle which is used to analyze whole buffer, if
+ * the engine wasn't quick enough to analyze it in one shot. */
+/* FIXME lower this priority */
+#define INCREMENTAL_UPDATE_PRIORITY	GTK_TEXT_VIEW_PRIORITY_VALIDATE
+/* Maximal amount of time allowed to spent in one cycle of background idle. */
 #define INCREMENTAL_UPDATE_TIME_SLICE	30
 
 #define GTK_SOURCE_CONTEXT_ENGINE_ERROR (gtk_source_context_engine_error_quark ())
@@ -341,9 +348,12 @@ struct _GtkSourceContextEnginePrivate
 
 
 #ifdef ENABLE_CHECK_TREE
-static void CHECK_TREE (GtkSourceContextEngine *ce);
-static void CHECK_SEGMENT_LIST (Segment *segment);
-static void CHECK_SEGMENT_CHILDREN (Segment *segment);
+static void check_tree (GtkSourceContextEngine *ce);
+static void check_segment_list (Segment *segment);
+static void check_segment_children (Segment *segment);
+#define CHECK_TREE check_tree
+#define CHECK_SEGMENT_LIST check_segment_list
+#define CHECK_SEGMENT_CHILDREN check_segment_children
 #else
 #define CHECK_TREE(ce)
 #define CHECK_SEGMENT_LIST(s)
@@ -461,11 +471,12 @@ set_tag_style (GtkSourceContextEngine *ce,
 
 	if (style == NULL)
 	{
-		/* FIXME: potential infinite loop, parser does not seem to check for circular references */
 		const char *map_to = style_name;
 
 		while (style == NULL)
 		{
+			/* FIXME This may be an infinite loop *if* we allow circular
+			 * references between lang files. */
 			map_to = g_hash_table_lookup (ce->priv->lang->priv->styles, map_to);
 
 			if (!map_to)
@@ -802,8 +813,9 @@ refresh_range (GtkSourceContextEngine *ce,
 	/* Here we need to make sure we do not make it redraw next line */
 	real_end = *end;
 	if (gtk_text_iter_starts_line (&real_end))
-		/* XXX if it's in the middle of \r\n, what line is it? */
-		gtk_text_iter_backward_char (&real_end);
+		/* I don't quite like this here, but at least it won't jump into
+		 * the middle of \r\n  */
+		gtk_text_iter_backward_cursor_position (&real_end);
 
 	g_signal_emit_by_name (ce->priv->buffer,
 			       "highlight_updated",
@@ -5338,7 +5350,6 @@ prepend_definition (G_GNUC_UNUSED gchar *id,
    lang files are matched only if match doesn't start with escaped char, and
    escaped char in the end of line means that the current contexts extends to the
    next line. */
-/* XXX unicode */
 void
 _gtk_source_context_engine_set_escape_char (GtkSourceContextEngine *ce,
 					    gunichar                escape_char)
@@ -5484,7 +5495,7 @@ check_regex (void)
 }
 
 static void
-CHECK_TREE (GtkSourceContextEngine *ce)
+check_tree (GtkSourceContextEngine *ce)
 {
 	Segment *root = ce->priv->root_segment;
 
@@ -5504,12 +5515,12 @@ CHECK_TREE (GtkSourceContextEngine *ce)
 }
 
 static void
-CHECK_SEGMENT_CHILDREN (Segment *segment)
+check_segment_children (Segment *segment)
 {
 	Segment *ch;
 
 	g_assert (segment != NULL);
-	CHECK_SEGMENT_LIST (segment->parent);
+	check_segment_list (segment->parent);
 
 	for (ch = segment->children; ch != NULL; ch = ch->next)
 	{
@@ -5524,7 +5535,7 @@ CHECK_SEGMENT_CHILDREN (Segment *segment)
 }
 
 static void
-CHECK_SEGMENT_LIST (Segment *segment)
+check_segment_list (Segment *segment)
 {
 	Segment *ch;
 
