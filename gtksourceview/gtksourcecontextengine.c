@@ -19,9 +19,6 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
-/* FIXME: toplevel children must have extend-parent=TRUE, because create_reg_all wants
-   end regex in toplevel context in this case */
-
 #include "gtksourceview-i18n.h"
 #include "gtksourcecontextengine.h"
 #include "gtktextregion.h"
@@ -2541,7 +2538,19 @@ create_reg_all (Context           *context,
 		{
 			if (!tmp->definition->extend_parent)
 			{
-				g_string_append (all, regex_get_pattern (tmp->parent->end));
+				if (tmp->parent->end != NULL)
+					g_string_append (all, regex_get_pattern (tmp->parent->end));
+				/* FIXME ?
+				 * The old code insisted on having tmp->parent->end != NULL here,
+				 * though e.g. in case line-comment -> email-address it's not the case.
+				 * Apparently using $ fixes the problem. */
+				else if (tmp->parent->definition->end_at_line_end)
+					g_string_append (all, "$");
+				/* FIXME it's not clear whether it can happen, maybe we need assert here
+				 * or parser need to check it */
+				else
+					g_critical ("%s: oops", G_STRLOC);
+
 				g_string_append (all, "|");
 			}
 
@@ -4840,6 +4849,18 @@ context_definition_new (const gchar        *id,
 		{
 			g_warning ("extend-parent should be "
 				   "\"true\" for main contexts (id: %s)",
+				   id);
+			definition->extend_parent = TRUE;
+		}
+	}
+
+	/* Children of toplevel context should have extend-parent = TRUE. */
+	if (parent && egg_regex_match_simple ("^(.+):\\1$", parent->id, 0, 0))
+	{
+		if (!definition->extend_parent)
+		{
+			g_warning ("extend-parent should be "
+				   "\"true\" for children of main context (id: %s)",
 				   id);
 			definition->extend_parent = TRUE;
 		}

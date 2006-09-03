@@ -1,3 +1,18 @@
+2006-09-03  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcecontextengine.c (create_reg_all): do not try
+	to use NULL parent end regex.
+	(context_definition_new): check that toplevel's children have 
+	extend-parent=true.
+	* gtksourceview/language-specs/c.lang: 'union' is a keyword, as struct 
+	or typedef.
+	* gtksourceview/language-specs/def.lang: use line-comment:* instead of
+	line-comment, to import children.
+	* gtksourceview/language-specs/gvim.styles: more styles to look like in
+	old engine.
+	* gtksourceview/language-specs/latex.lang: removed def:package style.
+	* gtksourceview/language-specs/python.lang: prettified a little bit.
+
 2006-08-31  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcestylescheme.c (parse_style): parse use-style
