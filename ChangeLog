@@ -1,5 +1,17 @@
 2006-09-03  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c,
+	gtksourceview/gtksourcelanguage-parser-1.c
+	gtksourceview/gtksourcelanguage-parser-2.c
+	gtksourceview/gtksourcelanguage.c
+	gtksourceview/gtksourcelanguagesmanager.c
+	gtksourceview/gtksourcestyle.c
+	gtksourceview/gtksourcestylescheme.c: do if (ptr != NULL) and
+	if (ptr == NULL) instead of if (ptr) and if (!ptr), to please
+	maintainers who are afraid of using pointers in boolean contexts.
+
+2006-09-03  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c (create_reg_all): do not try
 	to use NULL parent end regex.
 	(context_definition_new): check that toplevel's children have 

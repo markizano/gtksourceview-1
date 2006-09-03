@@ -37,7 +37,7 @@ static gchar *
 fix_pattern (const gchar *pattern,
 	     gboolean    *end_at_line_end)
 {
-	if (pattern && g_str_has_suffix (pattern, "\\n"))
+	if (pattern != NULL && g_str_has_suffix (pattern, "\\n"))
 	{
 		if (end_at_line_end)
 			*end_at_line_end = TRUE;
@@ -75,7 +75,7 @@ engine_add_simple_pattern (GtkSourceContextEngine *ce,
 								GTK_SOURCE_CONTEXT_END_AT_LINE_END,
 							    &error);
 
-	if (error)
+	if (error != NULL)
 	{
 		g_warning ("%s", error->message);
 		g_error_free (error);
@@ -121,7 +121,7 @@ engine_add_syntax_pattern (GtkSourceContextEngine *ce,
 							    options,
 							    &error);
 
-	if (error)
+	if (error != NULL)
 	{
 		g_warning ("%s", error->message);
 		g_error_free (error);
@@ -722,7 +722,7 @@ define_root_context (GtkSourceContextEngine *ce,
 							    GTK_SOURCE_CONTEXT_EXTEND_PARENT,
 							    &error);
 
-	if (error)
+	if (error != NULL)
 	{
 		g_warning ("%s", error->message);
 		g_error_free (error);
@@ -775,7 +775,7 @@ _gtk_source_language_file_parse_version1 (GtkSourceLanguage      *language,
 		return FALSE;
 	}
 
-	if (xmlStrcmp (cur->name, (const xmlChar *) "language"))
+	if (xmlStrcmp (cur->name, (const xmlChar *) "language") != 0)
 	{
 		g_warning ("File '%s' is of the wrong type",
 			   language->priv->lang_file_name);
