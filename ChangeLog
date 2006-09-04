@@ -1,5 +1,10 @@
 2006-09-03  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c (segment_erase_range_): 
+	last commit broke it, fixed.
+
+2006-09-03  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c (segment_destroy_children): 
 	do not read from g_free'd memory.
 
