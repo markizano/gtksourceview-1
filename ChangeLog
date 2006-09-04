@@ -1,5 +1,13 @@
 2006-09-03  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c (create_reg_all): include
+	regex error into the error message.
+	* gtksourceview/language-specs/c.lang,
+	gtksourceview/language-specs/python.lang: highlight conversion
+	specifiers and escaped sequences in strings.
+
+2006-09-03  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c:
 	commented UPDATE_PRIORITY and UPDATE_TIME_SLICE constants;
 	made CHECK_* macros and made corresponding function names lowercase;
@@ -11,7 +19,7 @@
 	* gtksourceview/gtksourcelanguage-parser-2.c:
 	(create_definition): added a TODO about big keyword lists;
 	removed old commented out code.
-	* gtksourceview/gtksourcestylescheme.c: replaced XXX with FIXME (more 
+	* gtksourceview/gtksourcestylescheme.c: replaced XXX with FIXME (more
 	informative one).
 	* gtksourceview/gtktextregion.c,
 	 gtksourceview/gtktextregion.h: removed gtk_text_region_subtract_region,
@@ -33,9 +41,9 @@
 
 	* gtksourceview/gtksourcecontextengine.c (create_reg_all): do not try
 	to use NULL parent end regex.
-	(context_definition_new): check that toplevel's children have 
+	(context_definition_new): check that toplevel's children have
 	extend-parent=true.
-	* gtksourceview/language-specs/c.lang: 'union' is a keyword, as struct 
+	* gtksourceview/language-specs/c.lang: 'union' is a keyword, as struct
 	or typedef.
 	* gtksourceview/language-specs/def.lang: use line-comment:* instead of
 	line-comment, to import children.
@@ -64,12 +72,12 @@
 
 	* gtksourceview/gtksourcecontextengine.c: added hint2 member
 	to GtkSourceContextEnginePrivate, to be used in all functions
-	that accept in-out hint parameter, so it doesn't crash if 
+	that accept in-out hint parameter, so it doesn't crash if
 	the hint got deleted.
 	(gtk_source_context_engine_attach_buffer): more NULL checks,
 	so it doesn't abort with invalid language.
 	(segment_destroy), (segment_remove): check ce->priv->hint2.
-	* gtksourceview/gtksourcelanguage.c: 
+	* gtksourceview/gtksourcelanguage.c:
 	(_gtk_source_language_new_from_file): do not crash on invalid lang files.
 	* gtksourceview/gtksourcelanguage-parser-2.c: removed GError** member
 	from ParserState, it's needed only in one place, and doesn't have anything
@@ -84,9 +92,9 @@
 	to get error messages from the xml parser.
 	* gtksourceview/language-specs/html.lang: use styles from xml.lang, and
 	do not make whole <tag stuff="blah"> thing bold.
-	* gtksourceview/language-specs/m4.lang: new file. Nothing special yet, 
+	* gtksourceview/language-specs/m4.lang: new file. Nothing special yet,
 	just includes stuff from sh.lang.
-	* gtksourceview/language-specs/sh.lang, gtksourceview/language-specs/sh.lang: 
+	* gtksourceview/language-specs/sh.lang, gtksourceview/language-specs/sh.lang:
 	converted to new format.
 	* gtksourceview/language-specs/makefile.lang: added line-comment element.
 
@@ -107,7 +115,7 @@
 	* gtksourceview/language-specs/makefile.lang: made it better.
 	* gtksourceview/language-specs/def.lang: added more stuff to
 	reuse in other langs.
-	* gtksourceview/gtksourcecontextengine.c: fixed handling of 
+	* gtksourceview/gtksourcecontextengine.c: fixed handling of
 	zero-length segments.
 
 2006-08-28  Yevgen Muntyan  <muntyan@tamu.edu>
@@ -134,13 +142,13 @@
 	to 'escape', it's not really 'C style';
 	added 'escape' style to 'line-continue' context;
 	added 'string' and 'single-quoted-string' contexts.
-	* gtksourceview/language-specs/javascript.lang: replaced 
+	* gtksourceview/language-specs/javascript.lang: replaced
 	def:c-style-escape with def:escape.
 	* gtksourceview/language-specs/language2.rng: added optional
 	style-ref and ignore-style attributes to <context ref=""> tags.
 	* gtksourceview/gtksourcecontextengine.[ch],
 	gtksourceview/gtksourcelanguage-parser-2.c: made it possible to
-	override style from referenced context: 
+	override style from referenced context:
 	<context ref="some-context" style-ref="some-style"> means "use
 	context some-context with style some-style", and ignore-style
 	attribute means "use no style in this context".
@@ -150,14 +158,14 @@
 	* gtksourceview/language-specs/Makefile.am: install style scheme into
 	$prefix/gtksourceview-2.0/styles dir.
 	* gtksourceview/gtksourcecontextengine.c: fixed subpatterns handling
-	(subpatterns tags were applied randomly); 
+	(subpatterns tags were applied randomly);
 	made high-priority one-time idle called more often, which hopefully
 	make it look nicer;
 	(gtk_source_context_engine_update_highlight): highlight as much as possible
 	even if some part of requested area is not analyzed yet.
 	* gtksourceview/gtksourcelanguage-parser-2.c: fixed two leaks.
-	* gtksourceview/gtksourcelanguagesmanager.c, 
-	gtksourceview/gtksourcestylescheme.h, 
+	* gtksourceview/gtksourcelanguagesmanager.c,
+	gtksourceview/gtksourcestylescheme.h,
 	gtksourceview/gtksourceview.c: _gtk_source_style_scheme_get_default() -
 	temporary workaround for no-builtin-scheme thing.
 
@@ -176,7 +184,7 @@
 
 2006-08-26  Yevgen Muntyan  <muntyan@tamu.edu>
 
-	* gtksourceview/language-specs/convert.py, 
+	* gtksourceview/language-specs/convert.py,
 	gtksourceview/language-specs/convert.sh: a script to convert old lang files
 	to the new format.
 	* gtksourceview/language-specs/c.lang: 'typedef' is a keyword, not a type.
@@ -185,7 +193,7 @@
 	* gtksourceview/language-specs/language2.rng: added 'first-line-only' attribute.
 	* gtksourceview/gtksourcecontextengine.[ch],
 	gtksourceview/gtksourcelanguage-parser-*.c: introduced GtkSourceContextMatchOptions
-	which are passed to _gtk_source_context_engine_define_context(), added 
+	which are passed to _gtk_source_context_engine_define_context(), added
 	first-line-only attribute for contexts.
 
 2006-08-26  Yevgen Muntyan  <muntyan@tamu.edu>
@@ -205,13 +213,13 @@
 	arguments here and there.
 	* gtksourceview/gtksourcecontextengine.c: removed debug_cb
 	callback.
-	* gtksourceview/gtksourcelanguage.c, 
+	* gtksourceview/gtksourcelanguage.c,
 	gtksourceview/gtksourcelanguage-private.h: got rid of xmlChar*
-	nonsense; added hidden, brackets, line-comment, and block-comment 
-	attributes to lang files; Others, Others 2, and Others 3 styles are 
+	nonsense; added hidden, brackets, line-comment, and block-comment
+	attributes to lang files; Others, Others 2, and Others 3 styles are
 	now defined explicitely by themes, since there's no def:others anymore.
-	* gtksourceview/gtksourcelanguagesmanager.[ch]: 
-	(gtk_source_languages_manager_get_available_style_schemes): no builtin 
+	* gtksourceview/gtksourcelanguagesmanager.[ch]:
+	(gtk_source_languages_manager_get_available_style_schemes): no builtin
 	scheme anymore.
 	* gtksourceview/gtksourcestylescheme.[ch]: removed default style scheme,
 	added GtkSourceStyleScheme::name property.
@@ -226,7 +234,7 @@
 	hidden attribute.
 	* gtksourceview/language-specs/gvim.styles: added styles necessary to
 	avoid using def:others* in other lang files; and removed "others*" styles.
-	* gtksourceview/language-specs/javascript.lang, 
+	* gtksourceview/language-specs/javascript.lang,
 	gtksourceview/language-specs/latex.lang: removed references to
 	def:others*.
 	* gtksourceview/language-specs/xml.lang: removed references to
@@ -239,14 +247,14 @@
 	* gtksourceview/libegg/regex/eggregex.c:
 	(regex_new): initialize ref_count field;
 	(egg_regex_clear): set regex->delims to NULL after freeing it.
-	* gtksourceview/gtksourcecontextengine.c: 
+	* gtksourceview/gtksourcecontextengine.c:
 	(idle_worker): do not highlight upadted regions unless asked for it.
 	* gtksourceview/gtksourcelanguage-parser-2.c: do not crash in
 	debug messages.
 
 2006-07-26  Yevgen Muntyan  <muntyan@tamu.edu>
 
-	* gtksourceview/gtksourcecontextengine.c: 
+	* gtksourceview/gtksourcecontextengine.c:
 	(refresh_region): added extra parameter telling whether the area
 	should be added to refresh_region.
 	(update_syntax): only add actually changed lines to refresh_region.
@@ -255,20 +263,20 @@
 
 	* gtksourceview/gtksourcecontextengine.c: added context_freeze() and
 	context_thaw() which are used to avoid destroying and recreating contexts
-	in update_syntax, and to avoid collecting child contexts there, which is 
+	in update_syntax, and to avoid collecting child contexts there, which is
 	slow.
 
 2006-07-26  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* acinclude.m4: do define EBCDIC to be 0, pcre wants it this way.
-	* gtksourceview/gtksourcecontextengine.c: 
+	* gtksourceview/gtksourcecontextengine.c:
 	(gtk_source_context_engine_attach_buffer): do not use enable_highlight
 	when detaching engine, just delete the tags.
-	(update_syntax): do not collect contexts from erased segments here, it's 
+	(update_syntax): do not collect contexts from erased segments here, it's
 	slow.
-	* gtksourceview/libegg/regex/eggregex.c: 
+	* gtksourceview/libegg/regex/eggregex.c:
 	(NEXT_CHAR): use the argument.
-	(egg_regex_copy): made size be of type gulong, so pcre_fullinfo won't crash 
+	(egg_regex_copy): made size be of type gulong, so pcre_fullinfo won't crash
 	if sizeof(int) != sizeof(unsigned long).
 
 2006-07-25  Yevgen Muntyan  <muntyan@tamu.edu>
@@ -284,7 +292,7 @@
 
 2006-07-25  Yevgen Muntyan  <muntyan@tamu.edu>
 
-	* gtksourceview/Makefile.am: reverted last commit, it was made by 
+	* gtksourceview/Makefile.am: reverted last commit, it was made by
 	mistake.
 
 2006-07-25  Yevgen Muntyan  <muntyan@tamu.edu>
@@ -305,9 +313,9 @@
 
 2006-07-25  Yevgen Muntyan  <muntyan@tamu.edu>
 
-	* gtksourceview/gtksourcecontextengine.c: fixed bug with tags hash 
+	* gtksourceview/gtksourcecontextengine.c: fixed bug with tags hash
 	table - it g_slist_free'd values, and led to funny memory corruption.
-	* gtksourceview/gtksourcelanguage-parser-2.c: (replace_delimiter): 
+	* gtksourceview/gtksourcelanguage-parser-2.c: (replace_delimiter):
 	fixed a memory leak.
 	* gtksourceview/language-specs/c.lang: added comments into preprocessor
 	context.
@@ -328,7 +336,7 @@
 2006-07-24  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	Updated EggRegex and pcre, updated build infrastructure for it,
-	made it optionally use system pcre. Made the library export only 
+	made it optionally use system pcre. Made the library export only
 	public symbols.
 
 	* docs/reference/gtksourceview.types:
@@ -347,7 +355,7 @@
 	* gtksourceview/Makefile.am:
 	* gtksourceview/gtksourceview.c:
 	* gtksourceview/gtksourceundomanager.c:
-	* gtksourceview/gtksourcebuffer.c: prefixed marshals with 
+	* gtksourceview/gtksourcebuffer.c: prefixed marshals with
 	underscore.
 	* gtksourceview/gtksourceview-i18n.[ch]: prefixed gtksourceview_gettext
 	with underscore.
@@ -359,7 +367,7 @@
 	api.
 
 	* acinclude.m4:
-	* configure.in: GTK_SOURCE_VIEW_AC_PCRE macro for --with-system-pcre 
+	* configure.in: GTK_SOURCE_VIEW_AC_PCRE macro for --with-system-pcre
 	configure option and pcre options needed in config.h.
 
 	* gtksourceview/gtksourcesimpleengine.[ch]:
@@ -374,8 +382,8 @@
 
 2006-07-23  Yevgen Muntyan  <muntyan@tamu.edu>
 
-	* gtksourceview/gtksourcestyle.[ch]: prefixed 
-	gtk_source_style_(un)apply with underscore, removed 
+	* gtksourceview/gtksourcestyle.[ch]: prefixed
+	gtk_source_style_(un)apply with underscore, removed
 	gtk_source_style_compose.
 	* gtksourceview/gtksourcebuffer.c:
 	* gtksourceview/gtksourcecontextengine.c:
@@ -389,7 +397,7 @@
 2006-07-23  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/language-specs/gvim.styles: default style scheme.
-	* gtksourceview/gtksourcelanguagesmanager.[ch]: added 
+	* gtksourceview/gtksourcelanguagesmanager.[ch]: added
 	GtkSourceLanguagesManager:style-schemes-dirs property and
 	corresponding api. GtkSourceLanguages now also manages style
 	schemes similar to languages.
@@ -399,7 +407,7 @@
 	* gtksourceview/gtksourceview.c: connect to notify::buffer on view
 	to update priv->source_buffer pointer; set style scheme in the buffer
 	only after we got a GtkSourceBuffer.
-	* tests/test-widget.c: use style schemes files in 
+	* tests/test-widget.c: use style schemes files in
 	$srcdir/gtksourceview/language-specs and set the non-default one.
 
 2006-07-23  Yevgen Muntyan  <muntyan@tamu.edu>
