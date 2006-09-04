@@ -1,5 +1,12 @@
 2006-09-03  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/language-specs/def.lang: added "complex" style
+	for complex numbers.
+	* gtksourceview/language-specs/python.lang: correctly highlight
+	numbers, def:whatevernumber are broken.
+
+2006-09-03  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c (create_reg_all): include
 	regex error into the error message.
 	* gtksourceview/language-specs/c.lang,
