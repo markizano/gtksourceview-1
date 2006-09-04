@@ -1,5 +1,10 @@
 2006-09-03  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c (segment_destroy_children): 
+	do not read from g_free'd memory.
+
+2006-09-03  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/language-specs/def.lang: added "complex" style
 	for complex numbers.
 	* gtksourceview/language-specs/python.lang: correctly highlight
