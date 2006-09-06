@@ -1,3 +1,23 @@
+2006-09-06  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcecontextengine.c,
+	gtksourceview/gtksourcelanguage-parser-2.c
+	gtksourceview/gtksourcelanguage.[ch]
+	gtksourceview/gtksourcelanguagesmanager.[ch]
+	gtksourceview/language-specs/c.lang
+	gtksourceview/language-specs/changelog.lang
+	gtksourceview/language-specs/cpp.lang
+	gtksourceview/language-specs/def.lang
+	gtksourceview/language-specs/diff.lang
+	gtksourceview/language-specs/html.lang
+	gtksourceview/language-specs/language2.rng
+	gtksourceview/language-specs/latex.lang
+	gtksourceview/language-specs/m4.lang
+	gtksourceview/language-specs/python.lang
+	gtksourceview/language-specs/xml.lang
+	gtksourceview/language-specs/yacc.lang
+	tests/test-widget.c: removed globs from lang files.
+
 2006-09-03  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcecontextengine.c (segment_erase_range_): 

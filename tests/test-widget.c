@@ -302,9 +302,6 @@ get_language_for_file (GtkSourceLanguagesManager *manager,
 	g_free (uri);
 #endif
 
-	if (!language)
-		language = gtk_source_languages_manager_get_language_for_filename (manager, filename);
-
 	return language;
 }
 

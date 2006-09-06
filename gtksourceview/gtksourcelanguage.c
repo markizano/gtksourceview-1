@@ -166,7 +166,6 @@ gtk_source_language_finalize (GObject *object)
 		g_free (lang->priv->section);
 		g_free (lang->priv->id);
 		slist_deep_free (lang->priv->mime_types);
-		slist_deep_free (lang->priv->globs);
 		g_hash_table_destroy (lang->priv->styles);
 		g_free (lang->priv->line_comment);
 		g_free (lang->priv->block_comment_start);
@@ -180,8 +179,8 @@ gtk_source_language_finalize (GObject *object)
 }
 
 static GSList *
-parse_mime_types_or_globs (xmlTextReaderPtr reader,
-			   const char      *attr_name)
+parse_mime_types (xmlTextReaderPtr reader,
+		  const char      *attr_name)
 {
 	xmlChar *attr;
 	gchar **mtl;
@@ -440,8 +439,7 @@ process_language_node (xmlTextReaderPtr reader, const gchar *filename)
 
 	xmlFree (version);
 
-	lang->priv->mime_types = parse_mime_types_or_globs (reader, "mimetypes");
-	lang->priv->globs = parse_mime_types_or_globs (reader, "globs");
+	lang->priv->mime_types = parse_mime_types (reader, "mimetypes");
 
 	if (lang->priv->version == GTK_SOURCE_LANGUAGE_VERSION_2_0)
 		process_brackets_and_comments (reader, lang);
@@ -525,23 +523,6 @@ gtk_source_language_get_mime_types (GtkSourceLanguage *language)
 	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
 
 	return slist_deep_copy (language->priv->mime_types);
-}
-
-/**
- * gtk_source_language_get_globs:
- * @language: a #GtkSourceLanguage.
- *
- * Returns a list of globs for the given @language.  After usage you should
- * free each element of the list as well as the list itself.
- *
- * Return value: a list of globs (strings).
- **/
-GSList *
-gtk_source_language_get_globs (GtkSourceLanguage *language)
-{
-	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
-
-	return slist_deep_copy (language->priv->globs);
 }
 
 /**

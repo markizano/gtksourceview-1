@@ -32,9 +32,6 @@
         <optional>
             <attribute name="mimetypes"/>
         </optional>
-        <optional>
-            <attribute name="globs"/>
-        </optional>
 
         <optional>
             <ref name="metadata"/>

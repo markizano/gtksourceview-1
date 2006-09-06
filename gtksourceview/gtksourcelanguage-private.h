@@ -43,7 +43,6 @@ struct _GtkSourceLanguagePrivate
 	gboolean		 hidden;
 
 	GSList			*mime_types;
-	GSList			*globs;
 
 	gchar			*brackets;
 	gchar			*line_comment;
