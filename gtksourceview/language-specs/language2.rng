@@ -56,11 +56,6 @@
         <ref name="definitions" />
 
         <optional>
-            <element name="brackets">
-                <text/>
-            </element>
-        </optional>
-        <optional>
             <element name="line-comment">
                 <attribute name="start"/>
             </element>

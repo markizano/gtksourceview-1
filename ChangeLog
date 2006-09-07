@@ -1,5 +1,14 @@
 2006-09-06  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcelanguage.c,
+	gtksourceview/gtksourcelanguage-private.h,
+	gtksourceview/language-specs/c.lang
+	gtksourceview/language-specs/cpp.lang
+	gtksourceview/language-specs/language2.rng
+	gtksourceview/language-specs/yacc.lang: removed brackets too.
+
+2006-09-06  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c,
 	gtksourceview/gtksourcelanguage-parser-2.c
 	gtksourceview/gtksourcelanguage.[ch]

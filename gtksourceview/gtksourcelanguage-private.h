@@ -44,7 +44,6 @@ struct _GtkSourceLanguagePrivate
 
 	GSList			*mime_types;
 
-	gchar			*brackets;
 	gchar			*line_comment;
 	gchar			*block_comment_start;
 	gchar			*block_comment_end;
