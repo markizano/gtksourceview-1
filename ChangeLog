@@ -1,5 +1,11 @@
 2006-09-06  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	*gtksourceview/language-specs/sh.lang: renamed line-comment
+	to "comment".
+	*gtksourceview/language-specs/m4.lang: added dnl comment.
+
+2006-09-06  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcelanguage.c,
 	gtksourceview/gtksourcelanguage-private.h,
 	gtksourceview/language-specs/c.lang
