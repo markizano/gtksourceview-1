@@ -1,8 +1,22 @@
+2006-09-10  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/libegg/regex/pcre/pcre.h: removed win32 DLL_EXPORT
+	stuff. It broke windows build, and we are not exporting pcre symbols 
+	anyway.
+	* gtksourceview/gtksourcecontextengine.[ch]: implemented two-phase
+	parsing for context references. Modified DefinitionChild structure
+	to keep context id or definition; moved context style to it to
+	remove a need to copy contexts (copying contexts was introduced for
+	overriding styles); modifed lot of functions to accept DefinitionChild
+	instead of ContextDefinition, so style and everything are correct.
+	* gtksourceview/gtksourcelanguage-parser-2.c: (hopefully) made XML
+	error handler work; added call to _gtk_source_context_engine_resolve_refs.
+
 2006-09-06  Yevgen Muntyan  <muntyan@tamu.edu>
 
-	*gtksourceview/language-specs/sh.lang: renamed line-comment
+	* gtksourceview/language-specs/sh.lang: renamed line-comment
 	to "comment".
-	*gtksourceview/language-specs/m4.lang: added dnl comment.
+	* gtksourceview/language-specs/m4.lang: added dnl comment.
 
 2006-09-06  Yevgen Muntyan  <muntyan@tamu.edu>
 
