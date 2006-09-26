@@ -1603,6 +1603,7 @@ text_reader_structured_error_func (GError     **gerror,
 	if (*gerror == NULL)
 		g_set_error (gerror, PARSER_ERROR, PARSER_ERROR_INVALID_DOC, "parser error");
 
+	/* XXX: g_print now because of --g-fatal-warnings */
 	g_print ("in file %s on line %d: %s\n", error->file, error->line, error->message);
 }
 
@@ -1787,8 +1788,6 @@ _gtk_source_language_file_parse_version2 (GtkSourceLanguage       *language,
 
 	filename = language->priv->lang_file_name;
 
-	/* TODO: tell the parser to validate the document while parsing
-	 * (XML_PARSE_DTD_VALID or XML_PARSER_VALIDATE). */
 	/* TODO: as an optimization tell the parser to merge CDATA
 	 * as text nodes (XML_PARSE_NOCDATA), and to ignore blank
 	 * nodes (XML_PARSE_NOBLANKS), if it is possible with
@@ -1808,7 +1807,7 @@ _gtk_source_language_file_parse_version2 (GtkSourceLanguage       *language,
 			      &loaded_lang_ids, &error);
 
 	if (success)
-		_gtk_source_context_engine_resolve_refs (engine, &error);
+		success = _gtk_source_context_engine_resolve_refs (engine, &error);
 
 	if (success)
 		g_hash_table_foreach_steal (styles,
