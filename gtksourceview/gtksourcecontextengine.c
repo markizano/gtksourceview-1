@@ -64,8 +64,11 @@
 #define FIRST_UPDATE_TIME_SLICE		10
 /* Priority of long running idle which is used to analyze whole buffer, if
  * the engine wasn't quick enough to analyze it in one shot. */
-/* FIXME lower this priority */
-#define INCREMENTAL_UPDATE_PRIORITY	GTK_TEXT_VIEW_PRIORITY_VALIDATE
+/* FIXME this priority is low, since we don't want to block other gui stuff.
+ * But, e.g. if we have a big file, and scroll down, we do want the engine
+ * to analyze quickly. Perhaps we want to reinstall first_update in case
+ * of expose events or something. */
+#define INCREMENTAL_UPDATE_PRIORITY	G_PRIORITY_LOW
 /* Maximal amount of time allowed to spent in one cycle of background idle. */
 #define INCREMENTAL_UPDATE_TIME_SLICE	30
 
@@ -245,6 +248,7 @@ struct _Context
 	GtkTextTag	       **subpattern_tags;
 
 	guint			 ref_count;
+	/* see context_freeze() */
 	guint                    frozen : 1;
 
 	/* Do all the ancestors extend their parent? */
@@ -3095,6 +3099,22 @@ context_freeze_hash_cb (G_GNUC_UNUSED gpointer text,
 	context_freeze (context);
 }
 
+/**
+ * context_freeze:
+ *
+ * @context: the context.
+ *
+ * Recursively increments reference count in context and its children,
+ * and marks them, so context_thaw is able to correctly decrement
+ * reference count.
+ * This function is for update_syntax: we want to preserve existing
+ * contexts when possible, and update_syntax erases contexts from
+ * reanalyzed lines; so to avoid destructing and recreating contexts
+ * every time, we need to increment reference count on existing contexts,
+ * and decrement it when we are done with analysis, so no more needed
+ * contexts go away. Keeping a list of referenced contexts is painful
+ * or slow, so we just reference all contexts present at the moment.
+ */
 static void
 context_freeze (Context *ctx)
 {
@@ -3127,6 +3147,14 @@ get_child_contexts_hash_cb (G_GNUC_UNUSED gpointer text,
 	*list = g_slist_prepend (*list, context);
 }
 
+/**
+ * context_thaw:
+ *
+ * @context: the context.
+ *
+ * Recursively decrements reference count in context and its children,
+ * if it was incremented by context_freeze.
+ */
 static void
 context_thaw (Context *ctx)
 {
@@ -3224,6 +3252,22 @@ create_child_context (Context           *parent,
 	return context;
 };
 
+/**
+ * segment_new:
+ *
+ * @ce: the engine.
+ * @parent: parent segment (NULL for the root segment).
+ * @context: context for this segment (NULL for invalid segments).
+ * @start_at: start offset.
+ * @end_at: end offset.
+ * @is_start: is_start flag.
+ *
+ * Creates a new segment structure. It doesn't take care about
+ * parent or siblings, create_segment() is the function to
+ * create new segments in the tree.
+ *
+ * Returns: newly created segment.
+ */
 static Segment *
 segment_new (GtkSourceContextEngine *ce,
 	     Segment                *parent,
@@ -3317,6 +3361,20 @@ find_segment_position_backward_ (Segment  *segment,
 	}
 }
 
+/**
+ * find_segment_position:
+ *
+ * @parent: parent segment (not NULL).
+ * @hint: segment somewhere near new segment position.
+ * @start_at: start offset.
+ * @end_at: end offset.
+ * @prev: location to return previous sibling.
+ * @next: location to return next sibling.
+ *
+ * Finds siblings of a new segment to be created at interval
+ * (start_at, end_at). It uses hint to avoid walking whole
+ * parent->children list.
+ */
 static void
 find_segment_position (Segment  *parent,
 		       Segment  *hint,
@@ -3356,6 +3414,21 @@ find_segment_position (Segment  *parent,
 		return find_segment_position_backward_ (hint, start_at, end_at, prev, next);
 }
 
+/**
+ * create_segment:
+ *
+ * @ce: the engine.
+ * @parent: parent segment (NULL for the root segment).
+ * @context: context for this segment (NULL for invalid segments).
+ * @start_at: start offset.
+ * @end_at: end offset.
+ * @is_start: is_start flag.
+ * @hint: a segment somewhere near new one, to omtimize search.
+ *
+ * Creates a new segment and inserts it into the tree.
+ *
+ * Returns: newly created segment.
+ */
 static Segment *
 create_segment (GtkSourceContextEngine *ce,
 		Segment                *parent,
@@ -3411,6 +3484,14 @@ create_segment (GtkSourceContextEngine *ce,
 	return segment;
 }
 
+/**
+ * segment_extend:
+ *
+ * @state: the semgent.
+ * @end_at: new end offset.
+ *
+ * Updates end offset in the segment and its ancestors.
+ */
 static void
 segment_extend (Segment *state,
 		gint     end_at)
@@ -3454,6 +3535,17 @@ segment_destroy_children (GtkSourceContextEngine *ce,
 	}
 }
 
+/**
+ * segment_destroy:
+ *
+ * @ce: the engine.
+ * @context: the segment to destroy.
+ *
+ * Recursively frees given segment. It removes the segment
+ * from ce structure, but it doesn't update parent and
+ * siblings. segment_remove() is the function that takes
+ * care of everything.
+ */
 static void
 segment_destroy (GtkSourceContextEngine *ce,
 		 Segment                *segment)
@@ -3482,6 +3574,11 @@ segment_destroy (GtkSourceContextEngine *ce,
 #endif
 }
 
+/**
+ * container_context_starts_here:
+ *
+ * See child_starts_here.
+ */
 static gboolean
 container_context_starts_here (GtkSourceContextEngine  *ce,
 			       Segment                 *state,
@@ -3536,6 +3633,11 @@ container_context_starts_here (GtkSourceContextEngine  *ce,
 	return TRUE;
 }
 
+/**
+ * simple_context_starts_here:
+ *
+ * See child_starts_here.
+ */
 static gboolean
 simple_context_starts_here (GtkSourceContextEngine *ce,
 			    Segment                *state,
@@ -3631,6 +3733,17 @@ child_starts_here (GtkSourceContextEngine *ce,
 	}
 }
 
+/**
+ * segment_ends_here:
+ *
+ * @state: the segment.
+ * @line: analyzed line.
+ * @pos: the position inside @line.
+ *
+ * Checks whether given segment ends at pos. Unlike
+ * child_starts_here it doesn't modify tree, it merely
+ * calls regex_match() for the end regex.
+ */
 static gboolean
 segment_ends_here (Segment  *state,
 		   LineInfo *line,
@@ -3646,20 +3759,17 @@ segment_ends_here (Segment  *state,
 }
 
 /**
- * ancestor_ends_here:
+ * ancestor_context_ends_here:
  *
- * @state: current state.
+ * @state: current context.
  * @line: the line to analyze.
  * @line_pos: the position inside @line.
- * @line_length: the length of @line.
- * @new_state: where to store the new state.
  *
- * Verifies if an ancestor context ends at the current position. If
- * state changed and @new_state is not NULL, then the new state is stored
- * in @new_state, and descendants of @new_state are closed, so the
- * terminating segment becomes current state.
+ * Verifies if some ancestor context ends at the current position.
+ * This function only checks conetxts and does not modify the tree,
+ * it's used by ancestor_ends_here().
  *
- * Return value: %TRUE if an ancestor ends at the given position.
+ * Return value: the ancestor context that terminates here or NULL.
  */
 static Context *
 ancestor_context_ends_here (Context                *state,
@@ -3710,6 +3820,21 @@ ancestor_context_ends_here (Context                *state,
 	return terminating_context;
 }
 
+/**
+ * ancestor_ends_here:
+ *
+ * @state: current state.
+ * @line: the line to analyze.
+ * @line_pos: the position inside @line.
+ * @new_state: where to store the new state.
+ *
+ * Verifies if some ancestor context ends at given position. If
+ * state changed and @new_state is not NULL, then the new state is stored
+ * in @new_state, and descendants of @new_state are closed, so the
+ * terminating segment becomes current state.
+ *
+ * Return value: %TRUE if an ancestor ends at the given position.
+ */
 static gboolean
 ancestor_ends_here (Segment                *state,
 		    LineInfo               *line,
@@ -4383,7 +4508,7 @@ get_segment_at_offset (GtkSourceContextEngine *ce,
  * segment_remove:
  *
  * @ce: #GtkSoucreContextEngine.
- * @segment: segment remove.
+ * @segment: segment to remove.
  *
  * Removes the segment from syntax tree and frees it.
  * It correctly updates parent's children list, not
@@ -4840,9 +4965,7 @@ erase_segments (GtkSourceContextEngine *ce,
  * when time elapsed is greater than %time, so analyzed region is
  * not necessarily what's requested (unless %time is 0).
  */
-/* XXX it needs to be refactored. I'm not doing it now because it's
- * not clear whether it does the right thing (it was rewritten two times
- * already). */
+/* XXX it needs to be refactored. */
 static void
 update_syntax (GtkSourceContextEngine *ce,
 	       const GtkTextIter      *end,
@@ -4940,10 +5063,12 @@ update_syntax (GtkSourceContextEngine *ce,
 		erase_segments (ce, line_start_offset, line_end_offset, ce->priv->hint);
                 get_line_info (buffer, &line_start, &line_end, &line);
 
+#ifdef ENABLE_CHECK_TREE
 		{
-			invalid = get_invalid_segment (ce);
-			g_assert (!invalid || invalid->start_at >= line_end_offset);
+			Segment *inv = get_invalid_segment (ce);
+			g_assert (inv == NULL || inv->start_at >= line_end_offset);
 		}
+#endif
 
 		if (line_start_offset == 0)
 			state = ce->priv->root_segment;
@@ -4960,9 +5085,11 @@ update_syntax (GtkSourceContextEngine *ce,
 
 		state = analyze_line (ce, state, &line);
 
-		invalid = get_invalid_segment (ce);
 #ifdef ENABLE_CHECK_TREE
-		g_assert (invalid == NULL || invalid->start_at >= line_end_offset);
+		{
+			Segment *inv = get_invalid_segment (ce);
+			g_assert (inv == NULL || inv->start_at >= line_end_offset);
+		}
 #endif
 
 		/* XXX this is wrong */
@@ -5063,6 +5190,7 @@ update_syntax (GtkSourceContextEngine *ce,
 	g_timer_destroy (timer);
 
 out:
+	/* must call context_thaw, so this is the only return point */
 	context_thaw (ce->priv->root_context);
 }
 

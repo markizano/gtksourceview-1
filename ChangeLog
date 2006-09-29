@@ -1,5 +1,9 @@
 2006-09-29  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c: More docs.
+
+2006-09-29  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c: 
 	(find_insertion_place): removed XXX comment.
 	Little cleanup before rewriting update_syntax().
