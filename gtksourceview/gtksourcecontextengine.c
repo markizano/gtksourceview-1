@@ -19,6 +19,9 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
+/* FIXME adjacent invalid segments: is it a problem? it should be taken care of,
+ * but need to check anyway (it's really impossible to *test*) */
+
 #include "gtksourceview-i18n.h"
 #include "gtksourcecontextengine.h"
 #include "gtktextregion.h"
@@ -1651,7 +1654,7 @@ delete_range_ (GtkSourceContextEngine *ce,
 {
 	g_return_if_fail (start < end);
 
-	/* XXX it may make two invalid segments adjacent, and we can get crash */
+	/* FIXME adjacent invalid segments? */
 	erase_segments (ce, start, end, NULL);
 	fix_offsets_delete_ (ce->priv->root_segment, start, end - start, ce->priv->hint);
 
@@ -1811,10 +1814,6 @@ update_tree (GtkSourceContextEngine *ce)
  * Makes sure the area is analyzed and highlighted. If %asynchronous
  * is FALSE, then it queues idle worker.
  */
-/* XXX make sure regions requested and highlighted are the same,
-   so we don't install an idle just because a view gave us a
-   start iter of the line it doesn't care about (and vice versa
-   in update_syntax) */
 static void
 gtk_source_context_engine_update_highlight (GtkSourceEngine   *engine,
 					    const GtkTextIter *start,
@@ -2746,7 +2745,6 @@ can_apply_match (Context  *state,
 		 * the end of the ancestor.
 		 * For instance in C a net-address context matches even if
 		 * it contains the end of a multi-line comment. */
-		/* XXX pos and match_start ?? */
 		if (!regex_match (regex, line->text, pos, match_start))
 		{
 			/* This match is not valid, so we can try to match
@@ -4361,11 +4359,16 @@ get_segment_at_offset (GtkSourceContextEngine *ce,
 	if (offset == ce->priv->root_segment->end_at)
 		return ce->priv->root_segment;
 
+#if 1
+	/* if you see this message (often), then something is
+	 * wrong with the hints business, i.e. optimizations
+	 * do not work quite like they should */
 	if (hint == NULL || hint == ce->priv->root_segment)
 	{
 		static int c;
 		g_print ("searching from root %d\n", ++c);
 	}
+#endif
 
 	result = get_segment_ (hint ? hint : ce->priv->root_segment, offset);
 

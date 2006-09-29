@@ -2,6 +2,7 @@
 
 	* gtksourceview/gtksourcecontextengine.c: 
 	(find_insertion_place): removed XXX comment.
+	Little cleanup before rewriting update_syntax().
 
 2006-09-26  Yevgen Muntyan  <muntyan@tamu.edu>
 
