@@ -29,9 +29,9 @@
 #include <errno.h>
 #include <string.h>
 
-#define ENABLE_DEBUG
-#define ENABLE_PROFILE
-#define ENABLE_CHECK_TREE
+#undef ENABLE_DEBUG
+#undef ENABLE_PROFILE
+#undef ENABLE_CHECK_TREE
 
 #ifdef ENABLE_DEBUG
 #define DEBUG(x) (x)
@@ -1123,20 +1123,16 @@ find_insertion_place (Segment  *segment,
 		return;
 	}
 
-	/* XXX grand child might be invalid, so we still can get two
-	 * adjacent zero-length segments, and crash */
 	if (segment->start_at == offset)
 	{
-		if (SEGMENT_IS_INVALID (segment->children) &&
-		    segment->children->start_at == offset)
-		{
-			*parent = segment->children;
-		}
-		else
-		{
-			*parent = segment;
-			*next = segment->children;
-		}
+#ifdef ENABLE_CHECK_TREE
+		g_assert (!segment->children ||
+			  !SEGMENT_IS_INVALID (segment->children) ||
+			  segment->children->start_at > offset);
+#endif
+
+		*parent = segment;
+		*next = segment->children;
 
 		return;
 	}

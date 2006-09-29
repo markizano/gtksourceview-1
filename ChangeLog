@@ -1,3 +1,20 @@
+2006-09-29  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcecontextengine.c: 
+	(find_insertion_place): removed XXX comment.
+
+2006-09-26  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcecontextengine.c: added is_start
+	flag to segments: fixed the bug with multi-line contexts, 
+	when start of a context erroneously became end of new context,
+	breaking sh highlighting. Added more docs.
+	* gtksourceview/gtksourcelanguage-parser-2.c: 
+	(_gtk_source_language_file_parse_version2): do not ignore
+	return value of _gtk_source_context_engine_resolve_refs.
+	* gtksourceview/language-specs/c.lang: added 'warning' to
+	the list of preprocessor directives.
+
 2006-09-10  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/libegg/regex/pcre/pcre.h: removed win32 DLL_EXPORT
