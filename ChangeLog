@@ -1,20 +1,43 @@
+2006-10-02  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcelanguage.[ch],
+	gtksourceview/gtksourcelanguage-private.h:
+	removed list of mime types and comments from GtkSourceLanguage;
+	added properties, read from lang files.
+	* gtksourceview/language-specs/changelog.lang,
+	gtksourceview/language-specs/c.lang,
+	gtksourceview/language-specs/cpp.lang,
+	gtksourceview/language-specs/diff.lang,
+	gtksourceview/language-specs/html.lang,
+	gtksourceview/language-specs/javascript.lang,
+	gtksourceview/language-specs/latex.lang,
+	gtksourceview/language-specs/m4.lang,
+	gtksourceview/language-specs/makefile.lang,
+	gtksourceview/language-specs/python.lang,
+	gtksourceview/language-specs/sh.lang,
+	gtksourceview/language-specs/xml.lang,
+	gtksourceview/language-specs/yacc.lang:
+	modified as appropriate.
+	* gtksourceview/language-specs/language2.rng: modified to
+	allow <property> tags in <metadata>.
+
 2006-09-29  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcecontextengine.c: More docs.
 
 2006-09-29  Yevgen Muntyan  <muntyan@tamu.edu>
 
-	* gtksourceview/gtksourcecontextengine.c: 
+	* gtksourceview/gtksourcecontextengine.c:
 	(find_insertion_place): removed XXX comment.
 	Little cleanup before rewriting update_syntax().
 
 2006-09-26  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcecontextengine.c: added is_start
-	flag to segments: fixed the bug with multi-line contexts, 
+	flag to segments: fixed the bug with multi-line contexts,
 	when start of a context erroneously became end of new context,
 	breaking sh highlighting. Added more docs.
-	* gtksourceview/gtksourcelanguage-parser-2.c: 
+	* gtksourceview/gtksourcelanguage-parser-2.c:
 	(_gtk_source_language_file_parse_version2): do not ignore
 	return value of _gtk_source_context_engine_resolve_refs.
 	* gtksourceview/language-specs/c.lang: added 'warning' to
@@ -23,7 +46,7 @@
 2006-09-10  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/libegg/regex/pcre/pcre.h: removed win32 DLL_EXPORT
-	stuff. It broke windows build, and we are not exporting pcre symbols 
+	stuff. It broke windows build, and we are not exporting pcre symbols
 	anyway.
 	* gtksourceview/gtksourcecontextengine.[ch]: implemented two-phase
 	parsing for context references. Modified DefinitionChild structure
@@ -71,12 +94,12 @@
 
 2006-09-03  Yevgen Muntyan  <muntyan@tamu.edu>
 
-	* gtksourceview/gtksourcecontextengine.c (segment_erase_range_): 
+	* gtksourceview/gtksourcecontextengine.c (segment_erase_range_):
 	last commit broke it, fixed.
 
 2006-09-03  Yevgen Muntyan  <muntyan@tamu.edu>
 
-	* gtksourceview/gtksourcecontextengine.c (segment_destroy_children): 
+	* gtksourceview/gtksourcecontextengine.c (segment_destroy_children):
 	do not read from g_free'd memory.
 
 2006-09-03  Yevgen Muntyan  <muntyan@tamu.edu>
