@@ -1,3 +1,29 @@
+2006-10-28  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcebuffer.c
+	(gtk_soucre_buffer_set_bracket_match_style): don't fail
+	when style is NULL.
+	* gtksourceview/gtksourcecontextengine.[ch],
+	gtksourceview/gtksourcelanguage-parser-2.c: less non-standard
+	things like trailing comma in enums; got rid of anonymous structs.
+	* gtksourceview/gtksourcelanguage.c (process_language_node): do not 
+	forget "mimetypes" attribute.
+	* gtksourceview/gtksourcestylemanager.[ch]: GtkSourceStyleManager
+	class.
+	* gtksourceview/gtksourcelanguagesmanager.[ch]: moved style
+	scheme stuff into GtkSourceStyleManager.
+	* gtksourceview/gtksourcestyle.[ch]: removed _gtk_source_style_unapply;
+	moved its functionality into _gtk_source_style_apply.
+	* gtksourceview/gtksourcestylescheme.[ch]: added methods required by 
+	GtkSourceStyleManager, made gtk_source_style_scheme_new private.
+	* gtksourceview/gtksourceview.c: do not set default scheme in
+	constructor.
+	* gtksourceview/language-specs/makefile.lang: added keywords from
+	old lang file.
+	* gtksourceview/language-specs/sh.lang: reverted to old lang file.
+	* tests/test-widget.c: added --style-scheme argument; fixed TEST_XML_MEM
+	stuff.
+
 2006-10-02  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcelanguage.[ch],

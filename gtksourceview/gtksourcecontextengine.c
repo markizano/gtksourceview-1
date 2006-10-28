@@ -117,7 +117,7 @@ typedef enum {
 
 typedef enum {
 	CONTEXT_TYPE_SIMPLE = 0,
-	CONTEXT_TYPE_CONTAINER,
+	CONTEXT_TYPE_CONTAINER
 } ContextType;
 
 typedef enum {
@@ -445,15 +445,17 @@ static void		install_first_update	(GtkSourceContextEngine	*ce);
 
 /* TAGS AND STUFF -------------------------------------------------------------- */
 
+struct BufAndIters {
+	GtkTextBuffer *buffer;
+	const GtkTextIter *start, *end;
+};
+
 static void
 unhighlight_region_cb (G_GNUC_UNUSED gpointer style,
 		       GSList   *tags,
 		       gpointer  user_data)
 {
-	struct {
-		GtkTextBuffer *buffer;
-		const GtkTextIter *start, *end;
-	} *data = user_data;
+	struct BufAndIters *data = user_data;
 
 	while (tags != NULL)
 	{
@@ -470,10 +472,11 @@ unhighlight_region (GtkSourceContextEngine *ce,
 		    const GtkTextIter      *start,
 		    const GtkTextIter      *end)
 {
-	struct {
-		GtkTextBuffer *buffer;
-		const GtkTextIter *start, *end;
-	} data = {ce->priv->buffer, start, end};
+	struct BufAndIters data;
+
+	data.buffer = ce->priv->buffer;
+	data.start = start;
+	data.end = end;
 
 	if (gtk_text_iter_equal (start, end))
 		return;
@@ -491,7 +494,7 @@ set_tag_style (GtkSourceContextEngine *ce,
 	g_return_if_fail (GTK_IS_TEXT_TAG (tag));
 	g_return_if_fail (style_name != NULL);
 
-	_gtk_source_style_unapply (tag);
+	_gtk_source_style_apply (NULL, tag);
 
 	if (ce->priv->style_scheme == NULL)
 		return;
@@ -988,7 +991,10 @@ find_insertion_place_forward_ (Segment  *segment,
 	for (child = start; child != NULL; child = child->next)
 	{
 		if (child->start_at <= offset && child->end_at >= offset)
-			return find_insertion_place (child, offset, parent, prev, next, NULL);
+		{
+			find_insertion_place (child, offset, parent, prev, next, NULL);
+			return;
+		}
 
 		if (child->end_at == offset)
 		{
@@ -1054,7 +1060,10 @@ find_insertion_place_backward_ (Segment  *segment,
 	for (child = start; child != NULL; child = child->prev)
 	{
 		if (child->start_at <= offset && child->end_at >= offset)
-			return find_insertion_place (child, offset, parent, prev, next, NULL);
+		{
+			find_insertion_place (child, offset, parent, prev, next, NULL);
+			return;
+		}
 
 		if (child->end_at == offset)
 		{
@@ -1665,7 +1674,7 @@ delete_range_ (GtkSourceContextEngine *ce,
 	/* no need to invalidate at start, update_tree will do it */
 
 	CHECK_TREE (ce);
-};
+}
 
 /**
  * gtk_source_context_engine_text_deleted:
@@ -2426,6 +2435,11 @@ sub_pattern_to_int (const gchar *name)
 	return number;
 }
 
+struct RegexResolveData {
+	Regex       *start_regex;
+	const gchar *matched_text;
+};
+
 static gboolean
 replace_start_regex (const EggRegex *regex,
 		     const gchar    *matched_text,
@@ -2434,11 +2448,7 @@ replace_start_regex (const EggRegex *regex,
 {
 	gchar *num_string, *subst, *subst_escaped, *escapes;
 	gint num;
-	struct
-	{
-		Regex       *start_regex;
-		const gchar *matched_text;
-	} *data = user_data;
+	struct RegexResolveData *data = user_data;
 
 	escapes = egg_regex_fetch (regex, 1, matched_text);
 	num_string = egg_regex_fetch (regex, 2, matched_text);
@@ -2500,10 +2510,7 @@ regex_resolve (Regex       *regex,
 	EggRegex *start_ref;
 	gchar *expanded_regex;
 	Regex *new_regex;
-	struct {
-		Regex       *start_regex;
-		const gchar *matched_text;
-	} data;
+	struct RegexResolveData data;
 
 	if (regex == NULL || regex->resolved)
 		return regex_ref (regex);
@@ -3250,7 +3257,7 @@ create_child_context (Context           *parent,
 		g_hash_table_insert (ptr->u.hash, match, context);
 
 	return context;
-};
+}
 
 /**
  * segment_new:
@@ -3409,9 +3416,9 @@ find_segment_position (Segment  *parent,
 		hint = parent->children;
 
 	if (hint->end_at <= start_at)
-		return find_segment_position_forward_ (hint, start_at, end_at, prev, next);
+		find_segment_position_forward_ (hint, start_at, end_at, prev, next);
 	else
-		return find_segment_position_backward_ (hint, start_at, end_at, prev, next);
+		find_segment_position_backward_ (hint, start_at, end_at, prev, next);
 }
 
 /**
@@ -5693,17 +5700,19 @@ _gtk_source_context_engine_add_ref (GtkSourceContextEngine    *ce,
  * Checks whether all children of a context definition refer to valid
  * contexts. Called from _gtk_source_context_engine_resolve_refs.
  */
+struct ResolveRefData {
+	GtkSourceContextEngine *ce;
+	GError *error;
+};
+
 static void
-resolve_reference (const gchar       *id,
+resolve_reference (G_GNUC_UNUSED const gchar *id,
 		   ContextDefinition *definition,
 		   gpointer           user_data)
 {
 	GSList *l;
 
-	struct {
-		GtkSourceContextEngine *ce;
-		GError *error;
-	} *data = user_data;
+	struct ResolveRefData *data = user_data;
 
 	if (data->error != NULL)
 		return;
@@ -5756,10 +5765,7 @@ gboolean
 _gtk_source_context_engine_resolve_refs (GtkSourceContextEngine	 *ce,
 					 GError			**error)
 {
-	struct {
-		GtkSourceContextEngine *ce;
-		GError *error;
-	} data;
+	struct ResolveRefData data;
 
 	g_return_val_if_fail (GTK_IS_SOURCE_CONTEXT_ENGINE (ce), FALSE);
 	g_return_val_if_fail (error != NULL && *error == NULL, FALSE);
@@ -5907,15 +5913,17 @@ check_segment (GtkSourceContextEngine *ce,
 	}
 }
 
+struct CheckContextData {
+	Context *parent;
+	ContextDefinition *definition;
+};
+
 static void
 check_context_hash_cb (const char *text,
 		       Context    *context,
 		       gpointer    user_data)
 {
-	struct {
-		Context *parent;
-		ContextDefinition *definition;
-	} *data = user_data;
+	struct CheckContextData *data = user_data;
 
 	g_assert (text != NULL);
 	g_assert (context != NULL);
@@ -5938,10 +5946,9 @@ check_context (Context *context)
 		}
 		else
 		{
-			struct {
-				Context *parent;
-				ContextDefinition *definition;
-			} data = {context, ptr->definition};
+			struct CheckContextData data;
+			data.parent = context;
+			data.definition = ptr->definition;
 			g_hash_table_foreach (ptr->u.hash,
 					      (GHFunc) check_context_hash_cb,
 					      &data);

@@ -24,7 +24,7 @@
 /* If TEST_XML_MEM is defined the test program will try to detect memory
  * allocated by xmlMalloc() but not freed by xmlFree() or freed by xmlFree()
  * but not allocated by xmlMalloc(). */
-// #define TEST_XML_MEM
+#define TEST_XML_MEM
 
 #include <stdio.h>
 #include <string.h>
@@ -33,6 +33,7 @@
 #include <gtksourceview/gtksourceview.h>
 #include <gtksourceview/gtksourcelanguage.h>
 #include <gtksourceview/gtksourcelanguagesmanager.h>
+#include <gtksourceview/gtksourcestylemanager.h>
 #ifdef TEST_XML_MEM
 #include <libxml/xmlreader.h>
 #endif
@@ -45,7 +46,7 @@
 /* Global list of open windows */
 
 static GList *windows = NULL;
-
+static GtkSourceStyleScheme *style_scheme = NULL;
 
 /* Private data structures */
 
@@ -565,10 +566,10 @@ open_file_cb (GtkAction *action, gpointer user_data)
 					       GTK_STOCK_OPEN, GTK_RESPONSE_OK,
 					       NULL);
 
-	if (!last_dir)
+	if (last_dir == NULL)
 		last_dir = g_strdup (TOP_SRCDIR "/gtksourceview");
 
-	if (last_dir)
+	if (last_dir != NULL && g_path_is_absolute (last_dir))
 		gtk_file_chooser_set_current_folder (GTK_FILE_CHOOSER (chooser),
 						     last_dir);
 
@@ -779,8 +780,6 @@ create_view_window (GtkSourceBuffer *buffer, GtkSourceView *from)
 	GtkActionGroup *action_group;
 	GtkUIManager *ui_manager;
 	GError *error;
-	const GSList *schemes;
-	GtkSourceLanguagesManager *lm;
 
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
 	g_return_val_if_fail (from == NULL || GTK_IS_SOURCE_VIEW (from), NULL);
@@ -794,10 +793,8 @@ create_view_window (GtkSourceBuffer *buffer, GtkSourceView *from)
 	/* view */
 	view = gtk_source_view_new_with_buffer (buffer);
 
-	lm = g_object_get_data (G_OBJECT (buffer), "languages-manager");
-	schemes = gtk_source_languages_manager_get_available_style_schemes (lm);
-	if (schemes->next)
-		gtk_source_view_set_style_scheme (GTK_SOURCE_VIEW (view), schemes->next->data);
+	if (style_scheme)
+		gtk_source_view_set_style_scheme (GTK_SOURCE_VIEW (view), style_scheme);
 
 	g_signal_connect (buffer, "mark_set", G_CALLBACK (move_cursor_cb), view);
 	g_signal_connect (buffer, "changed", G_CALLBACK (update_cursor_position), view);
@@ -1004,78 +1001,75 @@ create_source_buffer (GtkSourceLanguagesManager *manager)
 
 #ifdef TEST_XML_MEM
 
-static GHashTable *xml_mem_table = NULL;
+#define ALIGN 8
 
-static void
-xml_free (void *mem)
+/* my_free(malloc(n)) and free(my_malloc(n)) are invalid and
+ * abort on glibc */
+
+static gpointer
+my_malloc (gsize n_bytes)
 {
-	if (mem == NULL)
-		return;
+	char *mem = malloc (n_bytes + ALIGN);
+	return mem ? mem + ALIGN : NULL;
+}
 
-	if (g_hash_table_remove (xml_mem_table, mem))
+static gpointer
+my_realloc (gpointer mem,
+	    gsize    n_bytes)
+{
+	if (mem)
 	{
-		g_free (mem);
+		char *new_mem = realloc ((char*) mem - ALIGN, n_bytes + ALIGN);
+		return new_mem ? new_mem + ALIGN : NULL;
 	}
 	else
 	{
-		g_warning ("Memory at %p (\"%s\") was not allocated by libxml",
-				mem, (gchar*)mem);
+		return my_malloc (n_bytes);
 	}
-}
-
-static void *
-xml_malloc (size_t size)
-{
-	void *allocated_mem = g_malloc (size);
-	g_hash_table_insert (xml_mem_table, allocated_mem, GINT_TO_POINTER (TRUE));
-	return allocated_mem;
-}
-
-static void *
-xml_realloc (void *mem, size_t size)
-{
-	void *allocated_mem;
-
-	if (!g_hash_table_remove (xml_mem_table, mem))
-	{
-		g_warning ("Memory at %p (\"%s\") was not allocated by libxml",
-				mem, (gchar*)mem);
-	}
-
-	allocated_mem = g_realloc (mem, size);
-	g_hash_table_insert (xml_mem_table, allocated_mem, GINT_TO_POINTER (TRUE));
-	return allocated_mem;
 }
 
 static char *
-xml_strdup (const char *str)
+my_strdup (const char *s)
 {
-	void *allocated_mem = g_strdup (str);
-	g_hash_table_insert (xml_mem_table, allocated_mem, GINT_TO_POINTER (TRUE));
-	return allocated_mem;
+	if (s)
+	{
+		char *new_s = my_malloc (strlen (s) + 1);
+		strcpy (new_s, s);
+		return new_s;
+	}
+	else
+	{
+		return NULL;
+	}
 }
 
 static void
-xml_init ()
+my_free (gpointer mem)
 {
-	xml_mem_table = g_hash_table_new (NULL, NULL);
-	if (xmlMemSetup (xml_free, xml_malloc, xml_realloc, xml_strdup) != 0)
-		g_warning ("xmlMemSetup() failed");
+	if (mem)
+		free ((char*) mem - ALIGN);
 }
 
 static void
-xml_table_foreach_cb (gpointer key, gpointer value, gpointer user_data)
+init_mem_stuff (void)
 {
-	/* Some of this memory could be internally allocated by libxml. */
-	g_warning ("Memory at %p (\"%s\") was not freed, freed without using xmlFree() "
-			"or allocated internally by libxml", key, (gchar*)key);
-}
+	if (1)
+	{
+		if (xmlMemSetup (my_free, my_malloc, my_realloc, my_strdup) != 0)
+			g_warning ("xmlMemSetup() failed");
+	}
+	else
+	{
+		GMemVTable mem_table = {
+			my_malloc,
+			my_realloc,
+			my_free,
+			NULL, NULL, NULL
+		};
 
-static void
-xml_finalize ()
-{
-	g_hash_table_foreach (xml_mem_table, xml_table_foreach_cb, NULL);
-	g_hash_table_destroy (xml_mem_table);
+		g_mem_set_vtable (&mem_table);
+		g_slice_set_config (G_SLICE_CONFIG_ALWAYS_MALLOC, TRUE);
+	}
 }
 
 #endif /* TEST_XML_MEM */
@@ -1088,12 +1082,24 @@ main (int argc, char *argv[])
 {
 	GtkWidget *window;
 	GtkSourceLanguagesManager *lm;
+	GtkSourceStyleManager *sm;
 	GtkSourceBuffer *buffer;
 
-	GSList *lang_dirs, *style_dirs;
+	GSList *lang_dirs;
 
-	/* initialization */
-	gtk_init (&argc, &argv);
+	gchar *style_scheme_id = NULL;
+	GOptionContext *context;
+
+	GOptionEntry entries[] = {
+	  { "style-scheme", 's', 0, G_OPTION_ARG_STRING, &style_scheme_id, "Style scheme name to use", "SCHEME"},
+	  { NULL }
+	};
+
+	context = g_option_context_new ("- test GtkSourceView widget");
+	g_option_context_add_main_entries (context, entries, NULL);
+	g_option_context_add_group (context, gtk_get_option_group (TRUE));
+	g_option_context_parse (context, &argc, &argv, NULL);
+
 // 	gdk_window_set_debug_updates (TRUE);
 
 #ifdef USE_GNOME_VFS
@@ -1101,22 +1107,24 @@ main (int argc, char *argv[])
 #endif
 
 #ifdef TEST_XML_MEM
-	xml_init ();
+	init_mem_stuff ();
 #endif
 
 	/* create buffer */
 	lang_dirs = g_slist_prepend (NULL, g_strdup (TOP_SRCDIR "/gtksourceview/language-specs"));
-// 	lang_dirs = g_slist_prepend (NULL, g_strdup ("/usr/share/gtksourceview-1.0/language-specs"));
-	style_dirs = g_slist_prepend (NULL, g_strdup (TOP_SRCDIR "/gtksourceview/language-specs"));
-
 	lm = g_object_new (GTK_TYPE_SOURCE_LANGUAGES_MANAGER,
 			   "lang_files_dirs", lang_dirs,
-			   "style_schemes_dirs", style_dirs,
 			   NULL);
 	g_slist_foreach (lang_dirs, (GFunc) g_free, NULL);
-	g_slist_foreach (style_dirs, (GFunc) g_free, NULL);
 	g_slist_free (lang_dirs);
-	g_slist_free (style_dirs);
+
+	sm = gtk_source_style_manager_new ();
+	gtk_source_style_manager_prepend_search_path (sm, TOP_SRCDIR "/gtksourceview/language-specs");
+
+	if (style_scheme_id != NULL)
+		style_scheme = gtk_source_style_manager_get_scheme (sm, style_scheme_id);
+	if (style_scheme == NULL)
+		style_scheme = gtk_source_style_manager_get_scheme (sm, "gvim");
 
 	buffer = create_source_buffer (lm);
 	g_object_unref (lm);
@@ -1139,9 +1147,8 @@ main (int argc, char *argv[])
 	g_list_free (windows);
 	g_object_unref (buffer);
 
-#ifdef TEST_XML_MEM
-	xml_finalize ();
-#endif
+	g_object_unref (sm);
+	g_free (style_scheme_id);
 
 #ifdef USE_GNOME_VFS
 	gnome_vfs_shutdown ();

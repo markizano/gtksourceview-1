@@ -1042,10 +1042,11 @@ gtk_source_buffer_set_bracket_match_style (GtkSourceBuffer      *source_buffer,
 	}
 	else
 	{
-		_gtk_source_style_unapply (source_buffer->priv->bracket_match_tag);
+		_gtk_source_style_apply (NULL, source_buffer->priv->bracket_match_tag);
 	}
 
-	_gtk_source_style_apply (style, source_buffer->priv->bracket_match_tag);
+	if (style != NULL)
+		_gtk_source_style_apply (style, source_buffer->priv->bracket_match_tag);
 }
 
 /**

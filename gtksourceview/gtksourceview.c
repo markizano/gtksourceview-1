@@ -650,17 +650,6 @@ gtk_source_view_constructor (GType                  type,
 									    construct_param);
 	view = GTK_SOURCE_VIEW (object);
 
-	if (!view->priv->style_scheme)
-	{
-		GtkSourceStyleScheme *scheme = _gtk_source_style_scheme_get_default ();
-
-		if (scheme)
-		{
-			gtk_source_view_set_style_scheme (view, scheme);
-			g_object_unref (scheme);
-		}
-	}
-
 	set_source_buffer (view, gtk_text_view_get_buffer (GTK_TEXT_VIEW (view)));
 
 	return object;

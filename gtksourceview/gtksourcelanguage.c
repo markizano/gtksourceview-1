@@ -231,14 +231,9 @@ process_properties (xmlTextReaderPtr   reader,
 		xmlChar *name;
 		xmlChar *content;
 
-		if (child->type != XML_ELEMENT_NODE)
+		if (child->type != XML_ELEMENT_NODE ||
+		    xmlStrcmp (child->name, BAD_CAST "property") != 0)
 			continue;
-
-		if (xmlStrcmp (child->name, BAD_CAST "property") != 0)
-		{
-			g_warning ("unknown element %s", (char*) child->name);
-			continue;
-		}
 
 		name = xmlGetProp (child, BAD_CAST "name");
 		content = xmlNodeGetContent (child);
@@ -277,6 +272,13 @@ process_language_node (xmlTextReaderPtr reader, const gchar *filename)
 		lang->priv->hidden = string_to_bool ((gchar*) tmp);
 	else
 		lang->priv->hidden = FALSE;
+	xmlFree (tmp);
+
+	tmp = xmlTextReaderGetAttribute (reader, BAD_CAST "mimetypes");
+	if (tmp != NULL)
+		g_hash_table_insert (lang->priv->properties,
+				     g_strdup ("mimetypes"),
+				     g_strdup ((char*) tmp));
 	xmlFree (tmp);
 
 	tmp = xmlTextReaderGetAttribute (reader, BAD_CAST "_name");
