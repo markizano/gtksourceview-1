@@ -1,3 +1,17 @@
+2006-11-06  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/language-specs/python.lang: added globs.
+	* gtksourceview/language-specs/xml.lang: handle correctly
+	xml atrributes with values enclosed into apostrophes
+	<foo bar='blah'>.
+	* gtksourceview/libegg/eggregex/eggregex.c: do not mix
+	pcre and glib memory management api.
+	* gtksourceview/gtksourcestylemanager.c: removed odd message
+	about overridden scheme.
+	* tests/test-widget.c: moved init_mem_stuff() call to the top
+	of main(), so it gets executed before any glib functions when
+	using g_mem_set_vtable().
+
 2006-10-28  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcebuffer.c
@@ -6,7 +20,7 @@
 	* gtksourceview/gtksourcecontextengine.[ch],
 	gtksourceview/gtksourcelanguage-parser-2.c: less non-standard
 	things like trailing comma in enums; got rid of anonymous structs.
-	* gtksourceview/gtksourcelanguage.c (process_language_node): do not 
+	* gtksourceview/gtksourcelanguage.c (process_language_node): do not
 	forget "mimetypes" attribute.
 	* gtksourceview/gtksourcestylemanager.[ch]: GtkSourceStyleManager
 	class.
@@ -14,7 +28,7 @@
 	scheme stuff into GtkSourceStyleManager.
 	* gtksourceview/gtksourcestyle.[ch]: removed _gtk_source_style_unapply;
 	moved its functionality into _gtk_source_style_apply.
-	* gtksourceview/gtksourcestylescheme.[ch]: added methods required by 
+	* gtksourceview/gtksourcestylescheme.[ch]: added methods required by
 	GtkSourceStyleManager, made gtk_source_style_scheme_new private.
 	* gtksourceview/gtksourceview.c: do not set default scheme in
 	constructor.

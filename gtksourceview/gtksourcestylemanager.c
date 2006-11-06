@@ -266,11 +266,8 @@ gtk_source_style_manager_reload (GtkSourceStyleManager *mgr)
 
 			old = g_hash_table_lookup (schemes_hash, id);
 
-			if (old)
-			{
-				g_message ("scheme %s overridden", id);
+			if (old != NULL)
 				schemes = g_slist_remove (schemes, old);
-			}
 
 			schemes = g_slist_prepend (schemes, scheme);
 			g_hash_table_insert (schemes_hash, g_strdup (id), g_object_ref (scheme));

@@ -1095,6 +1095,10 @@ main (int argc, char *argv[])
 	  { NULL }
 	};
 
+#ifdef TEST_XML_MEM
+	init_mem_stuff ();
+#endif
+
 	context = g_option_context_new ("- test GtkSourceView widget");
 	g_option_context_add_main_entries (context, entries, NULL);
 	g_option_context_add_group (context, gtk_get_option_group (TRUE));
@@ -1104,10 +1108,6 @@ main (int argc, char *argv[])
 
 #ifdef USE_GNOME_VFS
 	gnome_vfs_init ();
-#endif
-
-#ifdef TEST_XML_MEM
-	init_mem_stuff ();
 #endif
 
 	/* create buffer */
