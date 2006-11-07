@@ -1,3 +1,10 @@
+2006-11-07  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcestylemanager.h: 
+	gtk_source_style_manager_reload is no longer public.
+	* gtksourceview/gtksourcestylemanager.c: emit "changed"
+	signal when search path changed.
+
 2006-11-06  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/language-specs/python.lang: added globs.
