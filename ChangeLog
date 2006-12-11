@@ -1,3 +1,11 @@
+2006-12-11  Paolo Borelli  <pborelli@katamail.com>
+
+	* gtksourceview/gtksourceview.c:
+	* gtksourceview/gtksourceview.h:
+
+	Backport from HEAD the "indent-on-tab" property and other
+	minor fixes.
+
 2006-11-07  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcestylemanager.h: 
