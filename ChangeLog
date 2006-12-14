@@ -1,5 +1,13 @@
 2006-12-13  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/language-specs/convert.py: do convert "globs"
+	attribute.
+	* gtksourceview/language-specs/check.sh:
+	* gtksourceview/language-specs/perl.lang: converted perl.lang
+	to new format.
+
+2006-12-13  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/libegg/eggregex.c:
 	* gtksourceview/libegg/eggregex.h:
 	* gtksourceview/gtksourcecontextengine.c:
