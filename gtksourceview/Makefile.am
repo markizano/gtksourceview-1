@@ -28,7 +28,6 @@ lib_LTLIBRARIES = libgtksourceview-2.0.la
 libgtksourceview_headers =			\
 	gtksourcebuffer.h			\
 	gtksourceiter.h				\
-	gtksourcetag.h				\
 	gtksourceview.h				\
 	gtksourcelanguage.h			\
 	gtksourcelanguagesmanager.h		\
@@ -40,7 +39,6 @@ libgtksourceview_headers =			\
 libgtksourceview_2_0_la_SOURCES = 	\
 	gtksourcebuffer.c 		\
 	gtksourceiter.c			\
-	gtksourcetag.c 			\
 	gtksourceview.c 		\
 	gtksourceundomanager.h 		\
 	gtksourceundomanager.c 		\
