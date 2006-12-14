@@ -2,7 +2,7 @@
  *
  * Copyright (C) 1999, 2000 Scott Wimer
  * Copyright (C) 2004, Matthias Clasen <mclasen@redhat.com>
- * Copyright (C) 2005 - 2006, Marco Barisione <barisione@gmail.com>
+ * Copyright (C) 2005 - 2006, Marco Barisione <marco@barisione.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -19,44 +19,130 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include "config.h"
-#include <glib.h>
-#include <string.h>
+#ifdef HAVE_CONFIG_H
+# include <config.h>
+#endif
+
 #include "eggregex.h"
+
+#include <glib.h>
+#include <glib/gi18n.h>
+#include <string.h>
+
+#ifdef USE_SYSTEM_PCRE
 #include <pcre.h>
+#else
+#include "pcre/pcre.h"
+#endif
 
-/* FIXME when this is in glib */
-#define _(s) s
+/* Mask of all the possible values for EggRegexCompileFlags. */
+#define EGG_REGEX_COMPILE_MASK (EGG_REGEX_CASELESS		| \
+			      EGG_REGEX_MULTILINE		| \
+			      EGG_REGEX_DOTALL		| \
+			      EGG_REGEX_EXTENDED		| \
+			      EGG_REGEX_ANCHORED		| \
+			      EGG_REGEX_DOLLAR_ENDONLY	| \
+			      EGG_REGEX_UNGREEDY		| \
+			      EGG_REGEX_RAW		| \
+			      EGG_REGEX_NO_AUTO_CAPTURE	| \
+			      EGG_REGEX_DUPNAMES		| \
+			      EGG_REGEX_NEWLINE_CR	| \
+			      EGG_REGEX_NEWLINE_CRLF)
 
-/* if the string is in UTF-8 use g_utf8_next_char(), else just
- * use +1. */
-#define NEXT_CHAR(re, s) (((re)->compile_opts & PCRE_UTF8) ? \
+/* Mask of all the possible values for EggRegexMatchFlags. */
+#define EGG_REGEX_MATCH_MASK (EGG_REGEX_MATCH_ANCHORED	| \
+			    EGG_REGEX_MATCH_NOTBOL	| \
+			    EGG_REGEX_MATCH_NOTEOL	| \
+			    EGG_REGEX_MATCH_NOTEMPTY	| \
+			    EGG_REGEX_MATCH_PARTIAL	| \
+			    EGG_REGEX_MATCH_NEWLINE_CR	| \
+			    EGG_REGEX_MATCH_NEWLINE_LF	| \
+			    EGG_REGEX_MATCH_NEWLINE_CRLF)
+
+/* if the string is in UTF-8 use g_utf8_ functions, else use
+ * use just +/- 1. */
+#define NEXT_CHAR(re, s) (((re)->pattern->compile_opts & PCRE_UTF8) ? \
 				g_utf8_next_char (s) : \
 				((s) + 1))
-
-/* TRUE if ret is an error code, FALSE otherwise. */
-#define IS_PCRE_ERROR(ret) ((ret) < PCRE_ERROR_NOMATCH && (ret) != PCRE_ERROR_PARTIAL)
+#define PREV_CHAR(re, s) (((re)->pattern->compile_opts & PCRE_UTF8) ? \
+				g_utf8_prev_char (s) : \
+				((s) - 1))
 
 #define WORKSPACE_INITIAL 1000
 #define OFFSETS_DFA_MIN_SIZE 21
 
-struct _EggRegex
+/* atomically returns the pcre_extra struct in the regex. */
+#define REGEX_GET_EXTRA(re) ((pcre_extra *)g_atomic_pointer_get (&(re)->pattern->extra))
+
+/* this struct can be shared by more regexes */
+typedef struct
 {
-  gint ref_count;	/* reference count */
-  gchar *pattern;       /* the pattern */
-  pcre *regex;		/* compiled form of the pattern */
-  pcre_extra *extra;	/* data stored when egg_regex_optimize() is used */
-  gint matches;		/* number of matching sub patterns */
-  gint pos;		/* position in the string where last match left off */
-  gint *offsets;	/* array of offsets paired 0,1 ; 2,3 ; 3,4 etc */
-  gint n_offsets;	/* number of offsets */
-  gint *workspace;	/* workspace for pcre_dfa_exec() */
-  gint n_workspace;	/* number of workspace elements */
+  volatile guint ref_count;	/* the ref count for the immutable part */
+  gchar *pattern;		/* the pattern */
+  pcre *pcre_re;		/* compiled form of the pattern */
   EggRegexCompileFlags compile_opts;	/* options used at compile time on the pattern */
   EggRegexMatchFlags match_opts;	/* options used at match time on the regex */
-  gssize string_len;	/* length of the string last used against */
-  GSList *delims;	/* delimiter sub strings from split next */
+  pcre_extra *extra;		/* data stored when egg_regex_optimize() is used */
+} EggRegexPattern;
+
+/* this struct is used only by a single regex */
+typedef struct
+{
+  gint matches;			/* number of matching sub patterns */
+  gint pos;			/* position in the string where last match left off */
+  gint *offsets;		/* array of offsets paired 0,1 ; 2,3 ; 3,4 etc */
+  gint n_offsets;		/* number of offsets */
+  gint *workspace;		/* workspace for pcre_dfa_exec() */
+  gint n_workspace;		/* number of workspace elements */
+  gssize string_len;		/* length of the string last used against */
+  GSList *delims;		/* delimiter sub strings from split next */
+  gint last_separator_end;	/* position of the last separator for split_next_full() */
+  gboolean last_match_is_empty;	/* was the last match in split_next_full() 0 bytes long? */
+} EggRegexMatch;
+
+struct _EggRegex
+{
+  EggRegexPattern *pattern;	/* immutable part, shared */
+  EggRegexMatch *match;		/* mutable part, not shared */
 };
+
+/* TRUE if ret is an error code, FALSE otherwise. */
+#define IS_PCRE_ERROR(ret) ((ret) < PCRE_ERROR_NOMATCH && (ret) != PCRE_ERROR_PARTIAL)
+
+static const gchar *match_errors[] =
+{N_("unknown error"),		/* Generic error */
+ NULL,				/* PCRE_ERROR_NOMATCH, not an error */
+ NULL,				/* PCRE_ERROR_NULL, NULL argument, should not happen */
+ N_(""),			/* PCRE_ERROR_BADOPTION */
+ N_("corrupted object"),	/* PCRE_ERROR_BADMAGIC */
+ N_("internal error or corrupted object"), /* PCRE_ERROR_UNKNOWN_NODE */
+ N_("out of memory"),		/* PCRE_ERROR_NOMEMORY */
+ NULL,				/* PCRE_ERROR_NOSUBSTRING, not used by pcre_exec() */
+ N_("backtracking limit reached"), /* PCRE_ERROR_MATCHLIMIT */
+ NULL,				/* PCRE_ERROR_CALLOUT, used with callouts */
+ NULL,				/* PCRE_ERROR_BADUTF8, we do not check UTF-8*/
+ NULL,				/* PCRE_ERROR_BADUTF8_OFFSET, we do not check UTF-8 */
+ NULL,				/* PCRE_ERROR_PARTIAL, not an error */
+ N_("the pattern contains items not supported for partial matching"), /* PCRE_ERROR_BADPARTIAL */
+ N_("internal error"),		/* PCRE_ERROR_INTERNAL */
+ NULL,				/* PCRE_ERROR_BADCOUNT, negative ovecsize, should not happen */
+ N_("the pattern contains items not supported for partial matching"), /* PCRE_ERROR_DFA_UITEM */
+ N_("back references as conditions are not supported for partial matching"), /* PCRE_ERROR_DFA_UCOND */
+ NULL,				/* PCRE_ERROR_DFA_UMLIMIT, should not happen */
+ NULL,				/* PCRE_ERROR_DFA_WSSIZE, handled expanding the workspace */
+ N_("recursion limit reached")	/* PCRE_ERROR_RECURSIONLIMIT */
+};
+
+static const gchar *
+match_error (gint errcode)
+{
+  errcode = - errcode; /* errors are negative numbers */
+  if (errcode < 0 || errcode >= G_N_ELEMENTS(match_errors))
+    errcode = 0;
+  if (match_errors[errcode] == NULL)
+    errcode = 0;
+  return gettext (match_errors[errcode]);
+}
 
 GQuark
 egg_regex_error_quark (void)
@@ -69,50 +155,93 @@ egg_regex_error_quark (void)
   return error_quark;
 }
 
-static EggRegex *
-regex_new (pcre                *re,
-	   const gchar         *pattern,
-	   EggRegexCompileFlags compile_options,
-	   EggRegexMatchFlags   match_options)
+static EggRegexPattern *
+regex_pattern_new (pcre              *re,
+		   const gchar       *pattern,
+		   EggRegexCompileFlags compile_options,
+		   EggRegexMatchFlags   match_options)
 {
-  /* function used internally by egg_regex_new() and egg_regex_copy()
-   * to create a new EggRegex from a pcre structure */
-  EggRegex *regex = g_new0 (EggRegex, 1);
-  gint capture_count;
-
-  regex->ref_count = 1;
-  regex->regex = re;
-  regex->pattern = g_strdup (pattern);
-  regex->string_len = -1;	/* not set yet */
-
-  /* set the options */
-  regex->compile_opts = compile_options;
-  regex->match_opts = match_options;
-
-  /* find out how many sub patterns exist in this pattern, and
-   * setup the offsets array and n_offsets accordingly */
-  pcre_fullinfo (regex->regex, regex->extra,
-		 PCRE_INFO_CAPTURECOUNT, &capture_count);
-  regex->n_offsets = (capture_count + 1) * 3;
-  regex->offsets = g_new0 (gint, regex->n_offsets);
-
-  return regex;
+  EggRegexPattern *rp = g_new0 (EggRegexPattern, 1);
+  rp->ref_count = 1;
+  rp->pcre_re = re;
+  rp->pattern = g_strdup (pattern);
+  rp->compile_opts = compile_options;
+  rp->match_opts = match_options;
+  return rp;
 }
 
-/**
+static EggRegexPattern *
+regex_pattern_ref (EggRegexPattern *rp)
+{
+  /* increases the ref count of the immutable part of the EggRegex */
+  g_atomic_int_inc ((gint*) &rp->ref_count);
+  return rp;
+}
+
+static void
+regex_pattern_unref (EggRegexPattern *rp)
+{
+  /* decreases the ref count of the immutable part of the EggRegex
+   * and deletes it if the ref count went to 0 */
+  if (g_atomic_int_exchange_and_add ((gint *) &rp->ref_count, -1) - 1 == 0)
+    {
+      g_free (rp->pattern);
+      if (rp->pcre_re != NULL)
+	pcre_free (rp->pcre_re);
+      if (rp->extra != NULL)
+	pcre_free (rp->extra);
+      g_free (rp);
+    }
+}
+
+static void
+regex_match_free (EggRegexMatch *rm)
+{
+  if (rm == NULL)
+    return;
+
+  g_slist_foreach (rm->delims, (GFunc) g_free, NULL);
+  g_slist_free (rm->delims);
+  g_free (rm->offsets);
+  g_free (rm->workspace);
+  g_free (rm);
+}
+
+static void
+regex_lazy_init_match (EggRegex *regex,
+		       gint    min_offsets)
+{
+  gint n_offsets;
+
+  if (regex->match != NULL)
+    return;
+
+  pcre_fullinfo (regex->pattern->pcre_re,
+		 REGEX_GET_EXTRA (regex),
+		 PCRE_INFO_CAPTURECOUNT, &n_offsets);
+  n_offsets = (MAX (n_offsets, min_offsets) + 1) * 3;
+
+  regex->match = g_new0 (EggRegexMatch, 1);
+  regex->match->string_len = -1;
+  regex->match->matches = -1000;
+  regex->match->n_offsets = n_offsets;
+  regex->match->offsets = g_new0 (gint, n_offsets);
+}
+
+/** 
  * egg_regex_new:
  * @pattern: the regular expression.
  * @compile_options: compile options for the regular expression.
  * @match_options: match options for the regular expression.
  * @error: return location for a #GError.
- *
+ * 
  * Compiles the regular expression to an internal form, and does the initial
- * setup of the #EggRegex structure.
- *
+ * setup of the #EggRegex structure.  
+ * 
  * Returns: a #EggRegex structure.
  */
 EggRegex *
-egg_regex_new (const gchar         *pattern,
+egg_regex_new (const gchar         *pattern, 
  	     EggRegexCompileFlags   compile_options,
 	     EggRegexMatchFlags     match_options,
 	     GError             **error)
@@ -121,9 +250,11 @@ egg_regex_new (const gchar         *pattern,
   const gchar *errmsg;
   gint erroffset;
   static gboolean initialized = FALSE;
-
+  
   g_return_val_if_fail (pattern != NULL, NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
+  g_return_val_if_fail ((compile_options & ~EGG_REGEX_COMPILE_MASK) == 0, NULL);
+  g_return_val_if_fail ((match_options & ~EGG_REGEX_MATCH_MASK) == 0, NULL);
 
   if (!initialized)
     {
@@ -133,29 +264,20 @@ egg_regex_new (const gchar         *pattern,
       pcre_config (PCRE_CONFIG_UTF8, &support);
       if (!support)
 	{
-	  msg = _("PCRE library is compiled without UTF8 support");
+	  msg = N_("PCRE library is compiled without UTF8 support");
 	  g_critical (msg);
-	  g_set_error (error, EGG_REGEX_ERROR, EGG_REGEX_ERROR_COMPILE, msg);
+	  g_set_error (error, EGG_REGEX_ERROR, EGG_REGEX_ERROR_COMPILE, gettext (msg));
 	  return NULL;
 	}
 
       pcre_config (PCRE_CONFIG_UNICODE_PROPERTIES, &support);
       if (!support)
 	{
-	  msg = _("PCRE library is compiled without UTF8 properties support");
+	  msg = N_("PCRE library is compiled without UTF8 properties support");
 	  g_critical (msg);
-	  g_set_error (error, EGG_REGEX_ERROR, EGG_REGEX_ERROR_COMPILE, msg);
+	  g_set_error (error, EGG_REGEX_ERROR, EGG_REGEX_ERROR_COMPILE, gettext (msg));
 	  return NULL;
 	}
-
-#ifndef USE_SYSTEM_PCRE
-      /* If we are using the system-supplied PCRE library it's not
-       * safe to do this. */
-      pcre_malloc = (void * (*) (size_t)) g_try_malloc;
-      pcre_free = g_free;
-      pcre_stack_malloc = pcre_malloc;
-      pcre_stack_free = pcre_free;
-#endif
 
       initialized = TRUE;
     }
@@ -177,11 +299,11 @@ egg_regex_new (const gchar         *pattern,
   /* compile the pattern */
   re = pcre_compile (pattern, compile_options, &errmsg, &erroffset, NULL);
 
-  /* if the compilation failed, set the error member and return
+  /* if the compilation failed, set the error member and return 
    * immediately */
   if (re == NULL)
     {
-      GError *tmp_error = g_error_new (EGG_REGEX_ERROR,
+      GError *tmp_error = g_error_new (EGG_REGEX_ERROR, 
 				       EGG_REGEX_ERROR_COMPILE,
 				       _("Error while compiling regular "
 					 "expression %s at char %d: %s"),
@@ -191,47 +313,28 @@ egg_regex_new (const gchar         *pattern,
       return NULL;
     }
   else
-    return regex_new (re, pattern, compile_options, match_options);
+    {
+      EggRegex *regex = g_new0 (EggRegex, 1);
+      regex->pattern = regex_pattern_new (re, pattern,
+					  compile_options, match_options);
+      return regex;
+    }
 }
 
 /**
- * egg_regex_ref:
+ * egg_regex_free:
  * @regex: a #EggRegex.
  *
- * Increases the reference count of the @regex by 1.
- *
- * Returns: the @regex that was passed in.
- **/
-EggRegex *
-egg_regex_ref (EggRegex *regex)
-{
-  if (regex != NULL)
-    ++regex->ref_count;
-  return regex;
-}
-
-/**
- * egg_regex_unref:
- * @regex: a #EggRegex.
- *
- * Decreases the reference count of the @regex by 1. If the reference
- * count went to 0, the @regex will be destroyed and the memory
- * allocated will be freed.
- **/
+ * Frees all the memory associated with the regex structure.
+ */
 void
-egg_regex_unref (EggRegex *regex)
+egg_regex_free (EggRegex *regex)
 {
-  if (regex == NULL || --regex->ref_count)
+  if (regex == NULL)
     return;
 
-  g_free (regex->pattern);
-  g_slist_free (regex->delims);
-  g_free (regex->offsets);
-  g_free (regex->workspace);
-  if (regex->regex != NULL)
-    pcre_free (regex->regex);
-  if (regex->extra != NULL)
-    pcre_free (regex->extra);
+  regex_pattern_unref (regex->pattern);
+  regex_match_free (regex->match);
   g_free (regex);
 }
 
@@ -239,7 +342,13 @@ egg_regex_unref (EggRegex *regex)
  * egg_regex_copy:
  * @regex: a #EggRegex structure from egg_regex_new().
  *
- * Copies a #EggRegex.
+ * Copies a #EggRegex. The returned #Gregex is in the same state as after
+ * a call to egg_regex_clear(), so it does not contain information on the
+ * last match.
+ *
+ * The returned copy shares some of its internal state with the original
+ * @regex, and the other internal variables are created only when needed,
+ * so the copy is a lightweight operation.
  *
  * Returns: a newly allocated copy of @regex, or %NULL if an error
  *          occurred.
@@ -248,30 +357,11 @@ EggRegex *
 egg_regex_copy (const EggRegex *regex)
 {
   EggRegex *copy;
-  gint res;
-  gulong size;
-  pcre *re;
 
   g_return_val_if_fail (regex != NULL, NULL);
 
-  res = pcre_fullinfo (regex->regex, NULL, PCRE_INFO_SIZE, &size);
-  g_return_val_if_fail (res >= 0, NULL);
-  re = pcre_malloc (size);
-  g_assert (re != NULL);
-  memcpy (re, regex->regex, size);
-  copy = regex_new (re, regex->pattern, regex->compile_opts, regex->match_opts);
-
-  if (regex->extra != NULL)
-    {
-      res = pcre_fullinfo (regex->regex, regex->extra,
-		      	   PCRE_INFO_STUDYSIZE, &size);
-      g_return_val_if_fail (res >= 0, copy);
-      copy->extra = pcre_malloc (sizeof (pcre_extra));
-      memset (copy->extra, 0, sizeof (pcre_extra));
-      copy->extra->flags = PCRE_EXTRA_STUDY_DATA;
-      copy->extra->study_data = g_malloc (size);
-      memcpy (copy->extra->study_data, regex->extra->study_data, size);
-    }
+  copy = g_new0 (EggRegex, 1);
+  copy->pattern = regex_pattern_ref (regex->pattern);
 
   return copy;
 }
@@ -290,7 +380,7 @@ egg_regex_get_pattern (const EggRegex *regex)
 {
   g_return_val_if_fail (regex != NULL, NULL);
 
-  return regex->pattern;
+  return regex->pattern->pattern;
 }
 
 /**
@@ -300,22 +390,28 @@ egg_regex_get_pattern (const EggRegex *regex)
  * Clears out the members of @regex that are holding information about the
  * last set of matches for this pattern.  egg_regex_clear() needs to be
  * called between uses of egg_regex_match_next() or egg_regex_match_next_full()
- * against new target strings.
+ * against new target strings. 
  */
 void
 egg_regex_clear (EggRegex *regex)
 {
   g_return_if_fail (regex != NULL);
 
-  regex->matches = -1;
-  regex->string_len = -1;
-  regex->pos = 0;
+  if (regex->match == NULL)
+    return;
+
+  regex->match->matches = -1000; /* an error code not used by PCRE */
+  regex->match->string_len = -1;
+  regex->match->pos = 0;
 
   /* if the pattern was used with egg_regex_split_next(), it may have
    * delimiter offsets stored.  Free up those guys as well. */
-  if (regex->delims != NULL)
-    g_slist_free (regex->delims);
-  regex->delims = NULL;
+  if (regex->match->delims != NULL)
+    {
+      g_slist_foreach (regex->match->delims, (GFunc) g_free, NULL);
+      g_slist_free (regex->match->delims);
+      regex->match->delims = NULL;
+    }
 }
 
 /**
@@ -334,27 +430,42 @@ egg_regex_optimize (EggRegex  *regex,
 		  GError **error)
 {
   const gchar *errmsg;
+  pcre_extra *extra;
 
   g_return_val_if_fail (regex != NULL, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
 
-  if (regex->extra != NULL)
+  if (REGEX_GET_EXTRA (regex) != NULL)
     /* already optimized. */
     return TRUE;
 
-  regex->extra = pcre_study (regex->regex, 0, &errmsg);
+  extra = pcre_study (regex->pattern->pcre_re, 0, &errmsg);
 
-  if (errmsg)
+  if (errmsg != NULL)
     {
       GError *tmp_error = g_error_new (EGG_REGEX_ERROR,
-				       EGG_REGEX_ERROR_OPTIMIZE,
+				       EGG_REGEX_ERROR_OPTIMIZE, 
 				       _("Error while optimizing "
 					 "regular expression %s: %s"),
-				       regex->pattern,
+				       regex->pattern->pattern,
 				       errmsg);
       g_propagate_error (error, tmp_error);
       return FALSE;
     }
+
+  if (extra == NULL)
+    return TRUE;
+
+  /* hack to silent gcc about strict-aliasing */
+  union
+  {
+    gpointer *p;
+    pcre_extra **extra;
+  } u;
+  u.extra = &extra;
+  if (!g_atomic_pointer_compare_and_exchange (u.p, NULL, extra))
+    /* someone else has optimized the regex while this functions was running */
+    pcre_free (extra);
 
   return TRUE;
 }
@@ -380,8 +491,8 @@ egg_regex_optimize (EggRegex  *regex,
  * Returns: %TRUE is the string matched, %FALSE otherwise.
  */
 gboolean
-egg_regex_match_simple (const gchar        *pattern,
-		      const gchar        *string,
+egg_regex_match_simple (const gchar        *pattern, 
+		      const gchar        *string, 
 		      EggRegexCompileFlags  compile_options,
 		      EggRegexMatchFlags    match_options)
 {
@@ -392,7 +503,7 @@ egg_regex_match_simple (const gchar        *pattern,
   if (!regex)
     return FALSE;
   result = egg_regex_match_full (regex, string, -1, 0, match_options, NULL);
-  egg_regex_unref (regex);
+  egg_regex_free (regex);
   return result;
 }
 
@@ -410,12 +521,12 @@ egg_regex_match_simple (const gchar        *pattern,
  * Returns: %TRUE is the string matched, %FALSE otherwise.
  */
 gboolean
-egg_regex_match (EggRegex          *regex,
-	       const gchar     *string,
+egg_regex_match (EggRegex          *regex, 
+	       const gchar     *string, 
 	       EggRegexMatchFlags match_options)
 {
   return egg_regex_match_full (regex, string, -1, 0,
-			       match_options, NULL);
+			     match_options, NULL);
 }
 
 /**
@@ -440,41 +551,48 @@ egg_regex_match (EggRegex          *regex,
  */
 gboolean
 egg_regex_match_full (EggRegex          *regex,
-		      const gchar       *string,
-		      gssize             string_len,
-		      gint               start_position,
-		      EggRegexMatchFlags match_options,
-		      GError           **error)
+		    const gchar       *string,
+		    gssize             string_len,
+		    gint               start_position,
+		    EggRegexMatchFlags match_options,
+		    GError           **error)
 {
   g_return_val_if_fail (regex != NULL, FALSE);
   g_return_val_if_fail (string != NULL, FALSE);
   g_return_val_if_fail (start_position >= 0, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+  g_return_val_if_fail ((match_options & ~EGG_REGEX_MATCH_MASK) == 0, FALSE);
+
+  regex_lazy_init_match (regex, 0);
 
   if (string_len < 0)
     string_len = strlen(string);
 
-  regex->string_len = string_len;
+  regex->match->string_len = string_len;
+
+  /* create regex->match->offsets if it does not exist */
+  regex_lazy_init_match (regex, 0);
 
   /* perform the match */
-  regex->matches = pcre_exec (regex->regex, regex->extra,
-			      string, regex->string_len,
-			      start_position,
-			      regex->match_opts | match_options,
-			      regex->offsets, regex->n_offsets);
-  if (IS_PCRE_ERROR (regex->matches))
+  regex->match->matches = pcre_exec (regex->pattern->pcre_re,
+				     REGEX_GET_EXTRA (regex),
+				     string, regex->match->string_len,
+				     start_position,
+				     regex->pattern->match_opts | match_options,
+				     regex->match->offsets, regex->match->n_offsets);
+  if (IS_PCRE_ERROR (regex->match->matches))
   {
     g_set_error (error, EGG_REGEX_ERROR, EGG_REGEX_ERROR_MATCH,
-		 _("Error while matching regular expression %s"),
-		 regex->pattern);
+		 _("Error while matching regular expression %s: %s"),
+		 regex->pattern->pattern, match_error (regex->match->matches));
     return FALSE;
   }
 
-  /* set regex->pos to -1 so that a call to egg_regex_match_next()
+  /* set regex->match->pos to -1 so that a call to egg_regex_match_next()
    * fails without a previous call to egg_regex_clear(). */
-  regex->pos = -1;
+  regex->match->pos = -1;
 
-  return regex->matches >= 0;
+  return regex->match->matches >= 0;
 }
 
 /**
@@ -493,12 +611,12 @@ egg_regex_match_full (EggRegex          *regex,
  * Returns: %TRUE is the string matched, %FALSE otherwise.
  */
 gboolean
-egg_regex_match_next (EggRegex          *regex,
-		    const gchar     *string,
+egg_regex_match_next (EggRegex          *regex, 
+		    const gchar     *string, 
 		    EggRegexMatchFlags match_options)
 {
   return egg_regex_match_next_full (regex, string, -1, 0,
-				    match_options, NULL);
+				  match_options, NULL);
 }
 
 /**
@@ -510,9 +628,15 @@ egg_regex_match_next (EggRegex          *regex,
  * @match_options: the match options.
  * @error: location to store the error occuring, or NULL to ignore errors.
  *
- * Scans for the next match in @string of the pattern in @regex.
- * array.  The match options are combined with the match options set when
- * the @regex was created.
+ * Scans for the next match in @string of the pattern in @regex. Calling
+ * egg_regex_match_next_full() until it returns %FALSE, you can retrieve
+ * all the non-overlapping matches of the pattern in @string. Empty matches
+ * are included, so matching the string "ab" with the pattern "b*" will
+ * find three matches: "" at position 0, "b" from position 1 to 2 and
+ * "" at position 2.
+ *
+ * The match options are combined with the match options set when the
+ * @regex was created.
  *
  * You have to call egg_regex_clear() to reuse the same pattern on a new
  * string.
@@ -525,18 +649,21 @@ egg_regex_match_next (EggRegex          *regex,
  */
 gboolean
 egg_regex_match_next_full (EggRegex          *regex,
-			   const gchar       *string,
-			   gssize             string_len,
-			   gint               start_position,
-			   EggRegexMatchFlags match_options,
-			   GError           **error)
+			 const gchar     *string,
+			 gssize           string_len,
+			 gint             start_position,
+			 EggRegexMatchFlags match_options,
+			 GError         **error)
 {
   g_return_val_if_fail (regex != NULL, FALSE);
   g_return_val_if_fail (string != NULL, FALSE);
   g_return_val_if_fail (start_position >= 0, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+  g_return_val_if_fail ((match_options & ~EGG_REGEX_MATCH_MASK) == 0, FALSE);
 
-  if G_UNLIKELY(regex->pos < 0)
+  regex_lazy_init_match (regex, 0);
+
+  if (G_UNLIKELY (regex->match->pos < 0))
     {
       const gchar *msg = _("egg_regex_match_next_full: called without a "
                            "previous call to egg_regex_clear()");
@@ -547,54 +674,57 @@ egg_regex_match_next_full (EggRegex          *regex,
 
   /* if this regex hasn't been used on this string before, then we
    * need to calculate the length of the string, and set pos to the
-   * start of it.
+   * start of it.  
    * Knowing if this regex has been used on this string is a bit of
    * a challenge.  For now, we require the user to call egg_regex_clear()
    * in between usages on a new string.  Not perfect, but not such a
    * bad solution either.
    */
-  if (regex->string_len == -1)
+  if (regex->match->string_len == -1)
     {
       if (string_len < 0)
         string_len = strlen(string);
-      regex->string_len = string_len;
+      regex->match->string_len = string_len;
 
-      regex->pos = start_position;
+      regex->match->pos = start_position;
     }
 
+  /* create regex->match->offsets if it does not exist */
+  regex_lazy_init_match (regex, 0);
 
   /* perform the match */
-  regex->matches = pcre_exec (regex->regex, regex->extra,
-			      string, regex->string_len,
-			      regex->pos,
-			      regex->match_opts | match_options,
-			      regex->offsets, regex->n_offsets);
-  if (IS_PCRE_ERROR (regex->matches))
+  regex->match->matches = pcre_exec (regex->pattern->pcre_re,
+				     REGEX_GET_EXTRA (regex),
+				     string, regex->match->string_len,
+				     regex->match->pos,
+				     regex->pattern->match_opts | match_options,
+				     regex->match->offsets, regex->match->n_offsets);
+  if (IS_PCRE_ERROR (regex->match->matches))
   {
     g_set_error (error, EGG_REGEX_ERROR, EGG_REGEX_ERROR_MATCH,
-		 _("Error while matching regular expression %s"),
-		 regex->pattern);
+		 _("Error while matching regular expression %s: %s"),
+		 regex->pattern->pattern, match_error (regex->match->matches));
     return FALSE;
   }
 
   /* avoid infinite loops if regex is an empty string or something
    * equivalent */
-  if (regex->pos == regex->offsets[1])
+  if (regex->match->pos == regex->match->offsets[1])
     {
-      regex->pos = NEXT_CHAR (regex, &string[regex->pos]) - string;
-      if (regex->pos > regex->string_len)
+      if (regex->match->pos > regex->match->string_len)
 	{
 	  /* we have reached the end of the string */
-	  regex->pos = -1;
+	  regex->match->pos = -1;
 	  return FALSE;
         }
+      regex->match->pos = NEXT_CHAR (regex, &string[regex->match->pos]) - string;
     }
   else
     {
-      regex->pos = regex->offsets[1];
+      regex->match->pos = regex->match->offsets[1];
     }
 
-  return regex->matches >= 0;
+  return regex->match->matches >= 0;
 }
 
 /**
@@ -612,11 +742,11 @@ egg_regex_match_next_full (EggRegex          *regex,
  */
 gboolean
 egg_regex_match_all (EggRegex          *regex,
-		     const gchar       *string,
-		     EggRegexMatchFlags match_options)
+		   const gchar     *string,
+		   EggRegexMatchFlags match_options)
 {
   return egg_regex_match_all_full (regex, string, -1, 0,
-				   match_options, NULL);
+				 match_options, NULL);
 }
 
 /**
@@ -659,73 +789,78 @@ egg_regex_match_all (EggRegex          *regex,
  */
 gboolean
 egg_regex_match_all_full (EggRegex          *regex,
-			  const gchar       *string,
-			  gssize             string_len,
-			  gint               start_position,
-			  EggRegexMatchFlags match_options,
-			  GError           **error)
+			const gchar     *string,
+			gssize           string_len,
+			gint             start_position,
+			EggRegexMatchFlags match_options,
+			GError         **error)
 {
   g_return_val_if_fail (regex != NULL, FALSE);
   g_return_val_if_fail (string != NULL, FALSE);
   g_return_val_if_fail (start_position >= 0, FALSE);
   g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
+  g_return_val_if_fail ((match_options & ~EGG_REGEX_MATCH_MASK) == 0, FALSE);
+
+  regex_lazy_init_match (regex, 0);
 
   if (string_len < 0)
     string_len = strlen(string);
 
-  regex->string_len = string_len;
+  regex->match->string_len = string_len;
 
-  if (regex->workspace == NULL)
+  if (regex->match->workspace == NULL)
     {
-      regex->n_workspace = WORKSPACE_INITIAL;
-      regex->workspace = g_new (gint, regex->n_workspace);
+      regex->match->n_workspace = WORKSPACE_INITIAL;
+      regex->match->workspace = g_new (gint, regex->match->n_workspace);
     }
 
-  if (regex->n_offsets < OFFSETS_DFA_MIN_SIZE)
+  if (regex->match->n_offsets < OFFSETS_DFA_MIN_SIZE)
     {
-      regex->n_offsets = OFFSETS_DFA_MIN_SIZE;
-      regex->offsets = g_realloc (regex->offsets,
-				  regex->n_offsets * sizeof(gint));
+      regex->match->n_offsets = OFFSETS_DFA_MIN_SIZE;
+      regex->match->offsets = g_realloc (regex->match->offsets,
+					 regex->match->n_offsets * sizeof(gint));
     }
 
   /* perform the match */
-  regex->matches = pcre_dfa_exec (regex->regex, regex->extra,
-				  string, regex->string_len,
-				  start_position,
-				  regex->match_opts | match_options,
-				  regex->offsets, regex->n_offsets,
-				  regex->workspace, regex->n_workspace);
-  if (regex->matches == PCRE_ERROR_DFA_WSSIZE)
+  regex->match->matches = pcre_dfa_exec (regex->pattern->pcre_re,
+					 REGEX_GET_EXTRA (regex), 
+					 string, regex->match->string_len,
+					 start_position,
+					 regex->pattern->match_opts | match_options,
+					 regex->match->offsets, regex->match->n_offsets,
+					 regex->match->workspace,
+					 regex->match->n_workspace);
+  if (regex->match->matches == PCRE_ERROR_DFA_WSSIZE)
   {
-    /* regex->workspace is too small. */
-    regex->n_workspace *= 2;
-    regex->workspace = g_realloc (regex->workspace,
-				  regex->n_workspace * sizeof(gint));
+    /* regex->match->workspace is too small. */
+    regex->match->n_workspace *= 2;
+    regex->match->workspace = g_realloc (regex->match->workspace,
+					 regex->match->n_workspace * sizeof(gint));
     return egg_regex_match_all_full (regex, string, string_len,
-				     start_position, match_options, error);
+				   start_position, match_options, error);
   }
-  else if (regex->matches == 0)
+  else if (regex->match->matches == 0)
   {
-    /* regex->offsets is too small. */
-    regex->n_offsets *= 2;
-    regex->offsets = g_realloc (regex->offsets,
-				regex->n_offsets * sizeof(gint));
+    /* regex->match->offsets is too small. */
+    regex->match->n_offsets *= 2;
+    regex->match->offsets = g_realloc (regex->match->offsets,
+				       regex->match->n_offsets * sizeof(gint));
     return egg_regex_match_all_full (regex, string, string_len,
-				     start_position, match_options, error);
+				   start_position, match_options, error);
   }
-  else if (IS_PCRE_ERROR (regex->matches))
+  else if (IS_PCRE_ERROR (regex->match->matches))
   {
     g_set_error (error, EGG_REGEX_ERROR, EGG_REGEX_ERROR_MATCH,
-		 _("Error while matching regular expression %s"),
-		 regex->pattern);
+		 _("Error while matching regular expression %s: %s"),
+		 regex->pattern->pattern, match_error (regex->match->matches));
     return FALSE;
   }
 
-  /* set regex->pos to -1 so that a call to egg_regex_match_next()
+  /* set regex->match->pos to -1 so that a call to egg_regex_match_next()
    * fails without a previous call to egg_regex_clear(). */
-  regex->pos = -1;
+  regex->match->pos = -1;
 
-  return regex->matches >= 0;
+  return regex->match->matches >= 0;
 }
 
 /**
@@ -749,15 +884,18 @@ egg_regex_get_match_count (const EggRegex *regex)
 {
   g_return_val_if_fail (regex != NULL, -1);
 
-  if (regex->matches == PCRE_ERROR_NOMATCH)
+  if (regex->match == NULL)
+    return -1;
+
+  if (regex->match->matches == PCRE_ERROR_NOMATCH)
     /* no match */
     return 0;
-  else if (regex->matches < PCRE_ERROR_NOMATCH)
+  else if (regex->match->matches < PCRE_ERROR_NOMATCH)
     /* error */
     return -1;
   else
     /* match */
-    return regex->matches;
+    return regex->match->matches;
 }
 
 /**
@@ -801,9 +939,12 @@ egg_regex_get_match_count (const EggRegex *regex)
 gboolean
 egg_regex_is_partial_match (const EggRegex *regex)
 {
-  g_return_val_if_fail (regex != NULL, -1);
+  g_return_val_if_fail (regex != NULL, FALSE);
 
-  return regex->matches == PCRE_ERROR_PARTIAL;
+  if (regex->match == NULL)
+    return FALSE;
+
+  return regex->match->matches == PCRE_ERROR_PARTIAL;
 }
 
 /**
@@ -831,8 +972,8 @@ egg_regex_is_partial_match (const EggRegex *regex)
  */
 gchar *
 egg_regex_fetch (const EggRegex *regex,
-	       gint         match_num,
-	       const gchar *string)
+	       gint          match_num,
+	       const gchar  *string)
 {
   /* we cannot use pcre_get_substring() because it allocates the
    * string using pcre_malloc(). */
@@ -841,7 +982,12 @@ egg_regex_fetch (const EggRegex *regex,
 
   g_return_val_if_fail (regex != NULL, NULL);
   g_return_val_if_fail (match_num >= 0, NULL);
-  g_return_val_if_fail (regex->string_len >= 0, NULL);
+
+  if (regex->match == NULL)
+    return NULL;
+
+  if (regex->match->string_len < 0)
+    return NULL;
 
   /* match_num does not exist or it didn't matched, i.e. matching "b"
    * against "(a)?b" then group 0 is empty. */
@@ -881,27 +1027,30 @@ egg_regex_fetch (const EggRegex *regex,
  *          unchanged.
  */
 gboolean
-egg_regex_fetch_pos (const EggRegex    *regex,
-		   gint         match_num,
-		   gint        *start_pos,
-		   gint        *end_pos)
+egg_regex_fetch_pos (const EggRegex *regex,
+		   gint          match_num,
+		   gint         *start_pos,
+		   gint         *end_pos)
 {
   g_return_val_if_fail (regex != NULL, FALSE);
   g_return_val_if_fail (match_num >= 0, FALSE);
+ 
+  if (regex->match == NULL)
+    return FALSE;
 
   /* make sure the sub expression number they're requesting is less than
    * the total number of sub expressions that were matched. */
-  if (match_num >= regex->matches)
+  if (match_num >= regex->match->matches)
     return FALSE;
 
   if (start_pos != NULL)
     {
-      *start_pos = regex->offsets[2 * match_num];
+      *start_pos = regex->match->offsets[2 * match_num];
     }
 
   if (end_pos != NULL)
     {
-      *end_pos = regex->offsets[2 * match_num + 1];
+      *end_pos = regex->match->offsets[2 * match_num + 1];
     }
 
   return TRUE;
@@ -1001,29 +1150,24 @@ gchar **
 egg_regex_fetch_all (const EggRegex *regex,
 		   const gchar  *string)
 {
-  gchar **listptr = NULL; /* the list pcre_get_substring_list() will fill */
+  /* we cannot use pcre_get_substring_list() because the returned value
+   * isn't suitable for g_strfreev(). */
   gchar **result;
+  gint i;
 
   g_return_val_if_fail (regex != NULL, FALSE);
   g_return_val_if_fail (string != NULL, FALSE);
 
-  if (regex->matches < 0)
+  if (regex->match == NULL)
     return NULL;
 
-  pcre_get_substring_list (string, regex->offsets,
-			   regex->matches, (const char ***)&listptr);
+  if (regex->match->matches < 0)
+    return NULL;
 
-  if (listptr)
-    {
-      /* PCRE returns a single block of memory allocated
-       * with pcre_malloc() which isn't suitable for
-       * g_strfreev().
-       */
-      result = g_strdupv (listptr);
-      pcre_free_substring_list ((const gchar **)listptr);
-    }
-  else
-    result = NULL;
+  result = g_new (gchar *, regex->match->matches + 1);
+  for (i = 0; i < regex->match->matches; i++)
+    result[i] = egg_regex_fetch (regex, i, string);
+  result[i] = NULL;
 
   return result;
 }
@@ -1046,7 +1190,7 @@ egg_regex_get_string_number (const EggRegex *regex,
   g_return_val_if_fail (regex != NULL, -1);
   g_return_val_if_fail (name != NULL, -1);
 
-  num = pcre_get_stringnumber (regex->regex, name);
+  num = pcre_get_stringnumber (regex->pattern->pcre_re, name);
   if (num == PCRE_ERROR_NOSUBSTRING)
 	  num = -1;
 
@@ -1075,11 +1219,23 @@ egg_regex_get_string_number (const EggRegex *regex,
  * once, it's more efficient to compile the pattern once with
  * egg_regex_new() and then use egg_regex_split().
  *
+ * As a special case, the result of splitting the empty string "" is an
+ * empty vector, not a vector containing a single string. The reason for
+ * this special case is that being able to represent a empty vector is
+ * typically more useful than consistent handling of empty elements. If
+ * you do need to represent empty elements, you'll need to check for the
+ * empty string before calling this function.
+ *
+ * A pattern that can match empty strings splits @string into separate
+ * characters wherever it matches the empty string between characters.
+ * For example splitting "ab c" using as a separator "\s*", you will get
+ * "a", "b" and "c".
+ *
  * Returns: a %NULL-terminated gchar ** array. Free it using g_strfreev().
  **/
 gchar **
 egg_regex_split_simple (const gchar        *pattern,
-		      const gchar        *string,
+		      const gchar        *string, 
 		      EggRegexCompileFlags  compile_options,
 		      EggRegexMatchFlags    match_options)
 {
@@ -1090,7 +1246,7 @@ egg_regex_split_simple (const gchar        *pattern,
   if (!regex)
     return NULL;
   result = egg_regex_split_full (regex, string, -1, 0, match_options, 0, NULL);
-  egg_regex_unref (regex);
+  egg_regex_free (regex);
   return result;
 }
 
@@ -1106,15 +1262,27 @@ egg_regex_split_simple (const gchar        *pattern,
  * anywhere in the string, then the whole string is returned as the first
  * token.
  *
+ * As a special case, the result of splitting the empty string "" is an
+ * empty vector, not a vector containing a single string. The reason for
+ * this special case is that being able to represent a empty vector is
+ * typically more useful than consistent handling of empty elements. If
+ * you do need to represent empty elements, you'll need to check for the
+ * empty string before calling this function.
+ *
+ * A pattern that can match empty strings splits @string into separate
+ * characters wherever it matches the empty string between characters.
+ * For example splitting "ab c" using as a separator "\s*", you will get
+ * "a", "b" and "c".
+ *
  * Returns: a %NULL-terminated gchar ** array. Free it using g_strfreev().
  **/
 gchar **
-egg_regex_split (EggRegex           *regex,
-	       const gchar      *string,
+egg_regex_split (EggRegex           *regex, 
+	       const gchar      *string, 
 	       EggRegexMatchFlags  match_options)
 {
   return egg_regex_split_full (regex, string, -1, 0,
-                               match_options, 0, NULL);
+                             match_options, 0, NULL);
 }
 
 /**
@@ -1134,6 +1302,18 @@ egg_regex_split (EggRegex           *regex,
  * anywhere in the string, then the whole string is returned as the first
  * token.
  *
+ * As a special case, the result of splitting the empty string "" is an
+ * empty vector, not a vector containing a single string. The reason for
+ * this special case is that being able to represent a empty vector is
+ * typically more useful than consistent handling of empty elements. If
+ * you do need to represent empty elements, you'll need to check for the
+ * empty string before calling this function.
+ *
+ * A pattern that can match empty strings splits @string into separate
+ * characters wherever it matches the empty string between characters.
+ * For example splitting "ab c" using as a separator "\s*", you will get
+ * "a", "b" and "c".
+ *
  * Setting @start_position differs from just passing over a shortened string
  * and  setting #EGG_REGEX_MATCH_NOTBOL in the case of a pattern that begins
  * with any kind of lookbehind assertion, such as "\b".
@@ -1141,21 +1321,17 @@ egg_regex_split (EggRegex           *regex,
  * Returns: a %NULL-terminated gchar ** array. Free it using g_strfreev().
  **/
 gchar **
-egg_regex_split_full (EggRegex           *regex,
-		      const gchar      *string,
-		      gssize            string_len,
-		      gint              start_position,
-		      EggRegexMatchFlags  match_options,
-		      gint              max_tokens,
-		      GError          **error)
+egg_regex_split_full (EggRegex           *regex, 
+		    const gchar      *string, 
+		    gssize            string_len,
+		    gint              start_position,
+		    EggRegexMatchFlags  match_options,
+		    gint              max_tokens,
+		    GError          **error)
 {
   gchar **string_list;		/* The array of char **s worked on */
   gint pos;
-  gboolean match_ok;
-  gint match_count;
   gint tokens;
-  gint new_pos;
-  gchar *token;
   GList *list, *last;
   GError *tmp_error = NULL;
 
@@ -1163,67 +1339,70 @@ egg_regex_split_full (EggRegex           *regex,
   g_return_val_if_fail (string != NULL, NULL);
   g_return_val_if_fail (start_position >= 0, NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
+  g_return_val_if_fail ((match_options & ~EGG_REGEX_MATCH_MASK) == 0, NULL);
 
-  /* we need to reset the state of the regex as we are going to use
-   * egg_regex_match_next_full(). */
+  regex_lazy_init_match (regex, 0);
+
+  if (max_tokens <= 0)
+    max_tokens = G_MAXINT;
+
+  if (string_len < 0)
+    string_len = strlen(string);
+
+  if (string_len - start_position == 0)
+    return g_new0 (gchar *, 1);
+
+  /* clear out the regex for reuse, just in case */
   egg_regex_clear (regex);
 
-  new_pos = start_position;
-  tokens = 0;
   list = NULL;
+  tokens = 0;
   while (TRUE)
     {
-      if ((max_tokens < 1) || (tokens <  max_tokens - 1))
-        {
-	  match_ok = egg_regex_match_next_full (regex, string, string_len,
-                                                new_pos, match_options,
-                                                &tmp_error);
-	  if (tmp_error != NULL)
-	    {
-	      g_propagate_error (error, tmp_error);
-	      g_list_foreach (list, (GFunc)g_free, NULL);
-	      g_list_free (list);
-	      return NULL;
-	    }
-	}
-      else
-	{
-	  match_ok = FALSE;
-	  if (regex->string_len < 0)
-	    {
-	      /* egg_regex_match_next_full() wasn't called, so
-	       * regex->string_len can be -1, but we need a valid
-	       * length to copy the last part of the string. */
-	      if (string_len < 0)
-		string_len = strlen (string);
-	      regex->string_len = string_len;
-	    }
-	}
+      gchar *token;
 
-      if (match_ok)
+      /* -1 to leave room for the last part. */
+      if (tokens >= max_tokens - 1)
 	{
-	  token = g_strndup (string + new_pos, regex->offsets[0] - new_pos);
-	  list = g_list_prepend (list, token);
-
-	  /* if there were substrings, these need to get added to the
-	   * list as well */
-	  match_count = egg_regex_get_match_count (regex);
-	  if (match_count > 1)
+	  /* we have reached the maximum number of tokens, so we copy
+	   * the remaining part of the string. */
+	  if (regex->match->last_match_is_empty)
 	    {
-	      gint i;
-	      for (i = 1; i < match_count; i++)
-		list = g_list_prepend (list, egg_regex_fetch (regex, i, string));
+	      /* the last match was empty, so we have moved one char
+	       * after the real position to avoid empty matches at the
+	       * same position. */
+	      regex->match->pos = PREV_CHAR (regex, &string[regex->match->pos]) - string;
 	    }
-
-	  new_pos = regex->pos;	/* move new_pos to end of match */
-	  tokens++;
-	}
-      else	 /* if there was no match, copy to end of string, and break */
-	{
-	  token = g_strndup (string + new_pos, regex->string_len - new_pos);
-	  list = g_list_prepend (list, token);
+	  /* the if is needed in the case we have terminated the available
+	   * tokens, but we are at the end of the string, so there are no
+	   * characters left to copy. */
+	  if (string_len > regex->match->pos)
+	    {
+	      token = g_strndup (string + regex->match->pos,
+				 string_len - regex->match->pos);
+	      list = g_list_prepend (list, token);
+	    }
+	  /* end the loop. */
 	  break;
 	}
+
+      token = egg_regex_split_next_full (regex, string, string_len, start_position,
+                                       match_options, &tmp_error);
+      if (tmp_error != NULL)
+	{
+	  g_propagate_error (error, tmp_error);
+	  g_list_foreach (list, (GFunc)g_free, NULL);
+	  g_list_free (list);
+	  regex->match->pos = -1;
+	  return NULL;
+	}
+
+      if (token == NULL)
+	/* no more tokens. */
+	break;
+
+      tokens++;
+      list = g_list_prepend (list, token);
     }
 
   string_list = g_new (gchar *, g_list_length (list) + 1);
@@ -1232,7 +1411,9 @@ egg_regex_split_full (EggRegex           *regex,
     string_list[pos++] = last->data;
   string_list[pos] = 0;
 
+  regex->match->pos = -1;
   g_list_free (list);
+
   return string_list;
 }
 
@@ -1248,6 +1429,11 @@ egg_regex_split_full (EggRegex           *regex,
  * If the pattern does not match anywhere in the string, then the whole
  * string is returned as the first token.
  *
+ * A pattern that can match empty strings splits @string into separate
+ * characters wherever it matches the empty string between characters.
+ * For example splitting "ab c" using as a separator "\s*", you will get
+ * "a", "b" and "c".
+ *
  * You have to call egg_regex_clear() to reuse the same pattern on a new
  * string.
  *
@@ -1259,7 +1445,7 @@ egg_regex_split_next (EggRegex          *regex,
 		    EggRegexMatchFlags match_options)
 {
   return egg_regex_split_next_full (regex, string, -1, 0, match_options,
-                                    NULL);
+                                  NULL);
 }
 
 /**
@@ -1277,6 +1463,11 @@ egg_regex_split_next (EggRegex          *regex,
  * If the pattern does not match anywhere in the string, then the whole
  * string is returned as the first token.
  *
+ * A pattern that can match empty strings splits @string into separate
+ * characters wherever it matches the empty string between characters.
+ * For example splitting "ab c" using as a separator "\s*", you will get
+ * "a", "b" and "c".
+ *
  * You have to call egg_regex_clear() to reuse the same pattern on a new
  * string.
  *
@@ -1288,11 +1479,11 @@ egg_regex_split_next (EggRegex          *regex,
  */
 gchar *
 egg_regex_split_next_full (EggRegex          *regex,
-			   const gchar     *string,
-			   gssize           string_len,
-			   gint             start_position,
-			   EggRegexMatchFlags match_options,
-			   GError         **error)
+			 const gchar     *string,
+			 gssize           string_len,
+			 gint             start_position,
+			 EggRegexMatchFlags match_options,
+			 GError         **error)
 {
   gint new_pos;
   gchar *token = NULL;
@@ -1303,32 +1494,46 @@ egg_regex_split_next_full (EggRegex          *regex,
   g_return_val_if_fail (regex != NULL, NULL);
   g_return_val_if_fail (string != NULL, NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
+  g_return_val_if_fail ((match_options & ~EGG_REGEX_MATCH_MASK) == 0, NULL);
 
-  new_pos = MAX (regex->pos, start_position);
+  regex_lazy_init_match (regex, 0);
+
+  new_pos = MAX (regex->match->pos, start_position);
+  if (regex->match->last_match_is_empty)
+    /* if the last match was empty, egg_regex_match_next_full() has moved
+     * forward to avoid infinite loops, but we still need to copy that
+     * character. */
+    new_pos = PREV_CHAR(regex, &string[new_pos]) - string;
 
   /* if there are delimiter substrings stored, return those one at a
-   * time.
+   * time.  
    */
-  if (regex->delims != NULL)
+  if (regex->match->delims != NULL)
     {
-      token = regex->delims->data;
-      regex->delims = g_slist_remove (regex->delims, token);
+      token = regex->match->delims->data;
+      regex->match->delims = g_slist_remove (regex->match->delims, token);
       return token;
     }
 
-  if (regex->pos == -1)
+  if (regex->match->pos == -1)
     /* the last call to egg_regex_match_next_full() returned NULL. */
     return NULL;
 
+  if (regex->match->string_len < 0)
+    {
+      regex->match->last_match_is_empty = FALSE;
+      /* initialize last_separator_end to start_position to skip the
+       * empty token at the beginning of the string. */
+      regex->match->last_separator_end = start_position;
+    }
+
   /* use egg_regex_match_next() to find the next occurance of the pattern
-   * in the string.  We use new_pos to keep track of where the stuff
-   * up to the current match starts.  Copy that token of the string off
-   * and append it to the buffer using g_strndup.  We have to NUL term the
-   * token we copied off before returning it.
-   */
+   * in the string. We use new_pos to keep track of where the stuff
+   * up to the current match starts. Copy that token of the string off
+   * and append it to the buffer using g_strndup. */
   match_ok = egg_regex_match_next_full (regex, string, string_len,
-                                        start_position, match_options,
-                                        &tmp_error);
+                                      start_position, match_options,
+                                      &tmp_error);
   if (tmp_error != NULL)
     {
       g_propagate_error (error, tmp_error);
@@ -1337,21 +1542,47 @@ egg_regex_split_next_full (EggRegex          *regex,
 
   if (match_ok)
     {
-      token = g_strndup (string + new_pos, regex->offsets[0] - new_pos);
+      regex->match->last_match_is_empty =
+		(regex->match->offsets[0] == regex->match->offsets[1]);
 
-      /* if there were substrings, these need to get added to the
-       * list of delims */
-      match_count = egg_regex_get_match_count (regex);
-      if (match_count > 1)
+      /* we need to skip empty separators at the same position of the end
+       * of another separator. e.g. the string is "a b" and the separator
+       * is "*", so from 1 to 2 we have a match and at position 2 we have
+       * an empty match. */
+      if (regex->match->last_separator_end != regex->match->offsets[1])
 	{
-	  gint i;
-	  for (i = 1; i < match_count; i++)
-	    regex->delims = g_slist_append (regex->delims,
-					    egg_regex_fetch (regex, i, string));
+	  token = g_strndup (string + new_pos, regex->match->offsets[0] - new_pos);
+
+	  /* if there were substrings, these need to get added to the
+	   * list of delims */
+	  match_count = egg_regex_get_match_count (regex);
+	  if (match_count > 1)
+	    {
+	      gint i;
+	      for (i = 1; i < match_count; i++)
+		regex->match->delims = g_slist_append (regex->match->delims,
+						       egg_regex_fetch (regex, i, string));
+	    }
+
+	  regex->match->last_separator_end = regex->match->offsets[1];
+	}
+      else
+	{
+	  /* we have skipped an empty separator so we need to find the
+	   * next match. */
+	  return egg_regex_split_next_full (regex, string, string_len,
+	                                  start_position, match_options,
+	                                  error);
 	}
     }
-  else		/* if there was no match, copy to end of string */
-    token = g_strndup (string + new_pos, regex->string_len - new_pos);
+  else
+    {
+      /* if there was no match, copy to end of string. */
+      if (!regex->match->last_match_is_empty)
+	token = g_strndup (string + new_pos, regex->match->string_len - new_pos);
+      else
+	token = NULL;
+    }
 
   return token;
 }
@@ -1361,15 +1592,29 @@ enum
   REPL_TYPE_STRING,
   REPL_TYPE_CHARACTER,
   REPL_TYPE_SYMBOLIC_REFERENCE,
-  REPL_TYPE_NUMERIC_REFERENCE
-};
+  REPL_TYPE_NUMERIC_REFERENCE,
+  REPL_TYPE_CHANGE_CASE
+}; 
 
-typedef struct
+typedef enum
 {
-  gchar *text;
-  gint   type;
-  gint   num;
-  gchar  c;
+  CHANGE_CASE_NONE         = 1 << 0,
+  CHANGE_CASE_UPPER        = 1 << 1,
+  CHANGE_CASE_LOWER        = 1 << 2,
+  CHANGE_CASE_UPPER_SINGLE = 1 << 3,
+  CHANGE_CASE_LOWER_SINGLE = 1 << 4,
+  CHANGE_CASE_SINGLE_MASK  = CHANGE_CASE_UPPER_SINGLE | CHANGE_CASE_LOWER_SINGLE,
+  CHANGE_CASE_LOWER_MASK   = CHANGE_CASE_LOWER | CHANGE_CASE_LOWER_SINGLE,
+  CHANGE_CASE_UPPER_MASK   = CHANGE_CASE_UPPER | CHANGE_CASE_UPPER_SINGLE
+} ChangeCase;
+
+typedef struct 
+{
+  gchar     *text;   
+  gint       type;   
+  gint       num;
+  gchar      c;
+  ChangeCase change_case;
 } InterpolationData;
 
 static void
@@ -1382,7 +1627,7 @@ free_interpolation_data (InterpolationData *data)
 static const gchar *
 expand_escape (EggRegex             *regex,
 	       const gchar        *replacement,
-	       const gchar        *p,
+	       const gchar        *p, 
 	       InterpolationData  *data,
 	       GError            **error)
 {
@@ -1441,7 +1686,7 @@ expand_escape (EggRegex             *regex,
       if (*p == '{')
 	{
 	  p++;
-	  do
+	  do 
 	    {
 	      h = g_ascii_xdigit_value (*p);
 	      if (h < 0)
@@ -1474,14 +1719,30 @@ expand_escape (EggRegex             *regex,
       g_unichar_to_utf8 (x, data->text);
       break;
     case 'l':
+      p++;
+      data->type = REPL_TYPE_CHANGE_CASE;
+      data->change_case = CHANGE_CASE_LOWER_SINGLE;
+      break;
     case 'u':
+      p++;
+      data->type = REPL_TYPE_CHANGE_CASE;
+      data->change_case = CHANGE_CASE_UPPER_SINGLE;
+      break;
     case 'L':
+      p++;
+      data->type = REPL_TYPE_CHANGE_CASE;
+      data->change_case = CHANGE_CASE_LOWER;
+      break;
     case 'U':
+      p++;
+      data->type = REPL_TYPE_CHANGE_CASE;
+      data->change_case = CHANGE_CASE_UPPER;
+      break;
     case 'E':
-    case 'Q':
-    case 'G':
-      error_detail = _("escape sequence not allowed");
-      goto error;
+      p++;
+      data->type = REPL_TYPE_CHANGE_CASE;
+      data->change_case = CHANGE_CASE_NONE;
+      break;
     case 'g':
       p++;
       if (*p != '<')
@@ -1490,7 +1751,7 @@ expand_escape (EggRegex             *regex,
 	  goto error;
 	}
       q = p + 1;
-      do
+      do 
 	{
 	  p++;
 	  if (!*p)
@@ -1508,7 +1769,7 @@ expand_escape (EggRegex             *regex,
       if (g_ascii_isdigit (*q))
 	{
 	  x = 0;
-	  do
+	  do 
 	    {
 	      h = g_ascii_digit_value (*q);
 	      if (h < 0)
@@ -1527,7 +1788,7 @@ expand_escape (EggRegex             *regex,
       else
 	{
 	  r = q;
-	  do
+	  do 
 	    {
 	      if (!g_ascii_isalnum (*r))
 		{
@@ -1546,10 +1807,10 @@ expand_escape (EggRegex             *regex,
     case '0':
       /* if \0 is followed by a number is an octal number representing a
        * character, else it is a numeric reference. */
-      if (g_ascii_digit_value (*NEXT_CHAR (regex, p)) >= 0)
+      if (g_ascii_digit_value (*g_utf8_next_char (p)) >= 0)
         {
           base = 8;
-          p = NEXT_CHAR (regex, p);
+          p = g_utf8_next_char (p);
         }
     case '1':
     case '2':
@@ -1565,13 +1826,13 @@ expand_escape (EggRegex             *regex,
       for (i = 0; i < 3; i++)
 	{
 	  h = g_ascii_digit_value (*p);
-	  if (h < 0)
+	  if (h < 0) 
 	    break;
 	  if (h > 7)
 	    {
 	      if (base == 8)
 		break;
-	      else
+	      else 
 		base = 10;
 	    }
 	  if (i == 2 && base == 10)
@@ -1597,20 +1858,18 @@ expand_escape (EggRegex             *regex,
       goto error;
       break;
     default:
-      data->type = REPL_TYPE_STRING;
-      data->text = g_new0 (gchar, 8);
-      g_unichar_to_utf8 (g_utf8_get_char (p), data->text);
-      p = NEXT_CHAR (regex, p);
+      error_detail = _("unknown escape sequence");
+      goto error;
     }
 
   return p;
 
  error:
-  tmp_error = g_error_new (EGG_REGEX_ERROR,
+  tmp_error = g_error_new (EGG_REGEX_ERROR, 
 			   EGG_REGEX_ERROR_REPLACE,
 			   _("Error while parsing replacement "
-			     "text \"%s\" at char %d: %s"),
-			   replacement,
+			     "text \"%s\" at char %"G_GSSIZE_FORMAT": %s"),
+			   replacement, 
 			   p - replacement,
 			   error_detail);
   g_propagate_error (error, tmp_error);
@@ -1626,8 +1885,8 @@ split_replacement (EggRegex       *regex,
   GList *list = NULL;
   InterpolationData *data;
   const gchar *p, *start;
-
-  start = p = replacement;
+  
+  start = p = replacement; 
   while (*p)
     {
       if (*p == '\\')
@@ -1638,6 +1897,7 @@ split_replacement (EggRegex       *regex,
 	    {
 	      g_list_foreach (list, (GFunc)free_interpolation_data, NULL);
 	      g_list_free (list);
+	      free_interpolation_data (data);
 
 	      return NULL;
 	    }
@@ -1662,6 +1922,44 @@ split_replacement (EggRegex       *regex,
   return g_list_reverse (list);
 }
 
+/* Change the case of c based on change_case. */
+#define CHANGE_CASE(c, change_case) \
+	(((change_case) & CHANGE_CASE_LOWER_MASK) ? \
+		g_unichar_tolower (c) : \
+		g_unichar_toupper (c))
+
+static void
+string_append (GString     *string,
+	       const gchar *text,
+               ChangeCase  *change_case)
+{
+  gunichar c;
+
+  if (text[0] == '\0')
+    return;
+
+  if (*change_case == CHANGE_CASE_NONE)
+    {
+      g_string_append (string, text);
+    }
+  else if (*change_case & CHANGE_CASE_SINGLE_MASK)
+    {
+      c = g_utf8_get_char (text);
+      g_string_append_unichar (string, CHANGE_CASE (c, *change_case));
+      g_string_append (string, g_utf8_next_char (text));
+      *change_case = CHANGE_CASE_NONE;
+    }
+  else
+    {
+      while (*text != '\0')
+        {
+          c = g_utf8_get_char (text);
+          g_string_append_unichar (string, CHANGE_CASE (c, *change_case));
+          text = g_utf8_next_char (text);
+        }
+    }
+}
+
 static gboolean
 interpolate_replacement (const EggRegex *regex,
 			 const gchar  *string,
@@ -1671,6 +1969,7 @@ interpolate_replacement (const EggRegex *regex,
   GList *list;
   InterpolationData *idata;
   gchar *match;
+  ChangeCase change_case = CHANGE_CASE_NONE;
 
   for (list = data; list; list = list->next)
     {
@@ -1678,31 +1977,83 @@ interpolate_replacement (const EggRegex *regex,
       switch (idata->type)
 	{
 	case REPL_TYPE_STRING:
-	  g_string_append (result, idata->text);
+	  string_append (result, idata->text, &change_case);
 	  break;
 	case REPL_TYPE_CHARACTER:
-	  g_string_append_c (result, idata->c);
+	  g_string_append_c (result, CHANGE_CASE (idata->c, change_case));
+          if (change_case & CHANGE_CASE_SINGLE_MASK)
+            change_case = CHANGE_CASE_NONE;
 	  break;
 	case REPL_TYPE_NUMERIC_REFERENCE:
 	  match = egg_regex_fetch (regex, idata->num, string);
-	  if (match)
+	  if (match) 
 	    {
-	      g_string_append (result, match);
+	      string_append (result, match, &change_case);
 	      g_free (match);
 	    }
 	  break;
 	case REPL_TYPE_SYMBOLIC_REFERENCE:
 	  match = egg_regex_fetch_named (regex, idata->text, string);
-	  if (match)
+	  if (match) 
 	    {
-	      g_string_append (result, match);
+	      string_append (result, match, &change_case);
 	      g_free (match);
 	    }
+	  break;
+	case REPL_TYPE_CHANGE_CASE:
+	  change_case = idata->change_case;
 	  break;
 	}
     }
 
-  return FALSE;
+  return FALSE; 
+}
+
+/**
+ * egg_regex_expand_references:
+ * @regex: #EggRegex structure used in last match.
+ * @string: the string on which the last match was made.
+ * @string_to_expand:  the string to expand.
+ * @error: location to store the error occuring, or NULL to ignore errors.
+ *
+ * Returns a new string containing the text in @string_to_expand with
+ * references expanded. References refer to the last match done with
+ * @string against @regex and have the same syntax used by egg_regex_replace().
+ *
+ * The @string_to_expand must be UTF-8 encoded even if #EGG_REGEX_RAW was
+ * passed to egg_regex_new().
+ *
+ * Returns: the expanded string, or %NULL if an error occurred.
+ */
+gchar *
+egg_regex_expand_references (EggRegex            *regex, 
+			   const gchar       *string, 
+			   const gchar       *string_to_expand,
+			   GError           **error)
+{
+  GString *result;
+  GList *list;
+  GError *tmp_error = NULL;
+
+  g_return_val_if_fail (regex != NULL, NULL);
+  g_return_val_if_fail (string != NULL, NULL);
+  g_return_val_if_fail (string_to_expand != NULL, NULL);
+  g_return_val_if_fail (error == NULL || *error == NULL, NULL);
+
+  list = split_replacement (regex, string_to_expand, &tmp_error);
+  if (tmp_error != NULL)
+    {
+      g_propagate_error (error, tmp_error);
+      return NULL;
+    }
+
+  result = g_string_sized_new (strlen (string_to_expand));
+  interpolate_replacement (regex, string, result, list);
+
+  g_list_foreach (list, (GFunc)free_interpolation_data, NULL);
+  g_list_free (list);
+
+  return g_string_free (result, FALSE);
 }
 
 /**
@@ -1721,8 +2072,42 @@ interpolate_replacement (const EggRegex *regex,
  * subexpression of the match, '\g&lt;name&gt;' refers to the captured subexpression
  * with the given name. '\0' refers to the complete match, but '\0' followed
  * by a number is the octal representation of a character. To include a
- * literal '\' in the replacement, write '\\'. If you do not need to use
- * backreferences use egg_regex_replace_literal().
+ * literal '\' in the replacement, write '\\'.
+ * There are also escapes that changes the case of the following text:
+ *
+ * <variablelist>
+ * <varlistentry><term>\l</term>
+ * <listitem>
+ * <para>Convert to lower case the next character</para>
+ * </listitem>
+ * </varlistentry>
+ * <varlistentry><term>\u</term>
+ * <listitem>
+ * <para>Convert to upper case the next character</para>
+ * </listitem>
+ * </varlistentry>
+ * <varlistentry><term>\L</term>
+ * <listitem>
+ * <para>Convert to lower case till \E</para>
+ * </listitem>
+ * </varlistentry>
+ * <varlistentry><term>\U</term>
+ * <listitem>
+ * <para>Convert to upper case till \E</para>
+ * </listitem>
+ * </varlistentry>
+ * <varlistentry><term>\E</term>
+ * <listitem>
+ * <para>End case modification</para>
+ * </listitem>
+ * </varlistentry>
+ * </variablelist>
+ *
+ * If you do not need to use backreferences use egg_regex_replace_literal().
+ *
+ * The @replacement string must be UTF-8 encoded even if #EGG_REGEX_RAW was
+ * passed to egg_regex_new(). If you want to use not UTF-8 encoded stings
+ * you can use egg_regex_replace_literal().
  *
  * Setting @start_position differs from just passing over a shortened string
  * and  setting #EGG_REGEX_MATCH_NOTBOL in the case of a pattern that begins
@@ -1731,8 +2116,8 @@ interpolate_replacement (const EggRegex *regex,
  * Returns: a newly allocated string containing the replacements.
  */
 gchar *
-egg_regex_replace (EggRegex            *regex,
-		 const gchar       *string,
+egg_regex_replace (EggRegex            *regex, 
+		 const gchar       *string, 
 		 gssize             string_len,
 		 gint               start_position,
 		 const gchar       *replacement,
@@ -1741,19 +2126,31 @@ egg_regex_replace (EggRegex            *regex,
 {
   gchar *result;
   GList *list;
+  GError *tmp_error = NULL;
 
   g_return_val_if_fail (regex != NULL, NULL);
   g_return_val_if_fail (string != NULL, NULL);
   g_return_val_if_fail (start_position >= 0, NULL);
   g_return_val_if_fail (replacement != NULL, NULL);
   g_return_val_if_fail (error == NULL || *error == NULL, NULL);
+  g_return_val_if_fail ((match_options & ~EGG_REGEX_MATCH_MASK) == 0, NULL);
 
-  list = split_replacement (regex, replacement, error);
-  result = egg_regex_replace_eval (regex,
+  list = split_replacement (regex, replacement, &tmp_error);
+  if (tmp_error != NULL)
+    {
+      g_propagate_error (error, tmp_error);
+      return NULL;
+    }
+
+  result = egg_regex_replace_eval (regex, 
 				 string, string_len, start_position,
 				 match_options,
 				 interpolate_replacement,
-				 (gpointer)list);
+				 (gpointer)list,
+                                 &tmp_error);
+  if (tmp_error != NULL)
+    g_propagate_error (error, tmp_error);
+
   g_list_foreach (list, (GFunc)free_interpolation_data, NULL);
   g_list_free (list);
 
@@ -1778,6 +2175,7 @@ literal_replacement (const EggRegex *regex,
  * @start_position: starting index of the string to match.
  * @replacement:  text to replace each match with.
  * @match_options:  options for the match.
+ * @error: location to store the error occuring, or NULL to ignore errors.
  *
  * Replaces all occurances of the pattern in @regex with the
  * replacement text. @replacement is replaced literally, to
@@ -1795,15 +2193,18 @@ egg_regex_replace_literal (EggRegex          *regex,
 			 gssize           string_len,
 			 gint             start_position,
 			 const gchar     *replacement,
-			 EggRegexMatchFlags match_options)
+			 EggRegexMatchFlags match_options,
+			 GError         **error)
 {
   g_return_val_if_fail (replacement != NULL, NULL);
+  g_return_val_if_fail ((match_options & ~EGG_REGEX_MATCH_MASK) == 0, NULL);
 
   return egg_regex_replace_eval (regex,
 			       string, string_len, start_position,
 			       match_options,
 			       literal_replacement,
-			       (gpointer)replacement);
+			       (gpointer)replacement,
+			       error);
 }
 
 /**
@@ -1815,6 +2216,7 @@ egg_regex_replace_literal (EggRegex          *regex,
  * @match_options:  Options for the match.
  * @eval: a function to call for each match.
  * @user_data: user data to pass to the function.
+ * @error: location to store the error occuring, or NULL to ignore errors.
  *
  * Replaces occurances of the pattern in regex with the output of @eval
  * for that occurance.
@@ -1832,16 +2234,21 @@ egg_regex_replace_eval (EggRegex            *regex,
 		      gint               start_position,
 		      EggRegexMatchFlags   match_options,
 		      EggRegexEvalCallback eval,
-		      gpointer           user_data)
+		      gpointer           user_data,
+		      GError           **error)
 {
   GString *result;
   gint str_pos = 0;
   gboolean done = FALSE;
+  GError *tmp_error = NULL;
 
   g_return_val_if_fail (regex != NULL, NULL);
   g_return_val_if_fail (string != NULL, NULL);
   g_return_val_if_fail (start_position >= 0, NULL);
   g_return_val_if_fail (eval != NULL, NULL);
+  g_return_val_if_fail ((match_options & ~EGG_REGEX_MATCH_MASK) == 0, NULL);
+
+  regex_lazy_init_match (regex, 0);
 
   if (string_len < 0)
     string_len = strlen(string);
@@ -1854,13 +2261,20 @@ egg_regex_replace_eval (EggRegex            *regex,
   /* run down the string making matches. */
   while (!done &&
 	 egg_regex_match_next_full (regex, string, string_len,
-				    start_position, match_options, NULL))
+				  start_position, match_options, &tmp_error))
     {
       g_string_append_len (result,
 			   string + str_pos,
-			   regex->offsets[0] - str_pos);
+			   regex->match->offsets[0] - str_pos);
       done = (*eval) (regex, string, result, user_data);
-      str_pos = regex->offsets[1];
+      str_pos = regex->match->offsets[1];
+    }
+
+  if (tmp_error != NULL)
+    {
+      g_propagate_error (error, tmp_error);
+      g_string_free (result, TRUE);
+      return NULL;
     }
 
   g_string_append_len (result, string + str_pos, string_len - str_pos);
@@ -1937,4 +2351,3 @@ egg_regex_escape_string (const gchar *string,
 
   return g_string_free (escaped, FALSE);
 }
-
