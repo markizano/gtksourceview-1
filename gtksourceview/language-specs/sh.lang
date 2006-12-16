@@ -2,6 +2,8 @@
 <language id="sh" _name="sh" version="2.0" _section="Scripts">
   <metadata>
     <property name="mimetypes">text/x-shellscript;application/x-shellscript;text/x-sh</property>
+    <property name="globs">*.sh</property>
+    <property name="line-comment-start">#</property>
   </metadata>
   <styles>
     <style id="function" name="Function" map-to="def:function"/>
@@ -39,7 +41,7 @@
       </include>
     </context>
     <context id="line-comment" style-ref="comment" end-at-line-end="true">
-      <start>#</start>
+      <start>(?&lt;!\S)#</start>
       <include>
         <context ref="def:escape"/>
         <context ref="def:line-continue"/>

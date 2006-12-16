@@ -1,3 +1,24 @@
+2006-12-16  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/language-specs/c.lang:
+	* gtksourceview/language-specs/changelog.lang:
+	* gtksourceview/language-specs/cpp.lang:
+	* gtksourceview/language-specs/diff.lang:
+	* gtksourceview/language-specs/html.lang:
+	* gtksourceview/language-specs/javascript.lang:
+	* gtksourceview/language-specs/latex.lang:
+	* gtksourceview/language-specs/m4.lang:
+	* gtksourceview/language-specs/xml.lang:
+	* gtksourceview/language-specs/yacc.lang:
+	Added "globs" property.
+	* gtksourceview/language-specs/makefile.lang: Added "globs" property,
+	made += highlighted as assignment.
+	* gtksourceview/language-specs/sh.lang: Added "globs" property,
+	fixed comment starting with hash.
+	* gtksourceview/language-specs/def.lang: temporarily added
+	def:specials style back, for javascript.lang, and added FIXME
+	comment.
+
 2006-12-13  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcetag.[ch]: removed.

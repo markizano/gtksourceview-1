@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <language id="xml" _name="XML" version="2.0" _section="Markup">
     <metadata>
-      <property name="mimetypes">application/xml;text/xml;image/svg+xml;text/rdf</property>
+      <property name="mimetypes">application/xml;text/xml</property>
+      <property name="globs">*.xml;*.xspf;*.siv;*.smil;*.smi;*.sml;*.kino;*.xul;*.xbel;*.abw;*.zabw;*.glade;*.jnlp;*.xhtml;*.svg;*.docbook;*.mml;*.rdf;*.rss;*.wml;*.xmi;*.fo;*.xslfo;*.xslt;*.xsl</property>
       <property name="block-comment-start">&lt;!--</property>
       <property name="block-comment-end">--&gt;</property>
     </metadata>
