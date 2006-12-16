@@ -1,10 +1,12 @@
 LANGUAGES =			\
 	ada.lang		\
+	boo.lang		\
 	c.lang			\
 	changelog.lang		\
 	cpp.lang		\
 	csharp.lang		\
 	css.lang		\
+	d.lang			\
 	def.lang		\
 	desktop.lang		\
 	diff.lang		\

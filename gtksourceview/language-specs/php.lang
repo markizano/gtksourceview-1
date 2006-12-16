@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- <!DOCTYPE language SYSTEM "language.dtd"> -->
+<!DOCTYPE language SYSTEM "language.dtd">
 <language _name="PHP" version="1.0" _section="Scripts" mimetypes="text/x-php;application/x-php;text/x-php-source;application/x-php-source">
 
 <!--  FIXME: keywords before a '(' is hightlined as a function call instead of a keyword -->
@@ -74,6 +74,7 @@
 		<keyword>as</keyword>
 		<keyword>break</keyword>
 		<keyword>case</keyword>
+ 		<keyword>catch</keyword>
 		<keyword>class</keyword>
 		<keyword>const</keyword>
 		<keyword>continue</keyword>
@@ -90,9 +91,11 @@
 		<keyword>extends</keyword>
 		<keyword>for</keyword>
 		<keyword>global</keyword>
-		<keyword>function</keyword>
+ 		<keyword>final</keyword>
 		<keyword>foreach</keyword>
+		<keyword>function</keyword>
 		<keyword>if</keyword>
+ 		<keyword>implements</keyword>
 		<keyword>import</keyword>
 		<keyword>include</keyword>
 		<keyword>include_once</keyword>
@@ -111,6 +114,8 @@
 		<keyword>return</keyword>
 		<keyword>static</keyword>
 		<keyword>switch</keyword>
+ 		<keyword>throw</keyword>
+ 		<keyword>try</keyword>
 		<keyword>var</keyword>
 		<keyword>while</keyword>
 		<keyword>xor</keyword>

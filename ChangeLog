@@ -1,5 +1,22 @@
 2006-12-16  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/language-specs/desktop.lang,
+	gtksourceview/language-specs/fortran.lang,
+	gtksourceview/language-specs/java.lang,
+	gtksourceview/language-specs/nemerle.lang,
+	gtksourceview/language-specs/pascal.lang,
+	gtksourceview/language-specs/php.lang,
+	gtksourceview/language-specs/R.lang,
+	gtksourceview/language-specs/ruby.lang,
+	gtksourceview/language-specs/verilog.lang,
+	gtksourceview/language-specs/Makefile.am:
+	Merged changes in HEAD lang files since 2006-01-28, the day when Marco
+	merged changes in HEAD.
+	* gtksourceview/language-specs/boo.lang,
+	gtksourceview/language-specs/d.lang: new files from HEAD.
+
+2006-12-16  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/language-specs/c.lang:
 	* gtksourceview/language-specs/changelog.lang:
 	* gtksourceview/language-specs/cpp.lang:
