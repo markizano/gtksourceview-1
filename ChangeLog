@@ -1,3 +1,20 @@
+2006-12-21  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/language-specs/csharp.lang,
+	gtksourceview/language-specs/css.lang,
+	gtksourceview/language-specs/php.lang,
+	gtksourceview/language-specs/sql.lang:
+	Corrected broken /**/ comments.
+	* gtksourceview/language-specs/scheme.lang:
+	Do not use def:preprocessor style here.
+	* gtksourceview/language-specs/def.lang,
+	gtksourceview/language-specs/gvim.styles:
+	Temporarily added back "def:preprocessor" style.
+	* gtksourceview/language-specs/desktop.lang,
+	gtksourceview/language-specs/m4.lang,
+	gtksourceview/language-specs/sh.lang:
+	Better highlighting.
+
 2006-12-16  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/language-specs/ada.lang,
