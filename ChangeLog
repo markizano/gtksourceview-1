@@ -1,3 +1,15 @@
+2006-12-23  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcelanguage-parser-2.c:
+	Fixed parsing keyword lists: it lost keywords before
+	a comment, if a comment was inside the list.
+	(str_to_bool): made it take xmlChar* to avoid casts in its users code;
+	(update_regex_flags): made it take xmlChar* instead of gboolean since
+	all its users called str_to_bool() on the argument anyway;
+	(get_regex_flags): moved getting regex options attributes from
+	create_definition() to new function;
+	(create_definition): the keywords fix.
+
 2006-12-21  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/language-specs/csharp.lang,
