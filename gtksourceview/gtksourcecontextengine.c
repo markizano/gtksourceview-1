@@ -5622,6 +5622,22 @@ _gtk_source_context_engine_add_sub_pattern (GtkSourceContextEngine  *ce,
 	return TRUE;
 }
 
+/**
+ * context_is_pure_container:
+ *
+ * @def: context definition.
+ *
+ * Checks whether context is a container with no start regex.
+ * References to such contexts are implicitly translated to
+ * wildcard references (context_id:*).
+ */
+static gboolean
+context_is_pure_container (ContextDefinition *def)
+{
+	return def->type == CONTEXT_TYPE_CONTAINER &&
+		def->u.start_end.start == NULL;
+}
+
 gboolean
 _gtk_source_context_engine_add_ref (GtkSourceContextEngine    *ce,
 				    const gchar               *parent_id,
@@ -5639,16 +5655,6 @@ _gtk_source_context_engine_add_ref (GtkSourceContextEngine    *ce,
 	g_return_val_if_fail (ref_id != NULL, FALSE);
 	g_return_val_if_fail (GTK_IS_SOURCE_CONTEXT_ENGINE (ce), FALSE);
 
-	if (all && (options & (GTK_SOURCE_CONTEXT_IGNORE_STYLE | GTK_SOURCE_CONTEXT_OVERRIDE_STYLE)))
-	{
-		g_set_error (error,
-			     GTK_SOURCE_CONTEXT_ENGINE_ERROR,
-			     GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_STYLE,
-			     "can't override style for '%s' reference",
-			     ref_id);
-		return FALSE;
-	}
-
 	ref = LOOKUP_DEFINITION (ce, ref_id);
 	parent = LOOKUP_DEFINITION (ce, parent_id);
 	g_return_val_if_fail (parent != NULL, FALSE);
@@ -5658,8 +5664,21 @@ _gtk_source_context_engine_add_ref (GtkSourceContextEngine    *ce,
 		g_set_error (error,
 			     GTK_SOURCE_CONTEXT_ENGINE_ERROR,
 			     GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_PARENT,
-			     "invalid parent type for the context '%s'",
+			     _("invalid parent type for the context '%s'"),
 			     ref_id);
+		return FALSE;
+	}
+
+	if (ref != NULL && context_is_pure_container (ref))
+		all = TRUE;
+
+	if (all && (options & (GTK_SOURCE_CONTEXT_IGNORE_STYLE | GTK_SOURCE_CONTEXT_OVERRIDE_STYLE)))
+	{
+		g_set_error (error, GTK_SOURCE_CONTEXT_ENGINE_ERROR,
+			     GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_STYLE,
+			     _("style override used with wildcard context reference"
+			       " in language '%s' in ref '%s'"),
+			     ce->priv->id, ref_id);
 		return FALSE;
 	}
 
@@ -5695,7 +5714,7 @@ resolve_reference (G_GNUC_UNUSED const gchar *id,
 	if (data->error != NULL)
 		return;
 
-	for (l = definition->children; l != NULL; l = l->next)
+	for (l = definition->children; l != NULL && data->error == NULL; l = l->next)
 	{
 		ContextDefinition *ref;
 		DefinitionChild *child_def = l->data;
@@ -5710,13 +5729,28 @@ resolve_reference (G_GNUC_UNUSED const gchar *id,
 			g_free (child_def->u.id);
 			child_def->u.definition = ref;
 			child_def->resolved = TRUE;
+
+			if (context_is_pure_container (ref))
+			{
+				if (child_def->override_style)
+				{
+					g_set_error (&data->error, GTK_SOURCE_CONTEXT_ENGINE_ERROR,
+						     GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_STYLE,
+						     "style override used with wildcard context reference"
+						     " in language '%s' in ref '%s'",
+						     data->ce->priv->id, ref->id);
+				}
+				else
+				{
+					child_def->is_ref_all = TRUE;
+				}
+			}
 		}
 		else
 		{
 			g_set_error (&data->error, GTK_SOURCE_CONTEXT_ENGINE_ERROR,
 				     GTK_SOURCE_CONTEXT_ENGINE_ERROR_INVALID_REF,
 				     "invalid reference '%s'", child_def->u.id);
-			break;
 		}
 	}
 }

@@ -1,10 +1,13 @@
 2006-12-23  Yevgen Muntyan  <muntyan@tamu.edu>
 
-	* gtksourceview/gtksourcecontextengine.c:
-	Fixed wrong usage of extend_parent flag: code didn't take into
-	account possibility of including any context elsewhere and demanded
-	this flag to be TRUE for toplevel definition and its children.
-	Same thing for end_at_line_end.
+	* gtksourceview/gtksourcecontextengine.c: (resolve_reference),
+	(_gtk_source_context_engine_add_ref): Made it treat references
+	to pure container contexts as wildcard references, so
+	<context id="foo"><include>...</include></context>
+	<context id="bar"><include><context ref="foo"></include></context>
+	is silently translated to
+	<context id="foo"><include>...</include></context>
+	<context id="bar"><include><context ref="foo:*"></include></context>
 
 2006-12-23  Yevgen Muntyan  <muntyan@tamu.edu>
 
