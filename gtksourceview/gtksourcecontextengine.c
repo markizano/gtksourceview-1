@@ -78,11 +78,22 @@
 	(g_hash_table_lookup ((ce)->priv->definitions, (id)))
 
 /* Can the context be terminated by ancestor? */
-#define ANCESTOR_CAN_END_CONTEXT(context) \
-	(!(context)->definition->extend_parent || \
-	 !(context)->all_ancestors_extend)
+/* Root context can't be terminated; its child may not be terminated by it;
+ * grandchildren look at the flag */
+#define ANCESTOR_CAN_END_CONTEXT(ctx) \
+	((ctx)->parent != NULL && (ctx)->parent->parent != NULL && \
+		(!(ctx)->definition->extend_parent || !(ctx)->all_ancestors_extend))
 
-#define SEGMENT_END_AT_LINE_END(s) ((s)->context->definition->end_at_line_end)
+/* Root context and its children have this TRUE; grandchildren use the flag */
+#define CONTEXT_EXTENDS_PARENT(ctx) \
+	((ctx)->parent == NULL || (ctx)->parent->parent == NULL || \
+		(ctx)->definition->extend_parent)
+
+/* Does the segment terminate at line end? */
+/* Root segment doesn't, children look at the flag */
+#define CONTEXT_END_AT_LINE_END(ctx) \
+	((ctx)->parent != NULL && (ctx)->definition->end_at_line_end)
+#define SEGMENT_END_AT_LINE_END(s) CONTEXT_END_AT_LINE_END((s)->context)
 
 #define CONTEXT_IS_SIMPLE(c) ((c)->definition->type == CONTEXT_TYPE_SIMPLE)
 #define CONTEXT_IS_CONTAINER(c) ((c)->definition->type == CONTEXT_TYPE_CONTAINER)
@@ -2831,22 +2842,28 @@ create_reg_all (Context           *context,
 
 		while (ANCESTOR_CAN_END_CONTEXT (tmp))
 		{
-			if (!tmp->definition->extend_parent)
+			if (!CONTEXT_EXTENDS_PARENT (tmp))
 			{
+				gboolean append = TRUE;
+
 				if (tmp->parent->end != NULL)
 					g_string_append (all, regex_get_pattern (tmp->parent->end));
 				/* FIXME ?
 				 * The old code insisted on having tmp->parent->end != NULL here,
 				 * though e.g. in case line-comment -> email-address it's not the case.
 				 * Apparently using $ fixes the problem. */
-				else if (tmp->parent->definition->end_at_line_end)
+				else if (CONTEXT_END_AT_LINE_END (tmp->parent))
 					g_string_append (all, "$");
 				/* FIXME it's not clear whether it can happen, maybe we need assert here
 				 * or parser need to check it */
 				else
+				{
 					g_critical ("%s: oops", G_STRLOC);
+					append = FALSE;
+				}
 
-				g_string_append (all, "|");
+				if (append)
+					g_string_append (all, "|");
 			}
 
 			tmp = tmp->parent;
@@ -2928,8 +2945,7 @@ context_new (Context           *parent,
 	context->parent = parent;
 	context->style = style;
 
-	if (!parent || (parent->all_ancestors_extend &&
-	    parent->definition->extend_parent))
+	if (!parent || (parent->all_ancestors_extend && CONTEXT_EXTENDS_PARENT (parent)))
 	{
 		context->all_ancestors_extend = TRUE;
 	}
@@ -3792,7 +3808,7 @@ ancestor_context_ends_here (Context                *state,
 	current_context = state;
 	while (ANCESTOR_CAN_END_CONTEXT (current_context))
 	{
-		if (!current_context->definition->extend_parent)
+		if (!CONTEXT_EXTENDS_PARENT (current_context))
 			check_ancestors = g_slist_prepend (check_ancestors,
 							   current_context->parent);
 		current_context = current_context->parent;
@@ -5247,7 +5263,6 @@ definition_child_free (DefinitionChild *ch)
 static ContextDefinition *
 context_definition_new (const gchar        *id,
 			ContextType         type,
-			ContextDefinition  *parent,
 			const gchar        *match,
 			const gchar        *start,
 			const gchar        *end,
@@ -5342,39 +5357,6 @@ context_definition_new (const gchar        *id,
 	definition->children = NULL;
 	definition->sub_patterns = NULL;
 	definition->n_sub_patterns = 0;
-
-	/* Main contexts (i.e. the contexts with id "language:language")
-	 * should have extend-parent="true" and end-at-line-end="false". */
-	if (parent == NULL && egg_regex_match_simple ("^(.+):\\1$", id, 0, 0))
-	{
-		if (definition->end_at_line_end)
-		{
-			g_warning ("end-at-line-end should be "
-				   "\"false\" for main contexts (id: %s)",
-				   id);
-			definition->end_at_line_end = FALSE;
-		}
-
-		if (!definition->extend_parent)
-		{
-			g_warning ("extend-parent should be "
-				   "\"true\" for main contexts (id: %s)",
-				   id);
-			definition->extend_parent = TRUE;
-		}
-	}
-
-	/* Children of toplevel context should have extend-parent = TRUE. */
-	if (parent != NULL && egg_regex_match_simple ("^(.+):\\1$", parent->id, 0, 0))
-	{
-		if (!definition->extend_parent)
-		{
-			g_warning ("extend-parent should be "
-				   "\"true\" for children of main context (id: %s)",
-				   id);
-			definition->extend_parent = TRUE;
-		}
-	}
 
 	return definition;
 }
@@ -5542,7 +5524,7 @@ _gtk_source_context_engine_define_context (GtkSourceContextEngine  *ce,
 		g_return_val_if_fail (parent != NULL, FALSE);
 	}
 
-	definition = context_definition_new (id, type, parent, match_regex,
+	definition = context_definition_new (id, type, match_regex,
 					     start_regex, end_regex, style,
 					     options, error);
 	if (definition == NULL)
