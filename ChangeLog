@@ -1,5 +1,14 @@
 2006-12-23  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c: added memory information
+	stuff: it can print how much memory is taken by context definitions
+	and by contexts.
+	* gtksourceview/libegg/regex/eggregex.c,
+	gtksourceview/libegg/regex/eggregex.h: (_egg_regex_get_memory):
+	new function to get amount of memory eaten by regex.
+
+2006-12-23  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c: (resolve_reference),
 	(_gtk_source_context_engine_add_ref): Made it treat references
 	to pure container contexts as wildcard references, so

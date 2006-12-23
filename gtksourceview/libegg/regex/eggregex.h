@@ -134,7 +134,7 @@ gboolean	  egg_regex_fetch_named_pos	(const EggRegex        *regex,
 						 gint                *end_pos);
 gchar		**egg_regex_fetch_all		(const EggRegex        *regex,
 						 const gchar         *string);
-gint		  egg_regex_get_string_number	(const EggRegex        *regex, 
+gint		  egg_regex_get_string_number	(const EggRegex        *regex,
 						 const gchar         *name);
 gchar		**egg_regex_split_simple		(const gchar         *pattern,
 						 const gchar         *string,
@@ -187,6 +187,8 @@ gchar		 *egg_regex_replace_eval		(EggRegex              *regex,
 						 GError             **error);
 gchar		 *egg_regex_escape_string		(const gchar         *string,
 						 gint                 length);
+
+gsize       _egg_regex_get_memory           (EggRegex   *regex);
 
 
 G_END_DECLS
