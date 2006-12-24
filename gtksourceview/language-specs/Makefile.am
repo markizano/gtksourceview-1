@@ -10,7 +10,9 @@ LANGUAGES =			\
 	def.lang		\
 	desktop.lang		\
 	diff.lang		\
+	dtd.lang		\
 	fortran.lang		\
+	gtk-doc.lang		\
 	gtkrc.lang		\
 	haskell.lang		\
 	html.lang		\
