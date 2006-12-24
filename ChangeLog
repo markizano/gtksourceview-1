@@ -1,5 +1,17 @@
 2006-12-23  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c,
+	gtksourceview/gtksourcecontextengine.h,
+	gtksourceview/gtksourcelanguage.c,
+	gtksourceview/gtksourcelanguage-private.h,
+	gtksourceview/gtksourcelanguage-parser-1.c,
+	gtksourceview/gtksourcelanguage-parser-2.c:
+	Made context definitions shared between engines using same language:
+	added GtkSourceContextData structure which holds definitions, and made
+	GtkSourceContextEngine refer to it.
+
+2006-12-23  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.c: added memory information
 	stuff: it can print how much memory is taken by context definitions
 	and by contexts.
