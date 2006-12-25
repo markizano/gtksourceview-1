@@ -52,10 +52,12 @@ struct _GtkSourceContextEngineClass
 	GtkSourceEngineClass parent_class;
 };
 
+/* must be ordered this way, hardcoded in parser */
 typedef enum {
 	GTK_SOURCE_CONTEXT_EXTEND_PARENT	= 1 << 0,
 	GTK_SOURCE_CONTEXT_END_AT_LINE_END	= 1 << 1,
-	GTK_SOURCE_CONTEXT_FIRST_LINE_ONLY	= 1 << 2
+	GTK_SOURCE_CONTEXT_FIRST_LINE_ONLY	= 1 << 2,
+	GTK_SOURCE_CONTEXT_ONCE_ONLY		= 1 << 3
 } GtkSourceContextMatchOptions;
 
 typedef enum {
