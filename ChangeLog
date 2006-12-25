@@ -1,5 +1,17 @@
 2006-12-25  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.c,
+	gtksourceview/gtksourcecontextengine.h,
+	gtksourceview/gtksourcelanguage-parser-2.c,
+	gtksourceview/language-specs/language2.rng:
+	New context option, "end-parent": terminate parent
+	when child with such option terminates.
+	* gtksourceview/language-specs/xml.lang:
+	Removed "attribute2" context, made "attribute" match
+	xml attribute values in both forms: "value" and 'value'.
+
+2006-12-25  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.h:
 	Removed comment about GtkSourceContextMatchOptions enum,
 	it's not true.

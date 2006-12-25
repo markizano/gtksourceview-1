@@ -294,18 +294,23 @@ get_regex_flags (xmlNode             *node,
 }
 
 static GtkSourceContextMatchOptions
-check_context_options (ParserState                  *parser_state,
-		       GtkSourceContextMatchOptions  options)
+get_context_options (ParserState *parser_state)
 {
 	guint i;
 	xmlChar *value;
+	GtkSourceContextMatchOptions options = GTK_SOURCE_CONTEXT_EXTEND_PARENT;
 	const gchar *names[] = {
-		"extend-parent", "end-at-line-end", "first-line-only", "once-only"
+		"extend-parent", "end-parent", "end-at-line-end", "first-line-only", "once-only"
 	};
 	GtkSourceContextMatchOptions flags[] = {
-		GTK_SOURCE_CONTEXT_EXTEND_PARENT, GTK_SOURCE_CONTEXT_END_AT_LINE_END,
-		GTK_SOURCE_CONTEXT_FIRST_LINE_ONLY, GTK_SOURCE_CONTEXT_ONCE_ONLY
+		GTK_SOURCE_CONTEXT_EXTEND_PARENT,
+		GTK_SOURCE_CONTEXT_END_PARENT,
+		GTK_SOURCE_CONTEXT_END_AT_LINE_END,
+		GTK_SOURCE_CONTEXT_FIRST_LINE_ONLY,
+		GTK_SOURCE_CONTEXT_ONCE_ONLY
 	};
+
+	g_assert (G_N_ELEMENTS (names) == G_N_ELEMENTS (flags));
 
 	for (i = 0; i < G_N_ELEMENTS (names); ++i)
 	{
@@ -348,7 +353,7 @@ create_definition (ParserState *parser_state,
 
 	g_return_val_if_fail (error == NULL || *error == NULL, FALSE);
 
-	options = check_context_options (parser_state, GTK_SOURCE_CONTEXT_EXTEND_PARENT);
+	options = get_context_options (parser_state);
 
 	DEBUG (g_message ("creating context %s, child of %s", id, parent_id ? parent_id : "(null)"));
 
