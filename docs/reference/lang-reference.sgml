@@ -1,4 +1,4 @@
-<refentry id="lang-reference" revision="10 May 2005">
+<refentry id="lang-reference" revision="25 December 2006">
 <refmeta>
 <refentrytitle>Language Definition v2.0 Reference</refentrytitle>
 </refmeta>
@@ -17,7 +17,7 @@ This is an overview of the Language Definition XML format, describing the
 meaning and usage of every element and attribute.  The formal definition is
 stored in the RelaxNG schema file <filename>language2.rng</filename> which
 should be installed on your system in the directory
-<filename>${PREFIX}/share/gtksourceview-2.0/schemas/</filename> (where
+<filename>${PREFIX}/share/gtksourceview-2.0/</filename> (where
 ${PREFIX} can be <filename>/usr/</filename> or
 <filename>/usr/local/</filename> if you have installed from source.
 </para>
@@ -81,17 +81,11 @@ it is possible to use arbitrary categories (while usually discouraged).
 </varlistentry>
 
 <varlistentry>
-<term><code>mimetypes</code> (optional)</term>
+<term><code>hidden</code> (optional)</term>
 <listitem><para>
-The list of mimetypes associated to the language.
-Each mimetype has to be separated with a semicolon.
-</para></listitem>
-</varlistentry>
-
-<varlistentry>
-<term><code>globs</code> (optional)</term>
-<listitem><para>
-The semicolon-separated list of globs associated to the language.
+It's a hint that the language should be "hidden" from user. For instance,
+def.lang has this flag, and a text editor should not present "default" as
+a syntax highlighting choice.
 </para></listitem>
 </varlistentry>
 
@@ -107,10 +101,48 @@ Contains optional metadata about the language definition.
 </para>
 
 <para>
-Contained elements: no element inside this one is currently defined,
-but it is possible to use arbitrary elements from
-different namespaces (e.g. Dublin Core metadata elements, etc.)
+Contained elements (all optional):
 </para>
+
+<varlistentry>
+<term><code>mimetypes</code></term>
+<listitem><para>
+The semicolon-separated list of mimetypes associated to the language.
+</para></listitem>
+</varlistentry>
+
+<varlistentry>
+<term><code>globs</code></term>
+<listitem><para>
+The semicolon-separated list of globs associated to the language.
+</para></listitem>
+</varlistentry>
+
+<varlistentry>
+<term><code>line-comment-start</code></term>
+<listitem><para>
+String used to create single-line comment in files of this type, e.g.
+"#" in shell scripts.
+It may be used in an editor to implement Comment/Uncomment functionality.
+</para></listitem>
+</varlistentry>
+
+<varlistentry>
+<term><code>block-comment-start</code></term>
+<listitem><para>
+String used to start block comment in files of this type, e.g. "/*" in C
+files.
+</para></listitem>
+</varlistentry>
+
+<varlistentry>
+<term><code>block-comment-end</code></term>
+<listitem><para>
+String used to end block comment in files of this type, e.g. "*/" in C
+files.
+</para></listitem>
+</varlistentry>
+
 </refsect1>
 
 <refsect1>
@@ -350,9 +382,30 @@ underscores ("<code>_</code>").
 <varlistentry>
 <term><code>extend-parent</code> (optional)</term>
 <listitem><para>
-A boolean value telling the engine whether the context has an higher
-priority than the end of he parent. If not specified it defaults to
+A boolean value telling the engine whether the context has higher
+priority than the end of its parent. If not specified it defaults to
 <code>true</code>.
+</para></listitem></varlistentry>
+
+<varlistentry>
+<term><code>end-parent</code> (optional)</term>
+<listitem><para>
+A boolean value telling the engine whether the context terminates parent context.
+If not specified it defaults to <code>false</code>.
+</para></listitem></varlistentry>
+
+<varlistentry>
+<term><code>first-line-only</code> (optional)</term>
+<listitem><para>
+A boolean value telling the engine whether the context can occur only
+on the first line of buffer. If not specified it defaults to <code>false</code>.
+</para></listitem></varlistentry>
+
+<varlistentry>
+<term><code>once-only</code> (optional)</term>
+<listitem><para>
+A boolean value telling the engine whether the context can occur only
+once in its parent. If not specified it defaults to <code>false</code>.
 </para></listitem></varlistentry>
 </variablelist>
 
@@ -402,8 +455,30 @@ priority than the end of he parent. If not specified it defaults to
 <term><code>end-at-line-end</code> (optional)</term>
 <listitem><para>
 A boolean value telling the engine whether the context must be forced
-to end at the end of the line, displaying an error. If not specified
+to end at the end of the line, displaying an error ???? XXX. If not specified
 it defaults to <code>false</code>.
+</para></listitem></varlistentry>
+
+<varlistentry>
+<term><code>end-parent</code> (optional)</term>
+<listitem><para>
+A boolean value telling the engine whether the context terminates parent context
+when it ends.
+If not specified it defaults to <code>false</code>.
+</para></listitem></varlistentry>
+
+<varlistentry>
+<term><code>first-line-only</code> (optional)</term>
+<listitem><para>
+A boolean value telling the engine whether the context can start only
+on the first line of buffer. If not specified it defaults to <code>false</code>.
+</para></listitem></varlistentry>
+
+<varlistentry>
+<term><code>once-only</code> (optional)</term>
+<listitem><para>
+A boolean value telling the engine whether the context can occur only
+once in its parent. If not specified it defaults to <code>false</code>.
 </para></listitem></varlistentry>
 </variablelist>
 </refsect2>

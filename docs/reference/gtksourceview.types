@@ -3,11 +3,9 @@
 #include <gtksourceview/gtksourcelanguage.h>
 #include <gtksourceview/gtksourcelanguagesmanager.h>
 #include <gtksourceview/gtksourcestylescheme.h>
-#include <gtksourceview/gtksourcetag.h>
 
 gtk_source_view_get_type
 gtk_source_buffer_get_type
 gtk_source_language_get_type
 gtk_source_languages_manager_get_type
 gtk_source_style_scheme_get_type
-gtk_source_tag_get_type
