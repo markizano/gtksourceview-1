@@ -28,12 +28,19 @@ GtkSourceStyleScheme
 
 </para>
 
-<!-- ##### STRUCT GtkSourceStyleSchemeClass ##### -->
+<!-- ##### ARG GtkSourceStyleScheme:name ##### -->
 <para>
 
 </para>
 
-@base_class: 
+<!-- ##### FUNCTION gtk_source_style_scheme_get_id ##### -->
+<para>
+
+</para>
+
+@scheme: 
+@Returns: 
+
 
 <!-- ##### FUNCTION gtk_source_style_scheme_get_name ##### -->
 <para>
@@ -42,5 +49,44 @@ GtkSourceStyleScheme
 
 @scheme: 
 @Returns: 
+
+
+<!-- ##### FUNCTION gtk_source_style_scheme_get_style ##### -->
+<para>
+
+</para>
+
+@scheme: 
+@style_name: 
+@Returns: 
+
+
+<!-- ##### FUNCTION gtk_source_style_scheme_get_matching_brackets_style ##### -->
+<para>
+
+</para>
+
+@scheme: 
+@Returns: 
+
+
+<!-- ##### FUNCTION gtk_source_style_scheme_get_current_line_color ##### -->
+<para>
+
+</para>
+
+@scheme: 
+@color: 
+@Returns: 
+
+
+<!-- ##### FUNCTION gtk_source_style_scheme_set_style ##### -->
+<para>
+
+</para>
+
+@scheme: 
+@name: 
+@style: 
 
 

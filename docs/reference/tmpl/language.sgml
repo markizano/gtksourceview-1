@@ -23,6 +23,15 @@ GtkSourceLanguage
 </para>
 
 
+<!-- ##### FUNCTION gtk_source_language_get_id ##### -->
+<para>
+
+</para>
+
+@language: 
+@Returns: 
+
+
 <!-- ##### FUNCTION gtk_source_language_get_name ##### -->
 <para>
 
@@ -41,12 +50,13 @@ GtkSourceLanguage
 @Returns: 
 
 
-<!-- ##### FUNCTION gtk_source_language_get_mime_types ##### -->
+<!-- ##### FUNCTION gtk_source_language_get_property ##### -->
 <para>
 
 </para>
 
 @language: 
+@name: 
 @Returns: 
 
 

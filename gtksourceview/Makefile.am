@@ -108,12 +108,12 @@ $(srcdir)/gtksourceview-typebuiltins.h: Makefile.am $(libgtksourceview_headers)
 	&& glib-mkenums \
 			--fhead "#ifndef __GTKSOURCEVIEW_TYPEBUILTINS_H__\n" \
 			--fhead "#define __GTKSOURCEVIEW_TYPEBUILTINS_H__ 1\n\n" \
-			--fhead "G_BEGIN_DECLS\n\n" \
-			--ftail "G_END_DECLS\n\n" \
 			--ftail "#endif /* __GTKSOURCEVIEW_TYPEBUILTINS_H__ */\n" \
-			--fprod "#include \"@filename@\"\n" \
+			--fprod "#include <gtksourceview/@filename@>\n" \
+			--eprod "G_BEGIN_DECLS\n" \
 			--eprod "#define GTK_TYPE_@ENUMSHORT@ @enum_name@_get_type()\n" \
 			--eprod "GType @enum_name@_get_type (void);\n" \
+			--eprod "G_END_DECLS\n\n" \
 		$(libgtksourceview_headers) > xgen-gth \
 	&& cp xgen-gth $(@F) \
 	&& rm -f xgen-gth

@@ -66,13 +66,6 @@ operation.
 @sourcebuffer: the object which received the signal.
 @arg1: TRUE if the buffer can now perform an undo.
 
-<!-- ##### SIGNAL GtkSourceBuffer::debug ##### -->
-<para>
-
-</para>
-
-@sourcebuffer: the object which received the signal.
-
 <!-- ##### SIGNAL GtkSourceBuffer::highlight-updated ##### -->
 <para>
 Emitted whenever the syntax highlighting information has been updated,

@@ -194,34 +194,18 @@ id_is_decorated (const gchar *id,
 	/* This function is quite simple because the XML validator check for
 	 * the correctness of the id with a regex */
 
-	gchar **tokens;
-	gboolean is_decorated;
+	const gchar *colon;
+	gboolean is_decorated = FALSE;
 
-	tokens = g_strsplit (id, ":", 2);
+	colon = strchr (id, ':');
 
-	g_return_val_if_fail (tokens != NULL, FALSE);
-
-	if (tokens [1] == NULL)
-	{
-		/* There is no ":" in the id */
-		is_decorated = FALSE;
-	}
-	else if (tokens [1] != NULL && strcmp ("*", tokens[1]) == 0)
-	{
-		/* This is an undecorated "import all", and not a decorated
-		 * reference */
-		is_decorated = FALSE;
-	}
-	else
+	if (colon != NULL && strcmp ("*", colon + 1) != 0)
 	{
 		is_decorated = TRUE;
-		if (lang_id != NULL)
-		{
-			*lang_id = g_strdup (tokens[0]);
-		}
-	}
 
-	g_strfreev (tokens);
+		if (lang_id != NULL)
+			*lang_id = g_strndup (id, colon - id);
+	}
 
 	return is_decorated;
 }

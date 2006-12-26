@@ -431,14 +431,6 @@ gtk_source_language_get_section	(GtkSourceLanguage *language)
 	return g_strdup (language->priv->section);
 }
 
-gint
-gtk_source_language_get_version (GtkSourceLanguage *language)
-{
-	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), 0);
-
-	return language->priv->version;
-}
-
 /**
  * gtk_source_language_get_mime_types:
  * @language: a #GtkSourceLanguage.

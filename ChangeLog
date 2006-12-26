@@ -1,3 +1,24 @@
+2006-12-26  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcelanguage.c,
+	gtksourceview/gtksourcelanguage.h:
+	Removed gtk_source_language_get_version(), it's not
+	used and should not be in public api.
+	* gtksourceview/gtksourcelanguage-parser-2.c
+	(id_is_decorated): do not do g_strsplit(), just use
+	strchr() to find colon.
+	* gtksourceview/gtksourcestyle.c,
+	gtksourceview/gtksourcestylescheme.c,
+	gtksourceview/gtksourcestylescheme.h:
+	More inline documentation.
+	* gtksourceview/Makefile.am:
+	Do not put #include <something> inside G_BEGIN_DECLS/G_END_DECLS.
+	* docs/reference/gtksourceview-docs.sgml,
+	docs/reference/gtksourceview-sections.txt,
+	docs/reference/gtksourceview.types,
+	docs/reference/tmpl/*.sgml:
+	Made docs work again. Removed GtkSourceTag*, added GtkSourceStyle*.
+
 2006-12-25  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* docs/reference/lang-reference.sgml:
