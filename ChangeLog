@@ -1,3 +1,18 @@
+2006-01-01  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* configure.in: Disabled printing; added ABS_TOP_SRCDIR for test-widget.
+	* docs/reference/lang-reference.sgml: more docs.
+	* gtksourceview/gtksourcelanguage.[ch]: removed
+        gtk_source_language_get_mime_types().
+	* gtksourceview/gtksourcestyle.c (gtk_source_style_get_type): use
+        G_UNLIKELY() here.
+	* gtksourceview/gtksourcelanguagesmanager.[ch]: added a hash table for
+        language ids; removed gtk_source_languages_manager_get_language_for_mime_type().
+	* tests/test-widget.c: moved get_language_for_whatever() to here, so it still
+        can find language for a file.
+	* tests/Makefile.am: use ABS_TOP_SRCDIR so it can find language-specs even
+        if top_srcdir is a relative path.
+
 2006-12-26  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcelanguage.c,

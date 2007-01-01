@@ -70,6 +70,8 @@ AC_ARG_ENABLE(gnomeprint, AC_HELP_STRING([--disable-gnomeprint],
   *) AC_MSG_ERROR(bad value ${enableval} for --enable-gnomeprint) ;;
 esac],
 [enable_gnomeprint=true]) dnl default
+# it doesn't work now
+enable_gnomeprint=false
 
 msg_gnomeprint=no
 AM_CONDITIONAL(HAVE_GNOMEPRINT, false)
@@ -106,6 +108,9 @@ if test x$build_tests = xtrue; then
 	PKG_CHECK_MODULES(TESTS, gnome-vfs-2.0,
 			  AM_CONDITIONAL(USE_GNOME_VFS, true),
 			  [:])
+        # test-widget uses this to find lang files and gtksourcebuffer.c
+        ABS_TOP_SRCDIR=`cd $srcdir && pwd`
+        AC_SUBST(ABS_TOP_SRCDIR)
 fi
 
 # I18N stuff

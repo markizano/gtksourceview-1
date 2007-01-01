@@ -101,7 +101,7 @@ Contains optional metadata about the language definition.
 </para>
 
 <para>
-Contained elements (all optional):
+Recognized elements are (all optional):
 </para>
 
 <varlistentry>
@@ -380,6 +380,15 @@ underscores ("<code>_</code>").
 </para></listitem></varlistentry>
 
 <varlistentry>
+<term><code>style-ref</code> (optional)</term>
+<listitem><para>
+Highlighting style for this context. Value of this attribute
+may be id of a style defined in current lang file, or id of a style
+defined in other files prefixed with corresponding language id,
+e.g. "def:comment".
+</para></listitem></varlistentry>
+
+<varlistentry>
 <term><code>extend-parent</code> (optional)</term>
 <listitem><para>
 A boolean value telling the engine whether the context has higher
@@ -444,9 +453,26 @@ underscores ("<code>_</code>").
 </para></listitem></varlistentry>
 
 <varlistentry>
+<term><code>style-ref</code> (optional)</term>
+<listitem><para>
+Highlighting style for this context. Value of this attribute
+may be id of a style defined in current lang file, or id of a style
+defined in other files prefixed with corresponding language id,
+e.g. "def:comment".
+</para></listitem></varlistentry>
+
+<varlistentry>
+<term><code>style-inside</code> (optional)</term>
+<listitem><para>
+If this attribute is "true", then the highlighting style will
+be applied to the area between start and end matches; otherwise
+whole context will be highlighted.
+</para></listitem></varlistentry>
+
+<varlistentry>
 <term><code>extend-parent</code> (optional)</term>
 <listitem><para>
-A boolean value telling the engine whether the context has an higher
+A boolean value telling the engine whether the context has a higher
 priority than the end of he parent. If not specified it defaults to
 <code>true</code>.
 </para></listitem></varlistentry>
@@ -551,6 +577,21 @@ every children of the specified context, instead of the context itself.
 Prepending the id of another language to the id of the context (separated
 with a semicolon ":") is possible to include contexts defined inside such
 external language.
+</para></listitem></varlistentry>
+
+<varlistentry>
+<term><code>style-ref</code> (optional)</term>
+<listitem><para>
+Style in included context may be overridden by using this attribute.
+Its value is id of the style to be used instead of style specified
+in the referenced context.
+</para></listitem></varlistentry>
+
+<varlistentry>
+<term><code>ignore-style</code> (optional)</term>
+<listitem><para>
+If this attribute it "true" then the referenced context will not
+be highlighted. It does not affect child contexts and their styles.
 </para></listitem></varlistentry>
 </variablelist>
 

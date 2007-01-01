@@ -270,13 +270,102 @@ remove_all_markers (GtkSourceBuffer *buffer)
 	}
 }
 
+/* Note this is wrong for several reasons, e.g. g_pattern_match is broken
+ * for glob matching. */
+static GtkSourceLanguage *
+get_language_for_filename (GtkSourceLanguagesManager *manager,
+			   const gchar               *filename)
+{
+	const GSList *list;
+	gchar *filename_utf8;
+
+	filename_utf8 = g_filename_to_utf8 (filename, -1, NULL, NULL, NULL);
+	g_return_val_if_fail (filename_utf8 != NULL, NULL);
+
+	list = gtk_source_languages_manager_get_available_languages (manager);
+
+	while (list != NULL)
+	{
+		GtkSourceLanguage *lang;
+		const gchar *prop;
+		char **globs, **p;
+
+		lang = list->data;
+		list = list->next;
+
+		prop = gtk_source_language_get_property (lang, "globs");
+
+		if (prop == NULL)
+			continue;
+
+		globs = g_strsplit (prop, ";", 0);
+
+		for (p = globs; *p != NULL; p++)
+		{
+			if (g_pattern_match_simple (*p, filename_utf8))
+			{
+				g_strfreev (globs);
+				g_free (filename_utf8);
+				return lang;
+			}
+		}
+
+		g_strfreev (globs);
+	}
+
+	g_free (filename_utf8);
+	return NULL;
+}
+
+/* Note this is wrong, because it ignores mime parent types and subtypes.
+ * It's fine to use in a simplish program like this, but is unacceptable
+ * in a serious text editor. */
+static GtkSourceLanguage *
+get_language_for_mime_type (GtkSourceLanguagesManager *manager,
+			    const gchar               *mime)
+{
+	const GSList *list;
+
+	list = gtk_source_languages_manager_get_available_languages (manager);
+
+	while (list != NULL)
+	{
+		GtkSourceLanguage *lang;
+		const gchar *prop;
+		char **mimetypes, **p;
+
+		lang = list->data;
+		list = list->next;
+
+		prop = gtk_source_language_get_property (lang, "mimetypes");
+
+		if (prop == NULL)
+			continue;
+
+		mimetypes = g_strsplit (prop, ";", 0);
+
+		for (p = mimetypes; *p != NULL; p++)
+		{
+			if (strcmp (*p, mime) == 0)
+			{
+				g_strfreev (mimetypes);
+				return lang;
+			}
+		}
+
+		g_strfreev (mimetypes);
+	}
+
+	return NULL;
+}
+
 static GtkSourceLanguage *
 get_language_for_file (GtkSourceLanguagesManager *manager,
 		       const gchar               *filename)
 {
 	GtkSourceLanguage *language = NULL;
 
-#ifdef USE_GNOME_VFS
+#if defined(USE_GNOME_VFS)
 	gchar *mime_type;
 	gchar *uri;
 
@@ -296,12 +385,14 @@ get_language_for_file (GtkSourceLanguagesManager *manager,
 	}
 
 	if ((mime_type = gnome_vfs_get_mime_type (uri)))
-		language = gtk_source_languages_manager_get_language_for_mime_type (manager,
-										    mime_type);
+		language = get_language_for_mime_type (manager, mime_type);
 
 	g_free (mime_type);
 	g_free (uri);
 #endif
+
+	if (!language)
+		language = get_language_for_filename (manager, filename);
 
 	return language;
 }
@@ -1094,6 +1185,8 @@ main (int argc, char *argv[])
 	  { "style-scheme", 's', 0, G_OPTION_ARG_STRING, &style_scheme_id, "Style scheme name to use", "SCHEME"},
 	  { NULL }
 	};
+
+	g_thread_init (NULL);
 
 #ifdef TEST_XML_MEM
 	init_mem_stuff ();
