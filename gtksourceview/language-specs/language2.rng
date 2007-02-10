@@ -242,6 +242,11 @@
             </attribute>
         </optional>
         <optional>
+            <attribute name="style-inside">
+                <ref name="boolean-value"/>
+            </attribute>
+        </optional>
+        <optional>
             <attribute name="extend-parent">
                 <ref name="boolean-value"/>
             </attribute>

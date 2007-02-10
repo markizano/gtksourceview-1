@@ -78,7 +78,7 @@
 #define LOOKUP_DEFINITION(ctx_data, id) \
 	(g_hash_table_lookup ((ctx_data)->definitions, (id)))
 
-#define HAS_OPTION(def,opt) (((def)->match_options & GTK_SOURCE_CONTEXT_##opt) != 0)
+#define HAS_OPTION(def,opt) (((def)->flags & GTK_SOURCE_CONTEXT_##opt) != 0)
 
 /* Can the context be terminated by ancestor? */
 /* Root context can't be terminated; its child may not be terminated by it;
@@ -193,7 +193,7 @@ struct _ContextDefinition
 	 * context. */
 	Regex			*reg_all;
 
-	GtkSourceContextMatchOptions match_options;
+	GtkSourceContextFlags    flags;
 };
 
 struct _SubPatternDefinition
@@ -300,6 +300,11 @@ struct _Segment
 	/* The context is used in the interval [start_at; end_at). */
 	gint			 start_at;
 	gint			 end_at;
+
+	/* In case of container contexts, start_len/end_len is length in chars
+	 * of start/end match. */
+	gint			 start_len;
+	gint			 end_len;
 
 	/* Whether this segment is a whole good segment, or it's an
 	 * an end of bigger one left after erase_segments() call. */
@@ -719,9 +724,27 @@ apply_tags (GtkSourceContextEngine *ce,
 
 	if (tag != NULL)
 	{
-		gtk_text_buffer_get_iter_at_offset (ce->priv->buffer, &start_iter, start_offset);
-		gtk_text_buffer_get_iter_at_offset (ce->priv->buffer, &end_iter, end_offset);
-		gtk_text_buffer_apply_tag (ce->priv->buffer, tag, &start_iter, &end_iter);
+		gint style_start_at, style_end_at;
+
+		style_start_at = start_offset;
+		style_end_at = end_offset;
+
+		if (HAS_OPTION (segment->context->definition, STYLE_INSIDE))
+		{
+			style_start_at = MAX (segment->start_at + segment->start_len, start_offset);
+			style_end_at = MIN (segment->end_at - segment->end_len, end_offset);
+		}
+
+		if (style_start_at > style_end_at)
+		{
+			g_critical ("%s: oops", G_STRLOC);
+		}
+		else
+		{
+			gtk_text_buffer_get_iter_at_offset (ce->priv->buffer, &start_iter, style_start_at);
+			gtk_text_buffer_get_iter_at_offset (ce->priv->buffer, &end_iter, style_end_at);
+			gtk_text_buffer_apply_tag (ce->priv->buffer, tag, &start_iter, &end_iter);
+		}
 	}
 
 	for (sp = segment->sub_patterns; sp != NULL; sp = sp->next)
@@ -1203,6 +1226,8 @@ find_insertion_place (Segment  *segment,
  *
  * Finds invalid segment adjacent to offset (i.e. such that start <= offset <= end),
  * if any.
+ *
+ * Returns: invalid segment or %NULL.
  */
 static Segment *
 get_invalid_at (GtkSourceContextEngine *ce,
@@ -1254,6 +1279,8 @@ segment_add_subpattern (Segment    *state,
  *
  * Creates new subpattern and adds it to the segment's
  * subpatterns list.
+ *
+ * Returns: new subpattern.
  */
 static SubPattern *
 sub_pattern_new (Segment              *segment,
@@ -1320,6 +1347,8 @@ segment_make_invalid_ (GtkSourceContextEngine *ce,
 	ctx = segment->context;
 	segment->context = NULL;
 	segment->is_start = FALSE;
+	segment->start_len = 0;
+	segment->end_len = 0;
 	add_invalid (ce, segment);
 	context_unref (ctx);
 }
@@ -1399,7 +1428,7 @@ simple_segment_split_ (GtkSourceContextEngine *ce,
  * means insertion; 0 means "something happened here", it's
  * treated as zero-length insertion.
  */
-static gboolean
+static void
 invalidate_region (GtkSourceContextEngine *ce,
 		   gint                    offset,
 		   gint                    length)
@@ -1455,8 +1484,6 @@ invalidate_region (GtkSourceContextEngine *ce,
 	CHECK_TREE (ce);
 
 	install_first_update (ce);
-
-	return TRUE;
 }
 
 /**
@@ -1469,7 +1496,7 @@ invalidate_region (GtkSourceContextEngine *ce,
  * Updates segment tree after insertion: it updates tree
  * offsets as appropriate, and inserts a new invalid segment
  * or extends existing invalid segment as @offset, so
- * after the call segment [offset, offset + length) is marked
+ * after the call segment [@offset, @offset + @length) is marked
  * invalid in the tree.
  * It may be safely called with length == 0 at any moment
  * to invalidate some offset (and it's used here and there).
@@ -1605,7 +1632,7 @@ gtk_source_context_engine_text_inserted (GtkSourceEngine *engine,
  * @start: start of deleted text.
  * @length: length of deleted text.
  *
- * Returns new offset depending on location of @offset
+ * Returns: new offset depending on location of @offset
  * relative to deleted text.
  * Called only from fix_offsets_delete_().
  */
@@ -1730,7 +1757,7 @@ gtk_source_context_engine_text_deleted (GtkSourceEngine *engine,
  *
  * @ce: a #GtkSourceContextEngine.
  *
- * Returns first invalid segment, or %NULL.
+ * Returns: first invalid segment, or %NULL.
  */
 static Segment *
 get_invalid_segment (GtkSourceContextEngine *ce)
@@ -1744,7 +1771,7 @@ get_invalid_segment (GtkSourceContextEngine *ce)
  *
  * @ce: a #GtkSourceContextEngine.
  *
- * Returns first invalid line, or -1.
+ * Returns: first invalid line, or -1.
  */
 static gint
 get_invalid_line (GtkSourceContextEngine *ce)
@@ -1948,7 +1975,7 @@ buffer_notify_highlight_cb (GtkSourceContextEngine *ce)
  *
  * @ce: a #GtkSourceContextEngine.
  *
- * Returns whether everything is analyzed (but it doesn't care about the tags).
+ * Returns: whether everything is analyzed (but it doesn't care about the tags).
  */
 static gboolean
 all_analyzed (GtkSourceContextEngine *ce)
@@ -1967,7 +1994,11 @@ all_analyzed (GtkSourceContextEngine *ce)
 static gboolean
 idle_worker (GtkSourceContextEngine *ce)
 {
+	gboolean retval = TRUE;
+
 	g_return_val_if_fail (ce->priv->buffer != NULL, FALSE);
+
+	gdk_threads_enter ();
 
 	/* analyze batch of text */
 	update_syntax (ce, NULL, INCREMENTAL_UPDATE_TIME_SLICE);
@@ -1976,10 +2007,12 @@ idle_worker (GtkSourceContextEngine *ce)
 	if (all_analyzed (ce))
 	{
 		ce->priv->incremental_update = 0;
-		return FALSE;
+		retval = FALSE;
 	}
 
-	return TRUE;
+	gdk_threads_leave ();
+
+	return retval;
 }
 
 /**
@@ -1995,6 +2028,8 @@ first_update_callback (GtkSourceContextEngine *ce)
 {
 	g_return_val_if_fail (ce->priv->buffer != NULL, FALSE);
 
+	gdk_threads_enter ();
+
 	/* analyze batch of text */
 	update_syntax (ce, NULL, FIRST_UPDATE_TIME_SLICE);
 	CHECK_TREE (ce);
@@ -2003,6 +2038,8 @@ first_update_callback (GtkSourceContextEngine *ce)
 
 	if (!all_analyzed (ce))
 		install_idle_worker (ce);
+
+	gdk_threads_leave ();
 
 	return FALSE;
 }
@@ -2192,8 +2229,17 @@ gtk_source_context_engine_attach_buffer (GtkSourceEngine *engine,
 									      &start, TRUE);
 		ce->priv->invalid_region.end = gtk_text_buffer_create_mark (buffer, NULL,
 									    &end, FALSE);
-		ce->priv->invalid_region.empty = FALSE;
-		ce->priv->invalid_region.delta = gtk_text_buffer_get_char_count (buffer);
+
+		if (gtk_text_buffer_get_char_count (buffer) != 0)
+		{
+			ce->priv->invalid_region.empty = FALSE;
+			ce->priv->invalid_region.delta = gtk_text_buffer_get_char_count (buffer);
+		}
+		else
+		{
+			ce->priv->invalid_region.empty = TRUE;
+			ce->priv->invalid_region.delta = 0;
+		}
 
 		g_object_get (ce->priv->buffer, "highlight", &ce->priv->highlight, NULL);
 		ce->priv->refresh_region = gtk_text_region_new (buffer);
@@ -2451,7 +2497,7 @@ find_single_byte_escape (const gchar *string)
  *
  * Creates a new regex.
  *
- * Return value: a newly-allocated #Regex.
+ * Returns: a newly-allocated #Regex.
  */
 static Regex *
 regex_new (const gchar           *pattern,
@@ -2590,7 +2636,7 @@ replace_start_regex (const EggRegex *regex,
  * them (they are extracted from @start_regex and @matched_text) and
  * returns the new regular expression.
  *
- * Return value: a #Regex.
+ * Returns: a #Regex.
  */
 static Regex *
 regex_resolve (Regex       *regex,
@@ -2743,6 +2789,33 @@ apply_sub_patterns (Segment         *state,
 {
 	GSList *sub_pattern_list = state->context->definition->sub_patterns;
 
+	if (SEGMENT_IS_CONTAINER (state))
+	{
+		gint start_pos;
+		gint end_pos;
+
+		regex_fetch_pos (regex, line->text, 0, &start_pos, &end_pos);
+
+		if (where == SUB_PATTERN_WHERE_START)
+		{
+			if (line->start_at + start_pos != state->start_at)
+				g_critical ("%s: oops", G_STRLOC);
+			else if (line->start_at + end_pos > state->end_at)
+				g_critical ("%s: oops", G_STRLOC);
+			else
+				state->start_len = line->start_at + end_pos - state->start_at;
+		}
+		else
+		{
+			if (line->start_at + start_pos < state->start_at)
+				g_critical ("%s: oops", G_STRLOC);
+			else if (line->start_at + end_pos != state->end_at)
+				g_critical ("%s: oops", G_STRLOC);
+			else
+				state->end_len = state->end_at - line->start_at - start_pos;
+		}
+	}
+
 	while (sub_pattern_list != NULL)
 	{
 		SubPatternDefinition *sp_def = sub_pattern_list->data;
@@ -2790,7 +2863,7 @@ apply_sub_patterns (Segment         *state,
  * See apply_match(), this function is a helper function
  * called from where, it doesn't modify syntax tree.
  *
- * Return value: %TRUE if the match can be applied.
+ * Returns: %TRUE if the match can be applied.
  */
 static gboolean
 can_apply_match (Context  *state,
@@ -2868,7 +2941,7 @@ can_apply_match (Context  *state,
  * If the match can be applied the function applies the appropriate
  * sub patterns.
  *
- * Return value: %TRUE if the match can be applied.
+ * Returns: %TRUE if the match can be applied.
  */
 static gboolean
 apply_match (Segment         *state,
@@ -2975,7 +3048,7 @@ create_reg_all (Context           *context,
 				 * or parser need to check it */
 				else
 				{
-//					g_critical ("%s: oops", G_STRLOC);
+					/* g_critical ("%s: oops", G_STRLOC); */
 					append = FALSE;
 				}
 
@@ -3863,7 +3936,7 @@ simple_context_starts_here (GtkSourceContextEngine *ce,
  * @line_pos in @line. If the contexts start here @new_state and
  * @line_pos are updated.
  *
- * Return value: %TRUE if the context starts here.
+ * Returns: %TRUE if the context starts here.
  */
 static gboolean
 child_starts_here (GtkSourceContextEngine *ce,
@@ -3932,7 +4005,7 @@ segment_ends_here (Segment  *state,
  * This function only checks conetxts and does not modify the tree,
  * it's used by ancestor_ends_here().
  *
- * Return value: the ancestor context that terminates here or %NULL.
+ * Returns: the ancestor context that terminates here or %NULL.
  */
 static Context *
 ancestor_context_ends_here (Context                *state,
@@ -3996,7 +4069,7 @@ ancestor_context_ends_here (Context                *state,
  * in @new_state, and descendants of @new_state are closed, so the
  * terminating segment becomes current state.
  *
- * Return value: %TRUE if an ancestor ends at the given position.
+ * Returns: %TRUE if an ancestor ends at the given position.
  */
 static gboolean
 ancestor_ends_here (Segment                *state,
@@ -4038,7 +4111,7 @@ ancestor_ends_here (Segment                *state,
  * Verifies if a context starts or ends in @line at @line_pos of after it.
  * If the contexts starts or ends here @new_state and @line_pos are updated.
  *
- * Return value: %FALSE is there are no more contexts in @line.
+ * Returns: %FALSE is there are no more contexts in @line.
  */
 static gboolean
 next_segment (GtkSourceContextEngine  *ce,
@@ -4174,7 +4247,7 @@ next_segment (GtkSourceContextEngine  *ce,
  * Closes the contexts that cannot contain end of lines if needed.
  * Updates hint if new state is different from @state.
  *
- * Return value: the new state.
+ * Returns: the new state.
  */
 static Segment *
 check_line_end (GtkSourceContextEngine *ce,
@@ -4283,7 +4356,7 @@ delete_zero_length_segments (GtkSourceContextEngine *ce,
  *
  * Finds contexts at the line and updates the syntax tree on it.
  *
- * Return value: starting state at the next line.
+ * Returns: starting state at the next line.
  */
 static Segment *
 analyze_line (GtkSourceContextEngine *ce,
@@ -5431,7 +5504,7 @@ context_definition_new (const gchar        *id,
 			const gchar        *start,
 			const gchar        *end,
 			const gchar        *style,
-			GtkSourceContextMatchOptions options,
+			GtkSourceContextFlags flags,
 			GError            **error)
 {
 	ContextDefinition *definition;
@@ -5515,7 +5588,7 @@ context_definition_new (const gchar        *id,
 	definition->id = g_strdup (id);
 	definition->default_style = g_strdup (style);
 	definition->type = type;
-	definition->match_options = options;
+	definition->flags = flags;
 	definition->children = NULL;
 	definition->sub_patterns = NULL;
 	definition->n_sub_patterns = 0;
@@ -5625,7 +5698,7 @@ _gtk_source_context_data_define_context (GtkSourceContextData *ctx_data,
 					 const gchar          *start_regex,
 					 const gchar          *end_regex,
 					 const gchar          *style,
-					 GtkSourceContextMatchOptions options,
+					 GtkSourceContextFlags flags,
 					 GError              **error)
 {
 	ContextDefinition *definition, *parent = NULL;
@@ -5689,7 +5762,7 @@ _gtk_source_context_data_define_context (GtkSourceContextData *ctx_data,
 
 	definition = context_definition_new (id, type, match_regex,
 					     start_regex, end_regex, style,
-					     options, error);
+					     flags, error);
 	if (definition == NULL)
 		return FALSE;
 
@@ -5935,7 +6008,7 @@ resolve_reference (G_GNUC_UNUSED const gchar *id,
  * May be called any number of times, must be called after parsing is
  * done.
  *
- * Return value: %TRUE on success, %FALSE if there were unresolved
+ * Returns: %TRUE on success, %FALSE if there were unresolved
  * references.
  */
 gboolean

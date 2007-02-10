@@ -36,7 +36,36 @@ static gchar *
 fix_pattern (const gchar *pattern,
 	     gboolean    *end_at_line_end)
 {
-	if (pattern != NULL && g_str_has_suffix (pattern, "\\n"))
+	char *slash;
+
+	if (pattern == NULL)
+		return NULL;
+
+	slash = strchr (pattern, '/');
+
+	if (slash != NULL)
+	{
+		GString *str;
+
+		str = g_string_new_len (pattern, slash - pattern);
+		g_string_append (str, "\\/");
+		pattern = slash + 1;
+
+		while ((slash = strchr (pattern, '/')) != NULL)
+		{
+			g_string_append_len (str, pattern, slash - pattern);
+			g_string_append (str, "\\/");
+			pattern = slash + 1;
+		}
+
+		if (g_str_has_suffix (pattern, "\\n"))
+			g_string_append_len (str, pattern, strlen(pattern) - 2);
+		else
+			g_string_append (str, pattern);
+
+		return g_string_free (str, FALSE);
+	}
+	else if (g_str_has_suffix (pattern, "\\n"))
 	{
 		if (end_at_line_end)
 			*end_at_line_end = TRUE;
@@ -99,7 +128,7 @@ ctx_data_add_syntax_pattern (GtkSourceContextData *ctx_data,
 	gchar *real_id, *root_id;
 	gchar *fixed_start, *fixed_end;
 	GError *error = NULL;
-	GtkSourceContextMatchOptions options = GTK_SOURCE_CONTEXT_EXTEND_PARENT;
+	GtkSourceContextFlags flags = GTK_SOURCE_CONTEXT_EXTEND_PARENT;
 
 	g_return_val_if_fail (id != NULL, FALSE);
 
@@ -110,14 +139,14 @@ ctx_data_add_syntax_pattern (GtkSourceContextData *ctx_data,
 	fixed_end = fix_pattern (pattern_end, &end_at_line_end);
 
 	if (end_at_line_end)
-		options |= GTK_SOURCE_CONTEXT_END_AT_LINE_END;
+		flags |= GTK_SOURCE_CONTEXT_END_AT_LINE_END;
 
 	result = _gtk_source_context_data_define_context (ctx_data, real_id, root_id,
 							  NULL,
 							  pattern_start,
 							  pattern_end,
 							  style,
-							  options,
+							  flags,
 							  &error);
 
 	if (error != NULL)

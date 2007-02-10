@@ -1,5 +1,29 @@
 2006-02-10  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcecontextengine.h: renamed once again
+        GtkSourceContextMatchOptions to GtkSourceContextFlags,
+        added GTK_SOURCE_CONTEXT_STYLE_INSIDE flag which means context
+        style should not be applied to its start and end matches.
+	* gtksourceview/gtksourcecontextengine.c:
+        (apply_tags), (apply_sub_patterns): use the STYLE_INSIDE flag;
+        (idle_worker), (first_update_callback): use gdk_threads_enter/leave
+        in idle callbacks;
+        (gtk_source_context_engine_attach_buffer): mark whole buffer as
+        invalid when attaching engine.
+	* gtksourceview/gtksourcelanguageparser-1.c: (fix_pattern): escape
+        slashes.
+	* gtksourceview/gtksourcelanguageparser-2.c:
+        (get_context_flags): use and parse STYLE_INSIDE option;
+        (ParserState), (lang_id_is_already_loaded), (handle_language_element),
+        (parser_state_new): use hash table instead of list of loaded languages;
+        (parse_style), (map_style): removed map_style(), it was broken and
+        didn't do anything useful for styles mapping, which yet has to be fixed;
+	* gtksourceview/gtksourcestylemanager.c: removed commented out
+        gtk_source_style_manager_add_scheme().
+	* gtksourceview/language-specs/language2.rng: added style-inside attribute.
+
+2006-02-10  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourceiter.c: (exact_prefix_cmp): new UTF8
         accent mark-aware replacement for strncmp(), fixes #339805;
         renamed g_utf8_* functions to utf8_* to avoid potential clash
