@@ -1,3 +1,38 @@
+2006-02-10  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/language-specs/Makefile.am,
+	gtksourceview/language-specs/check.sh,
+	gtksourceview/language-specs/dpatch.lang,
+	gtksourceview/language-specs/libtool.lang,
+	gtksourceview/language-specs/pkgconfig.lang: new lang files.
+	* gtksourceview/language-specs/c.lang: highlight TODO and alike in '#if 0'-ed
+        blocks; highlight #import as #include for Objective-C.
+	* gtksourceview/language-specs/convert.py,
+	gtksourceview/language-specs/csharp.lang,
+	gtksourceview/language-specs/css.lang,
+	gtksourceview/language-specs/idl.lang,
+	gtksourceview/language-specs/java.lang,
+	gtksourceview/language-specs/pascal.lang,
+	gtksourceview/language-specs/php.lang: escape slashes (/) in all patterns.
+	* gtksourceview/language-specs/def.lang,
+	gtksourceview/language-specs/cpp.lang,
+	gtksourceview/language-specs/desktop.lang,
+	gtksourceview/language-specs/html.lang,
+	gtksourceview/language-specs/javascript.lang,
+	gtksourceview/language-specs/xml.lang,
+	gtksourceview/language-specs/yacc.lang: renamed "comment" and "line-comment"
+        in def.lang to "in-comment" and "in-line-comment". Replaced "lang:ctx:*"
+        syntax with "lang:ctx".
+	* gtksourceview/language-specs/diff.lang: highlight ignored beginning of
+        patch file as comment.
+	* gtksourceview/language-specs/gtk-doc.lang: require whitespace
+        after starting /**.
+	* gtksourceview/language-specs/ini.lang: match decimal before integer.
+	* gtksourceview/language-specs/m4.lang: more autoconf macros.
+	* gtksourceview/language-specs/python.lang: do not highlight builtins
+        and keywords following dot (e.g. 'file' in 'foo.file').
+	* gtksourceview/language-specs/sh.lang: better here-doc.
+
 2006-01-01  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* configure.in: Disabled printing; added ABS_TOP_SRCDIR for test-widget.

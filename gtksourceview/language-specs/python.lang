@@ -11,7 +11,7 @@
     <style id="module-handler"    _name="Module handler"    map-to="def:character"/>
     <style id="keyword"           _name="Keyword"           map-to="def:keyword"/>
     <style id="function"          _name="Function"          map-to="def:keyword"/>
-    <style id="builtins"          _name="Builtins"/>
+    <style id="builtins"          _name="Builtins"          map-to="def:data-type"/>
     <style id="multiline-string"  _name="Multiline string"  map-to="def:string"/>
     <style id="string"            _name="String"            map-to="def:string"/>
     <style id="escaped-char"      _name="Escaped character" map-to="def:escape"/>
@@ -109,11 +109,12 @@
           <start>`</start>
           <end>`</end>
           <include>
-            <context ref="python:*"/>
+            <context ref="python"/>
           </include>
         </context>
 
 	<context id="special-variables" style-ref="special-variables">
+          <prefix>(?&lt;![\w\.])</prefix>
           <keyword>self</keyword>
           <keyword>False</keyword>
           <keyword>None</keyword>
@@ -187,6 +188,7 @@
         </context>
 
         <context id="builtins" style-ref="builtins">
+          <prefix>(?&lt;![\w\.])</prefix>
           <keyword>ArithmeticError</keyword>
           <keyword>AssertionError</keyword>
           <keyword>AttributeError</keyword>

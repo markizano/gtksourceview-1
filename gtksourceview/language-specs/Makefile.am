@@ -10,6 +10,7 @@ LANGUAGES =			\
 	def.lang		\
 	desktop.lang		\
 	diff.lang		\
+	dpatch.lang		\
 	dtd.lang		\
 	fortran.lang		\
 	gtk-doc.lang		\
@@ -21,6 +22,7 @@ LANGUAGES =			\
 	java.lang		\
 	javascript.lang		\
 	latex.lang		\
+	libtool.lang		\
 	lua.lang		\
 	makefile.lang		\
 	msil.lang		\
@@ -29,6 +31,7 @@ LANGUAGES =			\
 	pascal.lang		\
 	perl.lang		\
 	php.lang		\
+	pkgconfig.lang		\
 	po.lang			\
 	python.lang		\
 	R.lang			\
