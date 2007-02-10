@@ -1,5 +1,10 @@
 2006-02-10  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* tests/testfiles.sh: new file, a script which produces bunch
+        of files of different types, to check highlighting.
+
+2006-02-10  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcecontextengine.h: renamed once again
         GtkSourceContextMatchOptions to GtkSourceContextFlags,
         added GTK_SOURCE_CONTEXT_STYLE_INSIDE flag which means context
