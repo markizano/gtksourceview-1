@@ -177,7 +177,7 @@ gchar		 *egg_regex_replace_literal	(EggRegex              *regex,
 						 const gchar         *replacement,
 						 EggRegexMatchFlags     match_options,
 						 GError             **error);
-gchar		 *egg_regex_replace_eval		(EggRegex              *regex,
+gchar		 *egg_regex_replace_eval	(EggRegex              *regex,
 						 const gchar         *string,
 						 gssize               string_len,
 						 gint                 start_position,
@@ -185,8 +185,10 @@ gchar		 *egg_regex_replace_eval		(EggRegex              *regex,
 						 EggRegexEvalCallback   eval,
 						 gpointer             user_data,
 						 GError             **error);
-gchar		 *egg_regex_escape_string		(const gchar         *string,
+gchar		 *egg_regex_escape_string	(const gchar         *string,
 						 gint                 length);
+
+gint              egg_regex_get_backrefmax      (EggRegex            *regex);
 
 gsize       _egg_regex_get_memory           (EggRegex   *regex);
 

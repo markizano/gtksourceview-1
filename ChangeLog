@@ -1,3 +1,13 @@
+2006-02-12  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/libegg/regex/eggregex.h,
+        gtksourceview/libegg/regex/eggregex.c: new function 
+        egg_regex_get_backrefmax().
+	* gtksourceview/gtksourcelanguageparser-2.c: (expand_regex):
+        do not allow backreferences in highlighting patterns: error
+        out and produce a warning instead of silently acceting a pattern
+        that will never match.
+
 2006-02-10  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* tests/testfiles.sh: new file, a script which produces bunch

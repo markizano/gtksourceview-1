@@ -1083,6 +1083,28 @@ expand_regex (ParserState *parser_state,
 	if (regex == NULL)
 		return NULL;
 
+	if (egg_regex_match_simple ("(?<!\\\\)(\\\\\\\\)*\\\\[0-9]", regex, 0, 0))
+	{
+		/* This may be a backreference, or it may be an octal character */
+		EggRegex *compiled;
+
+		compiled = egg_regex_new (regex, flags, 0, error);
+
+		if (!compiled)
+			return NULL;
+
+		if (egg_regex_get_backrefmax (compiled) > 0)
+		{
+			g_set_error (error, PARSER_ERROR, PARSER_ERROR_MALFORMED_REGEX,
+				     _("in regex '%s': backreferences are not supported"), 
+				     regex);
+			egg_regex_free (compiled);
+			return NULL;
+		}
+
+		egg_regex_free (compiled);
+	}
+
 	if (g_utf8_get_char (regex) == '/')
 	{
 		gchar *regex_end = g_utf8_strrchr (regex, -1, '/');

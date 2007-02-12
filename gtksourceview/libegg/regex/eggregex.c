@@ -265,6 +265,31 @@ regex_lazy_init_match (EggRegex *regex,
 }
 
 /**
+ * egg_regex_get_backrefmax:
+ * @regex: #EggRegex.
+ *
+ * A wrapper around pcre_fullinfo(..., PCRE_INFO_BACKREFMAX).
+ *
+ * Not stock eggregex from Marco.
+ *
+ * Returns: The number of the highest back reference in the @regex's
+ * pattern. Zero is returned if there are no back references.
+ */
+gint
+egg_regex_get_backrefmax (EggRegex *regex)
+{
+  gint ret;
+
+  g_return_val_if_fail (regex != NULL, 0);
+
+  pcre_fullinfo (regex->pattern->pcre_re,
+		 REGEX_GET_EXTRA (regex),
+		 PCRE_INFO_BACKREFMAX,
+		 &ret);
+  return ret;
+}
+
+/**
  * egg_regex_new:
  * @pattern: the regular expression.
  * @compile_options: compile options for the regular expression.
