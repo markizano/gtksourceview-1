@@ -1134,22 +1134,50 @@ egg_regex_fetch_pos (const EggRegex *regex,
  */
 gchar *
 egg_regex_fetch_named (const EggRegex *regex,
-		     const gchar  *name,
-		     const gchar  *string)
+		       const gchar    *name,
+		       const gchar    *string)
 {
-  /* we cannot use pcre_get_named_substring() because it allocates the
-   * string using pcre_malloc(). */
-  gint num;
+  gint ret;
+  gchar buf[1024];
+  gchar *substring;
+  gchar *substring_copy;
 
   g_return_val_if_fail (regex != NULL, NULL);
   g_return_val_if_fail (string != NULL, NULL);
   g_return_val_if_fail (name != NULL, NULL);
 
-  num = egg_regex_get_string_number (regex, name);
-  if (num == -1)
+  if (regex->match == NULL)
     return NULL;
-  else
-    return egg_regex_fetch (regex, num, string);
+
+  if (regex->match->string_len < 0)
+    return NULL;
+
+  ret = pcre_copy_named_substring (regex->pattern->pcre_re,
+				   string,
+				   regex->match->offsets,
+				   regex->match->matches,
+				   name,
+				   buf,
+				   sizeof buf);
+
+  if (ret == PCRE_ERROR_NOSUBSTRING)
+    return NULL;
+
+  /* buf is too small, ask pcre for malloc'ed substring */
+  ret = pcre_get_named_substring (regex->pattern->pcre_re,
+				  string,
+				  regex->match->offsets,
+				  regex->match->matches,
+				  name,
+				  &substring);
+
+  if (ret < 0)
+    /* not enough memory or something */
+    return NULL;
+
+  substring_copy = g_strndup (substring, ret);
+  pcre_free (substring);
+  return substring_copy;
 }
 
 /**

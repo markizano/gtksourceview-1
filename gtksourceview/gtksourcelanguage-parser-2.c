@@ -257,6 +257,11 @@ get_regex_flags (xmlNode             *node,
 			flags = update_regex_flags (flags, "dot-match-all",
 						    attribute->children->content);
 		}
+		else if (xmlStrcmp (BAD_CAST "dupnames", attribute->name) == 0)
+		{
+			flags = update_regex_flags (flags, "dupnames",
+						    attribute->children->content);
+		}
 	}
 
 	return flags;
@@ -867,17 +872,13 @@ update_regex_flags (EggRegexCompileFlags flags,
 	DEBUG (g_message ("setting the '%s' regex flag to %d", option_name, value));
 
 	if (strcmp ("case-insensitive", option_name) == 0)
-	{
 		single_flag = EGG_REGEX_CASELESS;
-	}
 	else if (strcmp ("extended", option_name) == 0)
-	{
 		single_flag = EGG_REGEX_EXTENDED;
-	}
 	else if (strcmp ("dot-match-all", option_name) == 0)
-	{
 		single_flag = EGG_REGEX_DOTALL;
-	}
+	else if (strcmp ("dupnames", option_name) == 0)
+		single_flag = EGG_REGEX_DUPNAMES;
 	else
 		return flags;
 
@@ -1156,9 +1157,13 @@ expand_regex (ParserState *parser_state,
 			g_string_append (expanded_regex, "x");
 		if (flags & EGG_REGEX_DOTALL)
 			g_string_append (expanded_regex, "s");
+		/* J is added here if it's used, but -J isn't added
+		 * below */
+		if (flags & EGG_REGEX_DUPNAMES)
+			g_string_append (expanded_regex, "J");
 	}
 	if (flags != (EGG_REGEX_CASELESS | EGG_REGEX_EXTENDED |
-		EGG_REGEX_DOTALL))
+		      EGG_REGEX_DOTALL | EGG_REGEX_DUPNAMES))
 	{
 		g_string_append (expanded_regex, "-");
 		if (!(flags & EGG_REGEX_CASELESS))

@@ -1,5 +1,18 @@
 2006-02-12  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/libegg/regex/eggregex.c: (egg_regex_fetch_named):
+        fixed for the case when PCRE_DUPNAMES is used.
+	* gtksourceview/gtksourcecontextengine.c: (replace_start_regex):
+        use correct arguments to egg_regex_fetch_named().
+	* gtksourceview/language-specs/language2.rng,
+        gtksourceview/gtksourcelanguage-parser-2.c: (get_regex_flags),
+        (update_regex_flags), (expand_regex): new regex option "dupnames",
+        which is translated to EGG_REGEX_DUPNAMES.
+	* gtksourceview/language-specs/sh.lang: use "dupnames" thing to
+        simplify here-doc context.
+
+2006-02-12  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/libegg/regex/eggregex.h,
         gtksourceview/libegg/regex/eggregex.c: new function 
         egg_regex_get_backrefmax().
