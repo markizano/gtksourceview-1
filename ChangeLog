@@ -1,3 +1,14 @@
+2006-04-07  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcelanguage-parser-2.c: (file_parse): forgot to commit last time.
+	* gtksourceview/libegg/regex/eggregex.c: (egg_regex_optimize): do set pattern->extra
+        member after optimizing.
+	* tests/test-widget.c: removed debug_thing() and debug_thing2().
+	* gtksourceview/language-specs/cpp.lang: moved keywords to keywords section.
+	* gtksourceview/language-specs/gtk-doc.lang: make sure */ closes gtk-doc comment.
+	* gtksourceview/language-specs/makefile.lang: highlight ${foo} like $(foo).
+	* gtksourceview/language-specs/po.lang: use "location" style instead of "others-2".
+
 2006-03-29  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcelanguage-parser-2.c: (file_parse): do not
@@ -19,7 +30,7 @@
 2006-02-12  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/libegg/regex/eggregex.h,
-        gtksourceview/libegg/regex/eggregex.c: new function 
+        gtksourceview/libegg/regex/eggregex.c: new function
         egg_regex_get_backrefmax().
 	* gtksourceview/gtksourcelanguageparser-2.c: (expand_regex):
         do not allow backreferences in highlighting patterns: error

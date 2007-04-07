@@ -60,10 +60,6 @@ static GtkSourceStyleScheme *style_scheme = NULL;
 
 static void       open_file_cb                   (GtkAction       *action,
 						  gpointer         user_data);
-static void       debug_thing_cb                 (GtkAction       *action,
-						  gpointer         user_data);
-static void       debug_thing_2_cb		 (GtkAction       *action,
-						  gpointer         user_data);
 static void       debug_thing_3_cb		 (GtkAction       *action,
 						  gpointer         user_data);
 
@@ -95,11 +91,7 @@ static GtkActionEntry buffer_action_entries[] = {
 	{ "Open", GTK_STOCK_OPEN, "_Open", "<control>O",
 	  "Open a file", G_CALLBACK (open_file_cb) },
 	{ "Quit", GTK_STOCK_QUIT, "_Quit", "<control>Q",
-	  "Exit the application", G_CALLBACK (gtk_main_quit) },
-	{ "DebugThing", GTK_STOCK_QUIT, "_Debug Thing", "<control>D",
-	  "Debug Thing", G_CALLBACK (debug_thing_cb) },
-	{ "DebugThing2", GTK_STOCK_QUIT, "_Debug Thing 2", "<control><shift>D",
-	  "Debug Thing 2", G_CALLBACK (debug_thing_2_cb) },
+	  "Exit the application", G_CALLBACK (gtk_main_quit) }
 };
 
 static GtkActionEntry view_action_entries[] = {
@@ -176,8 +168,6 @@ static const gchar *buffer_ui_description =
 "  <menubar name=\"MainMenu\">"
 "    <menu action=\"FileMenu\">"
 "      <menuitem action=\"Open\"/>"
-"      <menuitem action=\"DebugThing\"/>"
-"      <menuitem action=\"DebugThing2\"/>"
 "      <menuitem action=\"DebugThing3\"/>"
 "      <separator/>"
 "      <menuitem action=\"Quit\"/>"
@@ -528,26 +518,6 @@ new_view_cb (GtkAction *action, gpointer user_data)
 
 
 /* Buffer action callbacks ------------------------------------------------------------ */
-
-static void
-debug_thing_cb (GtkAction *action,
-		gpointer   user_data)
-{
-	GtkTextBuffer *buffer = user_data;
-	GtkTextIter iter, iter2;
-	gtk_text_buffer_get_iter_at_offset (buffer, &iter, 0);
-	gtk_text_buffer_insert (buffer, &iter, "lala", -1);
-	gtk_text_buffer_get_iter_at_offset (buffer, &iter, 8);
-	gtk_text_buffer_get_iter_at_offset (buffer, &iter2, 11);
-	gtk_text_buffer_delete (buffer, &iter, &iter2);
-}
-
-static void
-debug_thing_2_cb (GtkAction *action,
-		  gpointer   user_data)
-{
-	g_signal_emit_by_name (user_data, "debug");
-}
 
 static gboolean
 replace_dialog (GtkWidget *widget,
