@@ -153,4 +153,5 @@ Configuration:
 	Compiler:		${CC}
 	gnome-print support:	$msg_gnomeprint
 	build tests:		$msg_tests
+        use system pcre:        $USE_SYSTEM_PCRE
 "

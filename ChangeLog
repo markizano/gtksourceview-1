@@ -1,5 +1,10 @@
 2006-04-07  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* acinclude.m4 (GTK_SOURCE_VIEW_AC_PCRE): require pcre-6.7.
+	* configure.in: report whether system pcre is used.
+
+2006-04-07  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcelanguage-parser-2.c: (file_parse): forgot to commit last time.
 	* gtksourceview/libegg/regex/eggregex.c: (egg_regex_optimize): do set pattern->extra
         member after optimizing.

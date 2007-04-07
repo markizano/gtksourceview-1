@@ -21,7 +21,7 @@ AC_HELP_STRING([--with-system-pcre], [whether to use system copy of pcre library
 if test "x$USE_SYSTEM_PCRE" != xno; then
     have_pcre="no"
 
-    PKG_CHECK_MODULES(PCRE, [libpcre >= 6.4], [
+    PKG_CHECK_MODULES(PCRE, [libpcre >= 6.7], [
         have_pcre="yes"
     ], [
         have_pcre="no"
@@ -100,7 +100,7 @@ if test x$USE_SYSTEM_PCRE = xno; then
 
     AC_C_CONST
     AC_TYPE_SIZE_T
-    AC_CHECK_FUNCS(bcopy memmove strerror)
+    AC_CHECK_FUNCS(memmove strerror)
 
     AC_DEFINE(NEWLINE, '\n', [The value of NEWLINE determines the newline character used in pcre])
 
