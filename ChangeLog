@@ -1,5 +1,10 @@
 2006-04-08  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourceiter.c: renamed strbreakup() to breakup_string(),
+        'strbreakup' is a reserved name.
+
+2006-04-08  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/language-specs/c.lang: highlight XPM files.
 
 2006-04-07  Yevgen Muntyan  <muntyan@tamu.edu>

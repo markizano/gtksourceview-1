@@ -476,9 +476,9 @@ backward_lines_match (const GtkTextIter *start,
 
 /* strsplit () that retains the delimiter as part of the string. */
 static gchar **
-strbreakup (const char *string,
-	    const char *delimiter,
-	    gint        max_tokens)
+breakup_string (const char *string,
+		const char *delimiter,
+		gint        max_tokens)
 {
 	GSList *string_list = NULL, *slist;
 	gchar **str_array, *s, *casefold, *new_string;
@@ -619,7 +619,7 @@ gtk_source_iter_forward_search (const GtkTextIter   *iter,
 	slice = (flags & GTK_SOURCE_SEARCH_TEXT_ONLY) == 0;
 
 	/* locate all lines */
-	lines = strbreakup (str, "\n", -1);
+	lines = breakup_string (str, "\n", -1);
 
 	search = *iter;
 
@@ -722,7 +722,7 @@ gtk_source_iter_backward_search (const GtkTextIter   *iter,
 	slice = (flags & GTK_SOURCE_SEARCH_TEXT_ONLY) == 0;
 
 	/* locate all lines */
-	lines = strbreakup (str, "\n", -1);
+	lines = breakup_string (str, "\n", -1);
 
 	search = *iter;
 
