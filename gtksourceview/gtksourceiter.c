@@ -227,6 +227,25 @@ finally_2:
 	return ret;
 }
 
+/* FIXME: total horror */
+static gboolean
+char_is_invisible (const GtkTextIter *iter)
+{
+	GSList *tags;
+	gboolean invisible = FALSE;
+	tags = gtk_text_iter_get_tags (iter);
+	while (tags)
+	{
+		gboolean this_invisible, invisible_set;
+		g_object_get (tags->data, "invisible", &this_invisible, 
+			      "invisible-set", &invisible_set, NULL);
+		if (invisible_set)
+			invisible = this_invisible;
+		tags = g_slist_delete_link (tags, tags);
+	}
+	return invisible;
+}
+
 static void
 forward_chars_with_skipping (GtkTextIter *iter,
 			     gint         count,
@@ -253,8 +272,9 @@ forward_chars_with_skipping (GtkTextIter *iter,
 		if (skip_nontext && gtk_text_iter_get_char (iter) == GTK_TEXT_UNKNOWN_CHAR)
 			ignored = TRUE;
 
-		if (!ignored && skip_invisible &&
-		    /* _gtk_text_btree_char_is_invisible (iter)*/ FALSE)
+		/* FIXME: char_is_invisible() gets list of tags for each char there,
+		   and checks every tag. It doesn't sound like a good idea. */
+		if (!ignored && skip_invisible && char_is_invisible (iter))
 			ignored = TRUE;
 
 		if (!ignored && skip_decomp)

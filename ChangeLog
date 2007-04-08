@@ -1,5 +1,10 @@
 2006-04-08  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourceiter.c (forward_chars_with_skipping): do skip
+        invisible chars.
+
+2006-04-08  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourceiter.c: renamed strbreakup() to breakup_string(),
         'strbreakup' is a reserved name.
 
