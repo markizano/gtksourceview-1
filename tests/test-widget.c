@@ -855,7 +855,7 @@ create_view_window (GtkSourceBuffer *buffer, GtkSourceView *from)
 	view = gtk_source_view_new_with_buffer (buffer);
 
 	if (style_scheme)
-		gtk_source_view_set_style_scheme (GTK_SOURCE_VIEW (view), style_scheme);
+		gtk_source_buffer_set_style_scheme (buffer, style_scheme);
 
 	g_signal_connect (buffer, "mark_set", G_CALLBACK (move_cursor_cb), view);
 	g_signal_connect (buffer, "changed", G_CALLBACK (update_cursor_position), view);

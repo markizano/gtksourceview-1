@@ -88,8 +88,7 @@ enum {
 	PROP_MARGIN,
 	PROP_SMART_HOME_END,
 	PROP_HIGHLIGHT_CURRENT_LINE,
-	PROP_INDENT_ON_TAB,
-	PROP_STYLE_SCHEME
+	PROP_INDENT_ON_TAB
 };
 
 struct _GtkSourceViewPrivate
@@ -191,6 +190,7 @@ static void     gtk_source_view_style_set               (GtkWidget         *widg
 							 GtkStyle          *previous_style);
 static void	gtk_source_view_realize			(GtkWidget         *widget);
 static void	gtk_source_view_unrealize		(GtkWidget         *widget);
+static void	gtk_source_view_update_style_scheme	(GtkSourceView     *view);
 
 
 /* Private functions. */
@@ -309,23 +309,6 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 							       _("Whether to indent the selected text when the tab key is pressed"),
 							       TRUE,
 							       G_PARAM_READWRITE));
-
-	/**
-	 * GtkSourceView:style-scheme:
-	 *
-	 * Style scheme. It contains styles for syntax highlighting, optionally
-	 * foreground, background, cursor color, current line color, and matching
-	 * brackets style.
-	 *
-	 * Since: 2.0
-	 */
-	g_object_class_install_property (object_class,
-					 PROP_STYLE_SCHEME,
-					 g_param_spec_object ("style_scheme",
-							      _("Style scheme"),
-							      _("Style scheme"),
-							      GTK_TYPE_SOURCE_STYLE_SCHEME,
-							      G_PARAM_READWRITE));
 
 	/**
 	 * GtkSourceView:right-margin-line-alpha:
@@ -516,11 +499,6 @@ gtk_source_view_set_property (GObject      *object,
 							   g_value_get_boolean (value));
 			break;
 
-		case PROP_STYLE_SCHEME:
-			gtk_source_view_set_style_scheme (view,
-							  g_value_get_object (value));
-			break;
-
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 			break;
@@ -594,10 +572,6 @@ gtk_source_view_get_property (GObject    *object,
 		case PROP_INDENT_ON_TAB:
 			g_value_set_boolean (value,
 					     gtk_source_view_get_indent_on_tab (view));
-			break;
-
-		case PROP_STYLE_SCHEME:
-			g_value_set_object (value, view->priv->style_scheme);
 			break;
 
 		default:
@@ -801,6 +775,14 @@ marker_updated_cb (GtkSourceBuffer *buffer,
 }
 
 static void
+buffer_style_scheme_changed_cb (GtkSourceBuffer *buffer,
+				GParamSpec	*pspec,
+				GtkSourceView   *view)
+{
+	gtk_source_view_update_style_scheme (view);
+}
+
+static void
 set_source_buffer (GtkSourceView *view,
 		   GtkTextBuffer *buffer)
 {
@@ -814,6 +796,9 @@ set_source_buffer (GtkSourceView *view,
 						      view);
 		g_signal_handlers_disconnect_by_func (view->priv->source_buffer,
 						      marker_updated_cb,
+						      view);
+		g_signal_handlers_disconnect_by_func (view->priv->source_buffer,
+						      buffer_style_scheme_changed_cb,
 						      view);
 		g_object_unref (view->priv->source_buffer);
 	}
@@ -830,15 +815,18 @@ set_source_buffer (GtkSourceView *view,
 				  "marker_updated",
 				  G_CALLBACK (marker_updated_cb),
 				  view);
-
-		if (view->priv->style_scheme)
-			_gtk_source_buffer_set_style_scheme (view->priv->source_buffer,
-							     view->priv->style_scheme);
+		g_signal_connect (buffer,
+				  "notify::style-scheme",
+				  G_CALLBACK (buffer_style_scheme_changed_cb),
+				  view);
 	}
 	else
 	{
 		view->priv->source_buffer = NULL;
 	}
+
+	if (buffer)
+		gtk_source_view_update_style_scheme (view);
 }
 
 static void
@@ -2181,7 +2169,7 @@ insert_tab_or_spaces (GtkSourceView *view, GtkTextIter *start, GtkTextIter *end)
 		gint tab_pos;
 		gint num_of_equivalent_spaces;
 
-		tabs_size = view->priv->tabs_width; 
+		tabs_size = view->priv->tabs_width;
 
 		iter = *start;
 
@@ -2200,7 +2188,7 @@ insert_tab_or_spaces (GtkSourceView *view, GtkTextIter *start, GtkTextIter *end)
 			tab_pos--;
 		}
 
-		num_of_equivalent_spaces = tabs_size - (cur_pos - tab_pos) % tabs_size; 
+		num_of_equivalent_spaces = tabs_size - (cur_pos - tab_pos) % tabs_size;
 
 		tab_buf = g_strnfill (num_of_equivalent_spaces, ' ');
 	}
@@ -2257,8 +2245,8 @@ gtk_source_view_key_press_event (GtkWidget *widget, GdkEventKey *event)
 
 		if (indent != NULL)
 		{
-			/* Allow input methods to internally handle a key press event. 
-			 * If this function returns TRUE, then no further processing should be done 
+			/* Allow input methods to internally handle a key press event.
+			 * If this function returns TRUE, then no further processing should be done
 			 * for this keystroke. */
 			if (gtk_im_context_filter_keypress (GTK_TEXT_VIEW(view)->im_context, event))
 				return TRUE;
@@ -2266,7 +2254,7 @@ gtk_source_view_key_press_event (GtkWidget *widget, GdkEventKey *event)
 			/* If an input method has inserted some test while handling the key press event,
 			 * the cur iterm may be invalid, so get the iter again */
 			gtk_text_buffer_get_iter_at_mark (buf, &cur, mark);
-	
+
 			/* Insert new line and auto-indent. */
 			gtk_text_buffer_begin_user_action (buf);
 			gtk_text_buffer_insert (buf, &cur, "\n", 1);
@@ -2312,7 +2300,7 @@ gtk_source_view_key_press_event (GtkWidget *widget, GdkEventKey *event)
 				return TRUE;
 			}
 		}
- 
+
 		insert_tab_or_spaces (view, &s, &e);
  		return TRUE;
 	}
@@ -2386,7 +2374,7 @@ gtk_source_view_button_press_event (GtkWidget *widget, GdkEventButton *event)
 					     &line_start,
 					     y_buf,
 					     NULL);
-	
+
 		if (event->type == GDK_BUTTON_PRESS && (event->button == 1))
 		{
 			if ((event->state & GDK_CONTROL_MASK) != 0)
@@ -2851,29 +2839,27 @@ gtk_source_view_unrealize (GtkWidget *widget)
 	GTK_WIDGET_CLASS (gtk_source_view_parent_class)->unrealize (widget);
 }
 
-/**
- * gtk_source_view_set_style_scheme:
- * @view: a #GtkSourceView.
- *
- * Sets style scheme used in %view.
- **/
-void
-gtk_source_view_set_style_scheme (GtkSourceView        *view,
-				  GtkSourceStyleScheme *scheme)
+static void
+gtk_source_view_update_style_scheme (GtkSourceView *view)
 {
-	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
-	g_return_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme));
+	GtkSourceStyleScheme *new_scheme;
+	GtkTextBuffer *buffer;
 
-	if (view->priv->style_scheme == scheme)
-		return;
+	buffer = gtk_text_view_get_buffer (GTK_TEXT_VIEW (view));
 
-	if (view->priv->style_scheme)
-		g_object_unref (view->priv->style_scheme);
+	if (GTK_IS_SOURCE_BUFFER (buffer))
+		new_scheme = gtk_source_buffer_get_style_scheme (GTK_SOURCE_BUFFER (buffer));
+	else
+		new_scheme = NULL;
 
-	view->priv->style_scheme = g_object_ref (scheme);
-	_gtk_source_style_scheme_apply (scheme, GTK_WIDGET (view));
-	update_current_line_gc (view);
-
-	if (view->priv->source_buffer)
-		_gtk_source_buffer_set_style_scheme (view->priv->source_buffer, scheme);
+	if (view->priv->style_scheme != new_scheme)
+	{
+		if (view->priv->style_scheme)
+			g_object_unref (view->priv->style_scheme);
+		view->priv->style_scheme = new_scheme;
+		if (new_scheme)
+			g_object_ref (new_scheme);
+		_gtk_source_style_scheme_apply (new_scheme, GTK_WIDGET (view));
+		update_current_line_gc (view);
+	}
 }

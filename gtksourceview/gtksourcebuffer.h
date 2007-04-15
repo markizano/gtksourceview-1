@@ -134,12 +134,14 @@ GtkSourceMarker         *gtk_source_buffer_get_next_marker      (GtkSourceBuffer
 GtkSourceMarker         *gtk_source_buffer_get_prev_marker      (GtkSourceBuffer        *buffer,
 								 GtkTextIter            *iter);
 
+GtkSourceStyleScheme    *gtk_source_buffer_get_style_scheme     (GtkSourceBuffer        *buffer);
+void			 gtk_source_buffer_set_style_scheme     (GtkSourceBuffer        *buffer,
+								 GtkSourceStyleScheme   *scheme);
+
 void			 _gtk_source_buffer_update_highlight    (GtkSourceBuffer        *buffer,
 								 const GtkTextIter      *start,
 								 const GtkTextIter      *end,
 								 gboolean                synchronous);
-void			 _gtk_source_buffer_set_style_scheme    (GtkSourceBuffer        *buffer,
-								 GtkSourceStyleScheme   *scheme);
 
 G_END_DECLS
 

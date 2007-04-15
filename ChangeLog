@@ -1,5 +1,16 @@
 2006-04-15  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcebuffer.[ch],
+        gtksourceview/gtksourceview.[ch]: made "style-scheme" a property
+        of GtkSourceBuffer, not of GtkSourceView. Removed gtk_source_view_set_style_scheme,
+        added gtk_source_buffer_(get|set)_style_scheme, and made view get style
+        scheme from the buffer it displays.
+        * gtksourceview/gtksourcestylescheme.c (_gtk_source_style_scheme_apply): made
+        it accept NULL, so it's possible to set NULL style scheme for a GtkSourceView.
+        * tests/test-widget.c: modified appropriately.
+
+2006-04-15  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/language-specs/idl.lang: fixed broken comment-start pattern.
 
 2006-04-08  Yevgen Muntyan  <muntyan@tamu.edu>

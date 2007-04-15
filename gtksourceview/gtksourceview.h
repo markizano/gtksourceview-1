@@ -98,7 +98,7 @@ void		 gtk_source_view_set_show_margin 	(GtkSourceView   *view,
 							 gboolean         show);
 gboolean 	 gtk_source_view_get_show_margin 	(GtkSourceView   *view);
 
-void		 gtk_source_view_set_indent_on_tab 	(GtkSourceView   *view, 
+void		 gtk_source_view_set_indent_on_tab 	(GtkSourceView   *view,
 							 gboolean         enable);
 gboolean	 gtk_source_view_get_indent_on_tab 	(GtkSourceView   *view);
 
@@ -107,9 +107,6 @@ void		 gtk_source_view_set_highlight_current_line
 							 gboolean         show);
 gboolean 	 gtk_source_view_get_highlight_current_line
 							(GtkSourceView   *view);
-
-void		 gtk_source_view_set_style_scheme       (GtkSourceView   *view,
-							 GtkSourceStyleScheme *scheme);
 
 void		 gtk_source_view_set_margin 		(GtkSourceView   *view,
 							 guint            margin);

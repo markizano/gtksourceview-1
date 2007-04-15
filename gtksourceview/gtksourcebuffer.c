@@ -74,7 +74,8 @@ enum {
 	PROP_CHECK_BRACKETS,
 	PROP_HIGHLIGHT,
 	PROP_MAX_UNDO_LEVELS,
-	PROP_LANGUAGE
+	PROP_LANGUAGE,
+	PROP_STYLE_SCHEME
 };
 
 struct _GtkSourceBufferPrivate
@@ -197,6 +198,23 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 							      _("Language object to get "
 								"highlighting patterns from"),
 							      GTK_TYPE_SOURCE_LANGUAGE,
+							      G_PARAM_READWRITE));
+
+	/**
+	 * GtkSourceBuffer:style-scheme:
+	 *
+	 * Style scheme. It contains styles for syntax highlighting, optionally
+	 * foreground, background, cursor color, current line color, and matching
+	 * brackets style.
+	 *
+	 * Since: 2.0
+	 */
+	g_object_class_install_property (object_class,
+					 PROP_STYLE_SCHEME,
+					 g_param_spec_object ("style_scheme",
+							      _("Style scheme"),
+							      _("Style scheme"),
+							      GTK_TYPE_SOURCE_STYLE_SCHEME,
 							      G_PARAM_READWRITE));
 
 	buffer_signals[CAN_UNDO] =
@@ -368,6 +386,11 @@ gtk_source_buffer_set_property (GObject      *object,
 							g_value_get_object (value));
 			break;
 
+		case PROP_STYLE_SCHEME:
+			gtk_source_buffer_set_style_scheme (source_buffer,
+							    g_value_get_object (value));
+			break;
+
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 			break;
@@ -403,6 +426,10 @@ gtk_source_buffer_get_property (GObject    *object,
 
 		case PROP_LANGUAGE:
 			g_value_set_object (value, source_buffer->priv->language);
+			break;
+
+		case PROP_STYLE_SCHEME:
+			g_value_set_object (value, source_buffer->priv->style_scheme);
 			break;
 
 		default:
@@ -1202,7 +1229,7 @@ _gtk_source_buffer_update_highlight (GtkSourceBuffer   *buffer,
 }
 
 /**
- * _gtk_source_buffer_set_style_scheme:
+ * gtk_source_buffer_set_style_scheme:
  *
  * @buffer: a #GtkSourceBuffer.
  * @scheme: style scheme.
@@ -1210,8 +1237,8 @@ _gtk_source_buffer_update_highlight (GtkSourceBuffer   *buffer,
  * Sets style scheme used by the buffer.
  **/
 void
-_gtk_source_buffer_set_style_scheme (GtkSourceBuffer      *buffer,
-				     GtkSourceStyleScheme *scheme)
+gtk_source_buffer_set_style_scheme (GtkSourceBuffer      *buffer,
+				    GtkSourceStyleScheme *scheme)
 {
 	GtkSourceStyle *style;
 
@@ -1233,6 +1260,23 @@ _gtk_source_buffer_set_style_scheme (GtkSourceBuffer      *buffer,
 	if (buffer->priv->highlight_engine != NULL)
 		_gtk_source_engine_set_style_scheme (buffer->priv->highlight_engine,
 						     scheme);
+
+	g_object_notify (G_OBJECT (buffer), "style-scheme");
+}
+
+/**
+ * gtk_source_buffer_get_style_scheme:
+ *
+ * @buffer: a #GtkSourceBuffer.
+ *
+ * Returns: the #GtkSourceStyleScheme set by
+ * gtk_source_buffer_set_style_scheme(), or %NULL.
+ **/
+GtkSourceStyleScheme *
+gtk_source_buffer_get_style_scheme (GtkSourceBuffer *buffer)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
+	return buffer->priv->style_scheme;
 }
 
 /* Markers functionality */
