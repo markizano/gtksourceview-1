@@ -1,3 +1,7 @@
+2006-04-15  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/language-specs/idl.lang: fixed broken comment-start pattern.
+
 2006-04-08  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourceiter.c (forward_chars_with_skipping): do skip
