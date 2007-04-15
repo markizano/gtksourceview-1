@@ -1,5 +1,10 @@
 2006-04-15  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourceview.c (gtk_source_view_expose): fixed drawing current
+        line so no garbage is left on screen when scrolling horizontally.
+
+2006-04-15  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/gtksourcebuffer.[ch],
         gtksourceview/gtksourceview.[ch]: made "style-scheme" a property
         of GtkSourceBuffer, not of GtkSourceView. Removed gtk_source_view_set_style_scheme,
