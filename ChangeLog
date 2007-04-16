@@ -1,3 +1,9 @@
+2006-04-16  Paolo Borelli  <pborelli@katamail.com>
+
+	* gtksourceview/gtksourcelanguagesmanager.c:
+	* gtksourceview/gtksourcestylemanager.c:
+	use g_get_user_data_dir, not g_get_user_config_dir.
+
 2006-04-15  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourceview.c (gtk_source_view_expose): fixed drawing current

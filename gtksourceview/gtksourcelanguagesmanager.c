@@ -203,7 +203,7 @@ copy_data_dirs_list (const GSList              *list,
 	 */
 
 	new_list = g_slist_prepend (new_list,
-				    g_build_filename (g_get_user_config_dir (),
+				    g_build_filename (g_get_user_data_dir (),
 						      SOURCEVIEW_DIR,
 						      basename,
 						      NULL));
