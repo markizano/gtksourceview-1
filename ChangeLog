@@ -1,3 +1,11 @@
+2006-04-16  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcebuffer.c (get_bracket_match_tag),
+        (gtk_source_buffer_move_cursor), (update_bracket_match_style),
+        gtksourceview/gtksourcebuffer.h: removed gtk_source_buffer_set_bracket_match_style;
+        fixed bracket match tag styling, so it's safe to call
+        gtk_source_buffer_style_scheme() from buffer_init.
+
 2006-04-16  Paolo Borelli  <pborelli@katamail.com>
 
 	* gtksourceview/gtksourcelanguagesmanager.c:

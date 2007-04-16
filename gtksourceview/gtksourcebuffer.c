@@ -37,6 +37,7 @@
 #include "gtksourceundomanager.h"
 #include "gtksourceview-marshal.h"
 #include "gtksourceiter.h"
+#include "gtksourcestylemanager.h"
 
 /*
 #define ENABLE_DEBUG
@@ -136,6 +137,7 @@ static void 	 gtk_source_buffer_real_delete_range 	(GtkTextBuffer           *buf
 
 static gboolean	 gtk_source_buffer_find_bracket_match_with_limit (GtkTextIter    *orig,
 								  gint            max_chars);
+static void      update_bracket_match_style             (GtkSourceBuffer *source_buffer);
 
 
 static void
@@ -506,6 +508,21 @@ gtk_source_buffer_can_redo_handler (GtkSourceUndoManager  	*um,
 		       can_redo);
 }
 
+static GtkTextTag *
+get_bracket_match_tag (GtkSourceBuffer *buffer)
+{
+	if (buffer->priv->bracket_match_tag == NULL)
+	{
+		buffer->priv->bracket_match_tag =
+			gtk_text_buffer_create_tag (GTK_TEXT_BUFFER (buffer),
+						    NULL,
+						    NULL);
+		update_bracket_match_style (buffer);
+	}
+
+	return buffer->priv->bracket_match_tag;
+}
+
 static void
 gtk_source_buffer_move_cursor (GtkTextBuffer     *buffer,
 			       const GtkTextIter *iter,
@@ -555,7 +572,7 @@ gtk_source_buffer_move_cursor (GtkTextBuffer     *buffer,
 		iter2 = iter1;
 		gtk_text_iter_forward_char (&iter2);
 		gtk_text_buffer_apply_tag (buffer,
-					   GTK_SOURCE_BUFFER (buffer)->priv->bracket_match_tag,
+					   get_bracket_match_tag (GTK_SOURCE_BUFFER (buffer)),
 					   &iter1,
 					   &iter2);
 		GTK_SOURCE_BUFFER (buffer)->priv->bracket_found = TRUE;
@@ -1044,36 +1061,17 @@ gtk_source_buffer_set_check_brackets (GtkSourceBuffer *buffer,
 	}
 }
 
-/**
- * gtk_source_buffer_set_bracket_match_style:
- * @source_buffer: a #GtkSourceBuffer.
- * @style: the #GtkSourceStyle specifying colors and text
- * attributes.
- *
- * Sets the style used for highlighting matching brackets.
- **/
-/* FIXME */
-void
-gtk_source_buffer_set_bracket_match_style (GtkSourceBuffer      *source_buffer,
-					   const GtkSourceStyle *style)
+static void
+update_bracket_match_style (GtkSourceBuffer *buffer)
 {
-	g_return_if_fail (GTK_IS_SOURCE_BUFFER (source_buffer));
-
-	/* create the tag if not already done so */
-	if (!source_buffer->priv->bracket_match_tag)
+	if (buffer->priv->bracket_match_tag != NULL)
 	{
-		source_buffer->priv->bracket_match_tag =
-			gtk_text_buffer_create_tag (GTK_TEXT_BUFFER (source_buffer),
-						    NULL,
-						    NULL);
+		GtkSourceStyle *style = NULL;
+		if (buffer->priv->style_scheme)
+			style = gtk_source_style_scheme_get_matching_brackets_style (buffer->priv->style_scheme);
+		_gtk_source_style_apply (style, buffer->priv->bracket_match_tag);
+		gtk_source_style_free (style);
 	}
-	else
-	{
-		_gtk_source_style_apply (NULL, source_buffer->priv->bracket_match_tag);
-	}
-
-	if (style != NULL)
-		_gtk_source_style_apply (style, source_buffer->priv->bracket_match_tag);
 }
 
 /**
@@ -1240,8 +1238,6 @@ void
 gtk_source_buffer_set_style_scheme (GtkSourceBuffer      *buffer,
 				    GtkSourceStyleScheme *scheme)
 {
-	GtkSourceStyle *style;
-
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 	g_return_if_fail (GTK_IS_SOURCE_STYLE_SCHEME (scheme));
 
@@ -1252,10 +1248,7 @@ gtk_source_buffer_set_style_scheme (GtkSourceBuffer      *buffer,
 		g_object_unref (buffer->priv->style_scheme);
 
 	buffer->priv->style_scheme = g_object_ref (scheme);
-
-	style = gtk_source_style_scheme_get_matching_brackets_style (scheme);
-	gtk_source_buffer_set_bracket_match_style (buffer, style);
-	gtk_source_style_free (style);
+	update_bracket_match_style (buffer);
 
 	if (buffer->priv->highlight_engine != NULL)
 		_gtk_source_engine_set_style_scheme (buffer->priv->highlight_engine,
