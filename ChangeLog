@@ -1,4 +1,10 @@
-2006-04-16  Yevgen Muntyan  <muntyan@tamu.edu>
+2007-04-17  Carlos Garnacho  <carlos@imendio.com>
+
+	* gtksourceview/gtksourceview.c (gtk_source_view_undo)
+	(gtk_source_view_redo) (gtk_source_view_populate_popup): Do not allow
+	undo/redo if the GtkSourceView is not editable. Fixes #418521.
+
+2007-04-16  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcebuffer.c (get_bracket_match_tag),
         (gtk_source_buffer_move_cursor), (update_bracket_match_style),
@@ -6,18 +12,18 @@
         fixed bracket match tag styling, so it's safe to call
         gtk_source_buffer_style_scheme() from buffer_init.
 
-2006-04-16  Paolo Borelli  <pborelli@katamail.com>
+2007-04-16  Paolo Borelli  <pborelli@katamail.com>
 
 	* gtksourceview/gtksourcelanguagesmanager.c:
 	* gtksourceview/gtksourcestylemanager.c:
 	use g_get_user_data_dir, not g_get_user_config_dir.
 
-2006-04-15  Yevgen Muntyan  <muntyan@tamu.edu>
+2007-04-15  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourceview.c (gtk_source_view_expose): fixed drawing current
         line so no garbage is left on screen when scrolling horizontally.
 
-2006-04-15  Yevgen Muntyan  <muntyan@tamu.edu>
+2007-04-15  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcebuffer.[ch],
         gtksourceview/gtksourceview.[ch]: made "style-scheme" a property
@@ -28,30 +34,30 @@
         it accept NULL, so it's possible to set NULL style scheme for a GtkSourceView.
         * tests/test-widget.c: modified appropriately.
 
-2006-04-15  Yevgen Muntyan  <muntyan@tamu.edu>
+2007-04-15  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/language-specs/idl.lang: fixed broken comment-start pattern.
 
-2006-04-08  Yevgen Muntyan  <muntyan@tamu.edu>
+2007-04-08  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourceiter.c (forward_chars_with_skipping): do skip
         invisible chars.
 
-2006-04-08  Yevgen Muntyan  <muntyan@tamu.edu>
+2007-04-08  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourceiter.c: renamed strbreakup() to breakup_string(),
         'strbreakup' is a reserved name.
 
-2006-04-08  Yevgen Muntyan  <muntyan@tamu.edu>
+2007-04-08  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/language-specs/c.lang: highlight XPM files.
 
-2006-04-07  Yevgen Muntyan  <muntyan@tamu.edu>
+2007-04-07  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* acinclude.m4 (GTK_SOURCE_VIEW_AC_PCRE): require pcre-6.7.
 	* configure.in: report whether system pcre is used.
 
-2006-04-07  Yevgen Muntyan  <muntyan@tamu.edu>
+2007-04-07  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcelanguage-parser-2.c: (file_parse): forgot to commit last time.
 	* gtksourceview/libegg/regex/eggregex.c: (egg_regex_optimize): do set pattern->extra
@@ -62,12 +68,12 @@
 	* gtksourceview/language-specs/makefile.lang: highlight ${foo} like $(foo).
 	* gtksourceview/language-specs/po.lang: use "location" style instead of "others-2".
 
-2006-03-29  Yevgen Muntyan  <muntyan@tamu.edu>
+2007-03-29  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcelanguage-parser-2.c: (file_parse): do not
         leak lang files fd's.
 
-2006-02-12  Yevgen Muntyan  <muntyan@tamu.edu>
+2007-02-12  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/libegg/regex/eggregex.c: (egg_regex_fetch_named):
         fixed for the case when PCRE_DUPNAMES is used.
@@ -80,7 +86,7 @@
 	* gtksourceview/language-specs/sh.lang: use "dupnames" thing to
         simplify here-doc context.
 
-2006-02-12  Yevgen Muntyan  <muntyan@tamu.edu>
+2007-02-12  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/libegg/regex/eggregex.h,
         gtksourceview/libegg/regex/eggregex.c: new function
@@ -90,12 +96,12 @@
         out and produce a warning instead of silently acceting a pattern
         that will never match.
 
-2006-02-10  Yevgen Muntyan  <muntyan@tamu.edu>
+2007-02-10  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* tests/testfiles.sh: new file, a script which produces bunch
         of files of different types, to check highlighting.
 
-2006-02-10  Yevgen Muntyan  <muntyan@tamu.edu>
+2007-02-10  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcecontextengine.h: renamed once again
         GtkSourceContextMatchOptions to GtkSourceContextFlags,
@@ -119,14 +125,14 @@
         gtk_source_style_manager_add_scheme().
 	* gtksourceview/language-specs/language2.rng: added style-inside attribute.
 
-2006-02-10  Yevgen Muntyan  <muntyan@tamu.edu>
+2007-02-10  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourceiter.c: (exact_prefix_cmp): new UTF8
         accent mark-aware replacement for strncmp(), fixes #339805;
         renamed g_utf8_* functions to utf8_* to avoid potential clash
         with glib namespace.
 
-2006-02-10  Yevgen Muntyan  <muntyan@tamu.edu>
+2007-02-10  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/language-specs/Makefile.am,
 	gtksourceview/language-specs/check.sh,
@@ -161,7 +167,7 @@
         and keywords following dot (e.g. 'file' in 'foo.file').
 	* gtksourceview/language-specs/sh.lang: better here-doc.
 
-2006-01-01  Yevgen Muntyan  <muntyan@tamu.edu>
+2007-01-01  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* configure.in: Disabled printing; added ABS_TOP_SRCDIR for test-widget.
 	* docs/reference/lang-reference.sgml: more docs.
