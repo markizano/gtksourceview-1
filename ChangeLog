@@ -1,3 +1,15 @@
+2006-04-20  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/Makefile.am,
+        gtksourceview/gtksourcelanguage-parser-1.c,
+        gtksourceview/gtksourcelanguage-parser-2.c,
+        gtksourceview/gtksourcelanguage-private.h,
+        gtksourceview/gtksourcelanguage.c,
+        tests/test-widget.c:
+        * gtksourcelanguagesmanager.[ch]: removed.
+        * gtksourcelanguagemanager.[ch]: new files.
+        Renamed GtkSourceLanguagesManager to GtkSourceLanguageManager.
+
 2006-04-17  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/language-specs/latex.lang: was broken, fixed.

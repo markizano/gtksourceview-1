@@ -30,7 +30,7 @@ libgtksourceview_headers =			\
 	gtksourceiter.h				\
 	gtksourceview.h				\
 	gtksourcelanguage.h			\
-	gtksourcelanguagesmanager.h		\
+	gtksourcelanguagemanager.h		\
 	gtksourcestyle.h			\
 	gtksourcestylemanager.h			\
 	gtksourcestylescheme.h			\
@@ -46,7 +46,7 @@ libgtksourceview_2_0_la_SOURCES = 	\
 	gtktextregion.c 		\
 	gtksourcelanguage.c 		\
 	gtksourcelanguage-private.h 	\
-	gtksourcelanguagesmanager.c 	\
+	gtksourcelanguagemanager.c 	\
 	gtksourcelanguage-parser-1.c	\
 	gtksourcelanguage-parser-2.c	\
 	gtksourceview-i18n.h 		\

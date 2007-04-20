@@ -32,7 +32,7 @@
 #include <gtk/gtk.h>
 #include <gtksourceview/gtksourceview.h>
 #include <gtksourceview/gtksourcelanguage.h>
-#include <gtksourceview/gtksourcelanguagesmanager.h>
+#include <gtksourceview/gtksourcelanguagemanager.h>
 #include <gtksourceview/gtksourcestylemanager.h>
 #ifdef TEST_XML_MEM
 #include <libxml/xmlreader.h>
@@ -263,8 +263,8 @@ remove_all_markers (GtkSourceBuffer *buffer)
 /* Note this is wrong for several reasons, e.g. g_pattern_match is broken
  * for glob matching. */
 static GtkSourceLanguage *
-get_language_for_filename (GtkSourceLanguagesManager *manager,
-			   const gchar               *filename)
+get_language_for_filename (GtkSourceLanguageManager *manager,
+			   const gchar              *filename)
 {
 	const GSList *list;
 	gchar *filename_utf8;
@@ -272,7 +272,7 @@ get_language_for_filename (GtkSourceLanguagesManager *manager,
 	filename_utf8 = g_filename_to_utf8 (filename, -1, NULL, NULL, NULL);
 	g_return_val_if_fail (filename_utf8 != NULL, NULL);
 
-	list = gtk_source_languages_manager_get_available_languages (manager);
+	list = gtk_source_language_manager_get_available_languages (manager);
 
 	while (list != NULL)
 	{
@@ -311,12 +311,12 @@ get_language_for_filename (GtkSourceLanguagesManager *manager,
  * It's fine to use in a simplish program like this, but is unacceptable
  * in a serious text editor. */
 static GtkSourceLanguage *
-get_language_for_mime_type (GtkSourceLanguagesManager *manager,
-			    const gchar               *mime)
+get_language_for_mime_type (GtkSourceLanguageManager *manager,
+			    const gchar              *mime)
 {
 	const GSList *list;
 
-	list = gtk_source_languages_manager_get_available_languages (manager);
+	list = gtk_source_language_manager_get_available_languages (manager);
 
 	while (list != NULL)
 	{
@@ -350,8 +350,8 @@ get_language_for_mime_type (GtkSourceLanguagesManager *manager,
 }
 
 static GtkSourceLanguage *
-get_language_for_file (GtkSourceLanguagesManager *manager,
-		       const gchar               *filename)
+get_language_for_file (GtkSourceLanguageManager *manager,
+		       const gchar              *filename)
 {
 	GtkSourceLanguage *language = NULL;
 
@@ -390,12 +390,12 @@ get_language_for_file (GtkSourceLanguagesManager *manager,
 static gboolean
 open_file (GtkSourceBuffer *buffer, const gchar *filename)
 {
-	GtkSourceLanguagesManager *manager;
+	GtkSourceLanguageManager *manager;
 	GtkSourceLanguage *language = NULL;
 	gchar *freeme = NULL;
 	gboolean success = FALSE;
 
-	manager = g_object_get_data (G_OBJECT (buffer), "languages-manager");
+	manager = g_object_get_data (G_OBJECT (buffer), "language-manager");
 
 	if (!g_path_is_absolute (filename))
 	{
@@ -1045,13 +1045,13 @@ create_main_window (GtkSourceBuffer *buffer)
 /* Buffer creation -------------------------------------------------------------- */
 
 static GtkSourceBuffer *
-create_source_buffer (GtkSourceLanguagesManager *manager)
+create_source_buffer (GtkSourceLanguageManager *manager)
 {
 	GtkSourceBuffer *buffer;
 
 	buffer = GTK_SOURCE_BUFFER (gtk_source_buffer_new (NULL));
 	g_object_set (G_OBJECT (buffer), "highlight", TRUE, NULL);
-	g_object_set_data_full (G_OBJECT (buffer), "languages-manager",
+	g_object_set_data_full (G_OBJECT (buffer), "language-manager",
 				g_object_ref (manager), (GDestroyNotify) g_object_unref);
 
 	return buffer;
@@ -1142,7 +1142,7 @@ int
 main (int argc, char *argv[])
 {
 	GtkWidget *window;
-	GtkSourceLanguagesManager *lm;
+	GtkSourceLanguageManager *lm;
 	GtkSourceStyleManager *sm;
 	GtkSourceBuffer *buffer;
 
@@ -1175,7 +1175,7 @@ main (int argc, char *argv[])
 
 	/* create buffer */
 	lang_dirs = g_slist_prepend (NULL, g_strdup (TOP_SRCDIR "/gtksourceview/language-specs"));
-	lm = g_object_new (GTK_TYPE_SOURCE_LANGUAGES_MANAGER,
+	lm = g_object_new (GTK_TYPE_SOURCE_LANGUAGE_MANAGER,
 			   "lang_files_dirs", lang_dirs,
 			   NULL);
 	g_slist_foreach (lang_dirs, (GFunc) g_free, NULL);
