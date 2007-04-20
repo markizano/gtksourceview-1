@@ -1,5 +1,12 @@
 2006-04-20  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourcelanguagemanager.[ch]: Made 'lang-files-dirs' a property
+        of type G_TYPE_STRV, NULL-terminated string array. Added
+        gtk_source_language_manager_set_lang_files_dirs() setter for it.
+        * tests/test-widget.c: adapted for the change.
+
+2006-04-20  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/Makefile.am,
         gtksourceview/gtksourcelanguage-parser-1.c,
         gtksourceview/gtksourcelanguage-parser-2.c,

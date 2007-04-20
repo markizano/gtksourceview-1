@@ -1146,7 +1146,7 @@ main (int argc, char *argv[])
 	GtkSourceStyleManager *sm;
 	GtkSourceBuffer *buffer;
 
-	GSList *lang_dirs;
+	gchar *lang_dirs[2];
 
 	gchar *style_scheme_id = NULL;
 	GOptionContext *context;
@@ -1173,13 +1173,12 @@ main (int argc, char *argv[])
 	gnome_vfs_init ();
 #endif
 
-	/* create buffer */
-	lang_dirs = g_slist_prepend (NULL, g_strdup (TOP_SRCDIR "/gtksourceview/language-specs"));
+	/* we do not use defaults so we don't need to install the library */
+	lang_dirs[0] = TOP_SRCDIR "/gtksourceview/language-specs";
+	lang_dirs[1] = NULL;
 	lm = g_object_new (GTK_TYPE_SOURCE_LANGUAGE_MANAGER,
-			   "lang_files_dirs", lang_dirs,
+			   "lang-files-dirs", lang_dirs,
 			   NULL);
-	g_slist_foreach (lang_dirs, (GFunc) g_free, NULL);
-	g_slist_free (lang_dirs);
 
 	sm = gtk_source_style_manager_new ();
 	gtk_source_style_manager_prepend_search_path (sm, TOP_SRCDIR "/gtksourceview/language-specs");
@@ -1189,6 +1188,7 @@ main (int argc, char *argv[])
 	if (style_scheme == NULL)
 		style_scheme = gtk_source_style_manager_get_scheme (sm, "gvim");
 
+	/* create buffer */
 	buffer = create_source_buffer (lm);
 	g_object_unref (lm);
 
