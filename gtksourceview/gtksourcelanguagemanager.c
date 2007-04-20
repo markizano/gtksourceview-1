@@ -30,6 +30,7 @@
 #define RNG_SCHEMA_FILE		"language2.rng"
 #define SOURCEVIEW_DIR		"gtksourceview-2.0"
 #define LANGUAGE_DIR		"language-specs"
+#define LANG_FILE_SUFFIX	".lang"
 
 enum {
 	PROP_0,
@@ -48,9 +49,6 @@ G_DEFINE_TYPE (GtkSourceLanguageManager, gtk_source_language_manager, G_TYPE_OBJ
 
 
 static void	 gtk_source_language_manager_finalize	 	(GObject 		   *object);
-
-static void	 slist_deep_free 				(GSList 		   *list);
-static GSList 	*get_lang_files 				(GtkSourceLanguageManager  *lm);
 
 static void	 gtk_source_language_manager_set_property 	(GObject 		   *object,
 					   			 guint 	 		    prop_id,
@@ -215,20 +213,26 @@ gtk_source_language_manager_get_lang_files_dirs	(GtkSourceLanguageManager *lm)
 
 		new_dirs = g_ptr_array_new ();
 
+		/* user dir */
+		g_ptr_array_add (new_dirs, g_build_filename (g_get_user_data_dir (),
+							     SOURCEVIEW_DIR,
+							     LANGUAGE_DIR,
+							     NULL));
+
+#ifdef G_OS_UNIX
+		/* Legacy gtsourceview 1 user dir, for backward compatibility */
+		g_ptr_array_add (new_dirs, g_strdup_printf ("%s/%s",
+							    g_get_user_data_dir (),
+							    ".gnome2/gtksourceview-1.0/language-specs"));
+#endif
+
+		/* system dir */
 		for (xdg_dirs = g_get_system_data_dirs (); xdg_dirs && *xdg_dirs; ++xdg_dirs)
 			g_ptr_array_add (new_dirs, g_build_filename (*xdg_dirs,
 								     SOURCEVIEW_DIR,
 								     LANGUAGE_DIR,
 								     NULL));
-#ifdef G_OS_UNIX
-		g_ptr_array_add (new_dirs, g_strdup_printf ("%s/%s",
-							    g_get_user_data_dir (),
-							    ".gnome2/gtksourceview-1.0/language-specs"));
-#endif
-		g_ptr_array_add (new_dirs, g_build_filename (g_get_user_data_dir (),
-							     SOURCEVIEW_DIR,
-							     LANGUAGE_DIR,
-							     NULL));
+
 		g_ptr_array_add (new_dirs, NULL);
 
 		lm->priv->lang_dirs = (gchar**) g_ptr_array_free (new_dirs, FALSE);
@@ -258,8 +262,9 @@ _gtk_source_language_manager_get_rng_file (GtkSourceLanguageManager *lm)
 		     dirs != NULL && *dirs != NULL;
 		     ++dirs)
 		{
-			char *file = g_build_filename (*dirs, RNG_SCHEMA_FILE, NULL);
+			gchar *file;
 
+			file = g_build_filename (*dirs, RNG_SCHEMA_FILE, NULL);
 			if (g_file_test (file, G_FILE_TEST_EXISTS))
 			{
 				lm->priv->rng_file = file;
@@ -271,6 +276,55 @@ _gtk_source_language_manager_get_rng_file (GtkSourceLanguageManager *lm)
 	}
 
 	return lm->priv->rng_file;
+}
+
+static GSList *
+build_file_listing (const gchar *directory,
+		    GSList      *filenames,
+		    const gchar *suffix)
+{
+	GDir *dir;
+	const gchar *name;
+
+	dir = g_dir_open (directory, 0, NULL);
+
+	if (dir == NULL)
+		return filenames;
+
+	while ((name = g_dir_read_name (dir)) != NULL)
+	{
+		gchar *full_path = g_build_filename (directory, name, NULL);
+
+		if (!g_file_test (full_path, G_FILE_TEST_IS_DIR) &&
+		    g_str_has_suffix (name, suffix))
+		{
+			filenames = g_slist_prepend (filenames, full_path);
+		}
+		else
+		{
+			g_free (full_path);
+		}
+	}
+
+	g_dir_close (dir);
+
+	return filenames;
+}
+
+static GSList *
+get_lang_files (GtkSourceLanguageManager *lm)
+{
+	gchar **dirs;
+	GSList *files = NULL;
+
+	for (dirs = lm->priv->lang_dirs; dirs && *dirs; ++dirs)
+	{
+		files = build_file_listing (*dirs,
+					    files,
+					    LANG_FILE_SUFFIX);
+	}
+
+	return g_slist_reverse (files);
 }
 
 static void
@@ -297,9 +351,10 @@ ensure_languages (GtkSourceLanguageManager *lm)
 	for (l = filenames; l != NULL; l = l->next)
 	{
 		GtkSourceLanguage *lang;
-		const gchar *filename;
+		gchar *filename;
 
 		filename = l->data;
+
 		lang = _gtk_source_language_new_from_file (filename, lm);
 
 		if (lang == NULL)
@@ -309,15 +364,21 @@ ensure_languages (GtkSourceLanguageManager *lm)
 		}
 
 		if (g_hash_table_lookup (lm->priv->language_ids, lang->priv->id) == NULL)
+		{
 			g_hash_table_insert (lm->priv->language_ids,
 					     lang->priv->id,
 					     lang);
+		}
 		else
+		{
 			g_object_unref (lang);
+		}
 	}
 
 	g_hash_table_foreach (lm->priv->language_ids, (GHFunc) prepend_lang, lm);
-	slist_deep_free (filenames);
+
+	g_slist_foreach (filenames, (GFunc) g_free, NULL);
+	g_slist_free (filenames);
 }
 
 /**
@@ -358,63 +419,3 @@ gtk_source_language_manager_get_language_by_id (GtkSourceLanguageManager *lm,
 	return g_hash_table_lookup (lm->priv->language_ids, id);
 }
 
-static GSList *
-build_file_listing (const gchar *directory,
-		    GSList      *filenames,
-		    const gchar *suffix)
-{
-	GDir *dir;
-	const gchar *name;
-
-	dir = g_dir_open (directory, 0, NULL);
-
-	if (dir == NULL)
-		return filenames;
-
-	while ((name = g_dir_read_name (dir)) != NULL)
-	{
-		gchar *full_path = g_build_filename (directory, name, NULL);
-
-		if (!g_file_test (full_path, G_FILE_TEST_IS_DIR) &&
-		    g_str_has_suffix (name, suffix))
-		{
-			filenames = g_slist_prepend (filenames, full_path);
-		}
-		else
-		{
-			g_free (full_path);
-		}
-	}
-
-	g_dir_close (dir);
-
-	return filenames;
-}
-
-static GSList *
-get_data_files (gchar      **dirs,
-		const gchar *suffix)
-{
-	GSList *filenames = NULL;
-
-	while (dirs && *dirs)
-	{
-		filenames = build_file_listing (*dirs, filenames, suffix);
-		++dirs;
-	}
-
-	return filenames;
-}
-
-static GSList *
-get_lang_files (GtkSourceLanguageManager *lm)
-{
-	return get_data_files (gtk_source_language_manager_get_lang_files_dirs (lm), ".lang");
-}
-
-static void
-slist_deep_free (GSList *list)
-{
-	g_slist_foreach (list, (GFunc) g_free, NULL);
-	g_slist_free (list);
-}

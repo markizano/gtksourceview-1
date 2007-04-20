@@ -99,7 +99,8 @@ gtk_source_style_manager_new (void)
 
 static GSList *
 build_file_listing (const gchar *directory,
-		    GSList      *filenames)
+		    GSList      *filenames,
+		    const gchar *suffix)
 {
 	GDir *dir;
 	const gchar *name;
@@ -114,7 +115,7 @@ build_file_listing (const gchar *directory,
 		gchar *full_path = g_build_filename (directory, name, NULL);
 
 		if (!g_file_test (full_path, G_FILE_TEST_IS_DIR) &&
-		    g_str_has_suffix (name, SCHEME_FILE_SUFFIX))
+		    g_str_has_suffix (name, suffix))
 		{
 			filenames = g_slist_prepend (filenames, full_path);
 		}
@@ -140,10 +141,15 @@ get_scheme_files (GtkSourceStyleManager *mgr)
 	gtk_source_style_manager_get_search_path (mgr, &dirs, &n_dirs);
 
 	for (i = 0; i < n_dirs; ++i)
-		files = build_file_listing (dirs[i], files);
+	{
+		files = build_file_listing (dirs[i],
+					    files,
+					    SCHEME_FILE_SUFFIX);
+	}
 
 	g_strfreev (dirs);
-	return files;
+
+	return g_slist_reverse (files);
 }
 
 static gboolean
@@ -244,6 +250,7 @@ gtk_source_style_manager_reload (GtkSourceStyleManager *mgr)
 	GHashTable *schemes_hash;
 	GSList *schemes;
 	GSList *files;
+	GSList *l;
 	GtkSourceStyleScheme *def_scheme;
 
 	g_return_if_fail (GTK_IS_SOURCE_STYLE_MANAGER (mgr));
@@ -253,19 +260,21 @@ gtk_source_style_manager_reload (GtkSourceStyleManager *mgr)
 	g_slist_foreach (schemes, (GFunc) g_object_unref, NULL);
 	g_slist_free (schemes);
 
-	files = get_scheme_files (mgr);
 	schemes_hash = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_object_unref);
 	def_scheme = _gtk_source_style_scheme_default_new ();
 	schemes = g_slist_prepend (NULL, def_scheme);
-	g_hash_table_insert (schemes_hash, g_strdup (gtk_source_style_scheme_get_id (def_scheme)),
+	g_hash_table_insert (schemes_hash,
+			     g_strdup (gtk_source_style_scheme_get_id (def_scheme)),
 			     g_object_ref (def_scheme));
 
-	while (files != NULL)
+	files = get_scheme_files (mgr);
+
+	for (l = files; l != NULL; l = l->next)
 	{
 		GtkSourceStyleScheme *scheme;
-		gchar *filename = files->data;
+		gchar *filename;
 
-		files = g_slist_delete_link (files, files);
+		filename = l->data;
 
 		scheme = _gtk_source_style_scheme_new_from_file (filename);
 
@@ -282,12 +291,13 @@ gtk_source_style_manager_reload (GtkSourceStyleManager *mgr)
 			schemes = g_slist_prepend (schemes, scheme);
 			g_hash_table_insert (schemes_hash, g_strdup (id), g_object_ref (scheme));
 		}
-
-		g_free (filename);
 	}
 
 	schemes = check_parents (schemes, schemes_hash);
 	g_hash_table_destroy (schemes_hash);
+
+	g_slist_foreach (files, (GFunc) g_free, NULL);
+	g_slist_free (files);
 
 	mgr->priv->schemes = schemes;
 	mgr->priv->need_reload = FALSE;
@@ -352,7 +362,9 @@ gtk_source_style_manager_get_search_path (GtkSourceStyleManager	*mgr,
 	*path = g_new0 (char*, n + 1);
 
 	for (i = 0, l = mgr->priv->dirs; l != NULL; ++i, l = l->next)
+	{
 		(*path)[i] = g_strdup (l->data);
+	}
 
 	if (n_elements != NULL)
 		*n_elements = n;
