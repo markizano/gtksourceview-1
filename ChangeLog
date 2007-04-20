@@ -1,6 +1,12 @@
 2006-04-20  Yevgen Muntyan  <muntyan@tamu.edu>
 
-	* gtksourcelanguagemanager.[ch]: Made 'lang-files-dirs' a property
+	* gtksourceview/language-specs/c.lang: made preprocessor directive
+        include string context, so // and /* inside strings do not start
+        a comment.
+
+2006-04-20  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	* gtksourceview/gtksourcelanguagemanager.[ch]: Made 'lang-files-dirs' a property
         of type G_TYPE_STRV, NULL-terminated string array. Added
         gtk_source_language_manager_set_lang_files_dirs() setter for it.
         * tests/test-widget.c: adapted for the change.
