@@ -93,13 +93,16 @@ gtk_source_language_manager_set_property (GObject 	*object,
 
 	switch (prop_id)
 	{
-	    case PROP_LANG_SPECS_DIRS:
-		gtk_source_language_manager_set_lang_files_dirs (lm, g_value_get_boxed (value));
-		break;
+		case PROP_LANG_SPECS_DIRS:
+			gtk_source_language_manager_set_lang_files_dirs
+					(lm, g_value_get_boxed (value));
+			break;
 
-	    default:
-		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-		break;
+		default:
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object,
+							   prop_id,
+							   pspec);
+			break;
 	}
 }
 
@@ -115,13 +118,15 @@ gtk_source_language_manager_get_property (GObject 	*object,
 
 	switch (prop_id)
 	{
-	    case PROP_LANG_SPECS_DIRS:
-		    g_value_set_boxed (value, gtk_source_language_manager_get_lang_files_dirs (lm));
-		    break;
+		case PROP_LANG_SPECS_DIRS:
+			g_value_set_boxed (value, gtk_source_language_manager_get_lang_files_dirs (lm));
+			break;
 
-	    default:
-		G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-		break;
+		default:
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object,
+							   prop_id,
+							   pspec);
+			break;
 	}
 }
 
