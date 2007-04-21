@@ -26,10 +26,11 @@
 G_BEGIN_DECLS
 
 #define GTK_TYPE_SOURCE_STYLE_MANAGER			(gtk_source_style_manager_get_type ())
-#define GTK_SOURCE_STYLE_MANAGER(obj)			(GTK_CHECK_CAST ((obj), GTK_TYPE_SOURCE_STYLE_MANAGER, GtkSourceStyleManager))
-#define GTK_SOURCE_STYLE_MANAGER_CLASS(klass)		(GTK_CHECK_CLASS_CAST ((klass), GTK_TYPE_SOURCE_STYLE_MANAGER, GtkSourceStyleManagerClass))
-#define GTK_IS_SOURCE_STYLE_MANAGER(obj)		(GTK_CHECK_TYPE ((obj), GTK_TYPE_SOURCE_STYLE_MANAGER))
-#define GTK_IS_SOURCE_STYLE_MANAGER_CLASS(klass)	(GTK_CHECK_CLASS_TYPE ((klass), GTK_TYPE_SOURCE_STYLE_MANAGER))
+#define GTK_SOURCE_STYLE_MANAGER(obj)			(G_TYPE_CHECK_INSTANCE_CAST((obj), GTK_TYPE_SOURCE_STYLE_MANAGER, GtkSourceStyleManager))
+#define GTK_SOURCE_STYLE_MANAGER_CLASS(klass)		(G_TYPE_CHECK_CLASS_CAST((klass), GTK_TYPE_SOURCE_STYLE_MANAGER, GtkSourceStyleManagerClass))
+#define GTK_IS_SOURCE_STYLE_MANAGER(obj)		(G_TYPE_CHECK_INSTANCE_TYPE((obj), GTK_TYPE_SOURCE_STYLE_MANAGER))
+#define GTK_IS_SOURCE_STYLE_MANAGER_CLASS(klass)	(G_TYPE_CHECK_CLASS_TYPE ((klass), GTK_TYPE_SOURCE_STYLE_MANAGER))
+#define GTK_SOURCE_STYLE_MANAGER_GET_CLASS(obj)		(G_TYPE_INSTANCE_GET_CLASS((obj), GTK_TYPE_SOURCE_STYLE_MANAGER, GtkSourceStyleManagerClass))
 
 
 typedef struct _GtkSourceStyleManager		GtkSourceStyleManager;
@@ -38,7 +39,7 @@ typedef struct _GtkSourceStyleManagerPrivate	GtkSourceStyleManagerPrivate;
 
 struct _GtkSourceStyleManager
 {
-	GObject                   parent;
+	GObject parent;
 
 	GtkSourceStyleManagerPrivate *priv;
 };
@@ -48,6 +49,12 @@ struct _GtkSourceStyleManagerClass
 	GObjectClass parent_class;
 
 	void (*changed) (GtkSourceStyleManager *mgr);
+
+	/* Padding for future expansion */
+	void (*_gtk_source_reserved1) (void);
+	void (*_gtk_source_reserved2) (void);
+	void (*_gtk_source_reserved3) (void);
+	void (*_gtk_source_reserved4) (void);
 };
 
 
