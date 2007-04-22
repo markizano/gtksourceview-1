@@ -35,7 +35,7 @@ G_BEGIN_DECLS
 
 typedef struct _GtkSourceLanguageManager	GtkSourceLanguageManager;
 typedef struct _GtkSourceLanguageManagerClass	GtkSourceLanguageManagerClass;
-typedef struct _GtkSourceLanguageManagerPrivate	GtkSourceLanguageManagerPrivate;
+typedef struct _GtkSourceLanguageManagerPrivate GtkSourceLanguageManagerPrivate;
 
 struct _GtkSourceLanguageManager
 {
@@ -65,8 +65,8 @@ const GSList		 *gtk_source_language_manager_get_available_languages	(GtkSourceLa
 GtkSourceLanguage	 *gtk_source_language_manager_get_language_by_id	(GtkSourceLanguageManager *lm,
 										 const gchar              *id);
 
-gchar			**gtk_source_language_manager_get_lang_files_dirs	(GtkSourceLanguageManager *lm);
-void			  gtk_source_language_manager_set_lang_files_dirs	(GtkSourceLanguageManager *lm,
+gchar			**gtk_source_language_manager_get_search_path		(GtkSourceLanguageManager *lm);
+void			  gtk_source_language_manager_set_search_path		(GtkSourceLanguageManager *lm,
 										 gchar                   **dirs);
 
 G_END_DECLS

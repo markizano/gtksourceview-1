@@ -63,16 +63,8 @@ GType			 gtk_source_style_manager_get_type		(void) G_GNUC_CONST;
 GtkSourceStyleManager	*gtk_source_style_manager_new			(void);
 
 void			 gtk_source_style_manager_set_search_path	(GtkSourceStyleManager	*manager,
-						    			 gchar	               **path,
-									 gint			 n_elements);
-void			 gtk_source_style_manager_get_search_path	(GtkSourceStyleManager	*manager,
-						    			 gchar		      ***path,
-									 guint			*n_elements);
-
-void			 gtk_source_style_manager_append_search_path	(GtkSourceStyleManager	*manager,
-						    			 const gchar		*path);
-void			 gtk_source_style_manager_prepend_search_path	(GtkSourceStyleManager	*manager,
-						    			 const gchar		*path);
+						    			 gchar	               **path);
+gchar		       **gtk_source_style_manager_get_search_path	(GtkSourceStyleManager	*manager);
 
 /* Do we need to add a GError? I don't think so, we can print a warning message on the terminal */
 gboolean		 gtk_source_style_manager_add_scheme		(GtkSourceStyleManager	*manager,

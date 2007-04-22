@@ -51,6 +51,8 @@ libgtksourceview_2_0_la_SOURCES = 	\
 	gtksourcelanguage-parser-2.c	\
 	gtksourceview-i18n.h 		\
 	gtksourceview-i18n.c		\
+	gtksourceview-utils.h 		\
+	gtksourceview-utils.c 		\
 	gtksourcestyle.c		\
 	gtksourcestylemanager.c		\
 	gtksourcestylescheme.c		\
@@ -100,7 +102,7 @@ $(srcdir)/gtksourceview-typebuiltins.c: Makefile.am $(libgtksourceview_headers)
 			--vtail "    type = g_@type@_register_static (\"@EnumName@\", _@enum_name@_values);\n\n" \
 			--vtail "  return type;\n}\n\n" \
 		$(libgtksourceview_headers) > xgen-gtbec \
-	&& cp xgen-gtbec $(@F) \
+	&& (cmp -s xgen-gtbec $(@F) || cp xgen-gtbec $(@F)) \
 	&& rm -f xgen-gtbec
 
 $(srcdir)/gtksourceview-typebuiltins.h: Makefile.am $(libgtksourceview_headers)
@@ -115,7 +117,7 @@ $(srcdir)/gtksourceview-typebuiltins.h: Makefile.am $(libgtksourceview_headers)
 			--eprod "GType @enum_name@_get_type (void);\n" \
 			--eprod "G_END_DECLS\n\n" \
 		$(libgtksourceview_headers) > xgen-gth \
-	&& cp xgen-gth $(@F) \
+	&& (cmp -s xgen-gth $(@F) || cp xgen-gth $(@F)) \
 	&& rm -f xgen-gth
 
 EXTRA_DIST = 				\

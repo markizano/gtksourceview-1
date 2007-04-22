@@ -839,6 +839,7 @@ gtk_source_buffer_find_bracket_match_with_limit (GtkTextIter *orig, gint max_cha
 	return FALSE;
 }
 
+#if 0
 /**
  * gtk_source_iter_find_matching_bracket:
  * @iter: a #GtkTextIter.
@@ -859,6 +860,7 @@ gtk_source_iter_find_matching_bracket (GtkTextIter *iter)
 
 	return gtk_source_buffer_find_bracket_match_with_limit (iter, -1);
 }
+#endif
 
 /**
  * gtk_source_buffer_can_undo:

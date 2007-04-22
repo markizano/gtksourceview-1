@@ -31,8 +31,11 @@
 #ifndef __GTKSOURCEVIEW_18N_H__
 #define __GTKSOURCEVIEW_18N_H__ 1
 
-#include <glib.h>
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
 
+#include <glib.h>
 
 G_BEGIN_DECLS
 

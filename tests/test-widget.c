@@ -1146,13 +1146,16 @@ main (int argc, char *argv[])
 	GtkSourceStyleManager *sm;
 	GtkSourceBuffer *buffer;
 
-	gchar *lang_dirs[2];
+	gchar *builtin_lang_dirs[] = {TOP_SRCDIR "/gtksourceview/language-specs", NULL};
+	gchar **lang_dirs;
+	gboolean use_default_paths = FALSE;
 
 	gchar *style_scheme_id = NULL;
 	GOptionContext *context;
 
 	GOptionEntry entries[] = {
 	  { "style-scheme", 's', 0, G_OPTION_ARG_STRING, &style_scheme_id, "Style scheme name to use", "SCHEME"},
+	  { "default-paths", 'd', 0, G_OPTION_ARG_NONE, &use_default_paths, "Style scheme name to use", "SCHEME"},
 	  { NULL }
 	};
 
@@ -1174,14 +1177,9 @@ main (int argc, char *argv[])
 #endif
 
 	/* we do not use defaults so we don't need to install the library */
-	lang_dirs[0] = TOP_SRCDIR "/gtksourceview/language-specs";
-	lang_dirs[1] = NULL;
-	lm = g_object_new (GTK_TYPE_SOURCE_LANGUAGE_MANAGER,
-			   "lang-files-dirs", lang_dirs,
-			   NULL);
-
-	sm = gtk_source_style_manager_new ();
-	gtk_source_style_manager_prepend_search_path (sm, TOP_SRCDIR "/gtksourceview/language-specs");
+	lang_dirs = use_default_paths ? NULL : builtin_lang_dirs;
+	lm = g_object_new (GTK_TYPE_SOURCE_LANGUAGE_MANAGER, "search-path", lang_dirs, NULL);
+	sm = g_object_new (GTK_TYPE_SOURCE_STYLE_MANAGER, "search-path", lang_dirs, NULL);
 
 	if (style_scheme_id != NULL)
 		style_scheme = gtk_source_style_manager_get_scheme (sm, style_scheme_id);
