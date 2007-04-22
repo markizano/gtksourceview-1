@@ -277,18 +277,14 @@ get_language_for_filename (GtkSourceLanguageManager *manager,
 	while (list != NULL)
 	{
 		GtkSourceLanguage *lang;
-		const gchar *prop;
-		char **globs, **p;
+		gchar **globs, **p;
 
 		lang = list->data;
 		list = list->next;
 
-		prop = gtk_source_language_get_property (lang, "globs");
-
-		if (prop == NULL)
+		globs = gtk_source_language_get_globs (lang);
+		if (globs == NULL)
 			continue;
-
-		globs = g_strsplit (prop, ";", 0);
 
 		for (p = globs; *p != NULL; p++)
 		{
@@ -321,18 +317,15 @@ get_language_for_mime_type (GtkSourceLanguageManager *manager,
 	while (list != NULL)
 	{
 		GtkSourceLanguage *lang;
-		const gchar *prop;
-		char **mimetypes, **p;
+		gchar **mimetypes, **p;
 
 		lang = list->data;
 		list = list->next;
 
-		prop = gtk_source_language_get_property (lang, "mimetypes");
+		mimetypes = gtk_source_language_get_mime_types (lang);
 
-		if (prop == NULL)
+		if (mimetypes == NULL)
 			continue;
-
-		mimetypes = g_strsplit (prop, ";", 0);
 
 		for (p = mimetypes; *p != NULL; p++)
 		{
