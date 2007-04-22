@@ -29,12 +29,16 @@ IGNORE_HFILES =					\
 	gtksourceview-i18n.h			\
 	gtksourceview-marshal.h			\
 	gtksourceview-typebuiltins.h		\
+	gtksourceview-utils.h			\
 	gtktextregion.h				\
 	gtksourceengine.h			\
 	gtksourcecontextengine.h		\
 	gtksourceprintjob.h			\
-	regex.h					\
-	regex_internal.h
+	eggregex.h				\
+	pcre.h					\
+	pcre_internal.h				\
+	ucp.h					\
+	ucpinternal.h
 
 # Extra options to supply to gtkdoc-mkdb
 MKDB_OPTIONS = --sgml-mode --output-format=xml --ignore-files=trio
@@ -44,6 +48,7 @@ HTML_IMAGES =
 
 # Extra SGML files that are included by $(DOC_MAIN_SGML_FILE)
 content_files =			\
+	tmpl/buffer.sgml	\
 	version.xml		\
 	lang-tutorial.sgml	\
 	lang-reference.sgml
