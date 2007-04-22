@@ -1,0 +1,69 @@
+<!-- ##### SECTION Title ##### -->
+GtkSourceLanguage
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### STRUCT GtkSourceLanguage ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### STRUCT GtkSourceLanguageClass ##### -->
+<para>
+
+</para>
+
+@parent_class: 
+
+<!-- ##### FUNCTION gtk_source_language_get_id ##### -->
+<para>
+
+</para>
+
+@language: 
+@Returns: 
+
+
+<!-- ##### FUNCTION gtk_source_language_get_name ##### -->
+<para>
+
+</para>
+
+@language: 
+@Returns: 
+
+
+<!-- ##### FUNCTION gtk_source_language_get_property ##### -->
+<para>
+
+</para>
+
+@language: 
+@name: 
+@Returns: 
+
+
+<!-- ##### FUNCTION gtk_source_language_get_section ##### -->
+<para>
+
+</para>
+
+@language: 
+@Returns: 
+
+

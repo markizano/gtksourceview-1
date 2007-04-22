@@ -48,7 +48,6 @@ HTML_IMAGES =
 
 # Extra SGML files that are included by $(DOC_MAIN_SGML_FILE)
 content_files =			\
-	tmpl/buffer.sgml	\
 	version.xml		\
 	lang-tutorial.sgml	\
 	lang-reference.sgml

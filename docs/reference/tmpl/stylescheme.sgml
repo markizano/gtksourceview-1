@@ -1,0 +1,101 @@
+<!-- ##### SECTION Title ##### -->
+GtkSourceStyleScheme
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### STRUCT GtkSourceStyleScheme ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG GtkSourceStyleScheme:id ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG GtkSourceStyleScheme:name ##### -->
+<para>
+
+</para>
+
+<!-- ##### STRUCT GtkSourceStyleSchemeClass ##### -->
+<para>
+
+</para>
+
+@base_class: 
+@_gtk_source_reserved1: 
+@_gtk_source_reserved2: 
+
+<!-- ##### FUNCTION gtk_source_style_scheme_get_id ##### -->
+<para>
+
+</para>
+
+@scheme: 
+@Returns: 
+
+
+<!-- ##### FUNCTION gtk_source_style_scheme_get_name ##### -->
+<para>
+
+</para>
+
+@scheme: 
+@Returns: 
+
+
+<!-- ##### FUNCTION gtk_source_style_scheme_get_matching_brackets_style ##### -->
+<para>
+
+</para>
+
+@scheme: 
+@Returns: 
+
+
+<!-- ##### FUNCTION gtk_source_style_scheme_get_current_line_color ##### -->
+<para>
+
+</para>
+
+@scheme: 
+@color: 
+@Returns: 
+
+
+<!-- ##### FUNCTION gtk_source_style_scheme_set_style ##### -->
+<para>
+
+</para>
+
+@scheme: 
+@name: 
+@style: 
+
+
+<!-- ##### FUNCTION gtk_source_style_scheme_get_style ##### -->
+<para>
+
+</para>
+
+@scheme: 
+@style_name: 
+@Returns: 
+
+
