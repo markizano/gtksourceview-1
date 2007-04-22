@@ -56,10 +56,16 @@ GType            	 gtk_source_language_get_type 			(void) G_GNUC_CONST;
 gchar	 		*gtk_source_language_get_id			(GtkSourceLanguage       *language);
 
 gchar	 		*gtk_source_language_get_name			(GtkSourceLanguage       *language);
+
 gchar			*gtk_source_language_get_section		(GtkSourceLanguage       *language);
 
-const gchar		*gtk_source_language_get_property		(GtkSourceLanguage       *language,
+const gchar		*gtk_source_language_get_metadata		(GtkSourceLanguage       *language,
 									 const gchar		 *name);
+
+gchar			**gtk_source_language_get_mime_types		(GtkSourceLanguage       *language);
+
+gchar			**gtk_source_language_get_globs			(GtkSourceLanguage       *language);
+
 
 G_END_DECLS
 

@@ -38,8 +38,11 @@
 
 #define DEFAULT_SECTION _("Others")
 
-G_DEFINE_TYPE (GtkSourceLanguage, gtk_source_language, G_TYPE_OBJECT)
+#define GTK_SOURCE_LANGUAGE_GET_PRIVATE(object)(G_TYPE_INSTANCE_GET_PRIVATE ((object), \
+						GTK_TYPE_SOURCE_LANGUAGE, \
+						GtkSourceLanguagePrivate))
 
+G_DEFINE_TYPE (GtkSourceLanguage, gtk_source_language, G_TYPE_OBJECT)
 
 static void		  gtk_source_language_finalize 		(GObject 			*object);
 
@@ -116,13 +119,16 @@ static void
 gtk_source_language_class_init (GtkSourceLanguageClass *klass)
 {
 	GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
 	object_class->finalize	= gtk_source_language_finalize;
+
+	g_type_class_add_private (object_class, sizeof(GtkSourceLanguagePrivate));
 }
 
 static void
 gtk_source_language_init (GtkSourceLanguage *lang)
 {
-	lang->priv = g_new0 (GtkSourceLanguagePrivate, 1);
+	lang->priv = GTK_SOURCE_LANGUAGE_GET_PRIVATE (lang);
 	lang->priv->styles = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
 	lang->priv->properties = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
 }
@@ -146,39 +152,10 @@ gtk_source_language_finalize (GObject *object)
 		g_free (lang->priv->id);
 		g_hash_table_destroy (lang->priv->properties);
 		g_hash_table_destroy (lang->priv->styles);
-		g_free (lang->priv);
-		lang->priv = NULL;
 	}
 
 	G_OBJECT_CLASS (gtk_source_language_parent_class)->finalize (object);
 }
-
-#if 0
-static GSList *
-parse_mime_types (xmlTextReaderPtr reader,
-		  const char      *attr_name)
-{
-	xmlChar *attr;
-	gchar **mtl;
-	gint i;
-	GSList *list = NULL;
-
-	attr = xmlTextReaderGetAttribute (reader, BAD_CAST attr_name);
-	if (attr == NULL)
-		return NULL;
-
-	mtl = g_strsplit_set ((gchar*) attr, ";,", 0);
-
-	for (i = 0; mtl[i] != NULL; i++)
-		/* steal the strings from the array */
-		list = g_slist_prepend (list, mtl[i]);
-
-	g_free (mtl);
-	xmlFree (attr);
-
-	return g_slist_reverse (list);
-}
-#endif
 
 static gboolean
 string_to_bool (const gchar *string)
@@ -243,8 +220,8 @@ process_properties (xmlTextReaderPtr   reader,
 
 		if (name != NULL && content != NULL)
 			g_hash_table_insert (language->priv->properties,
-					     g_strdup ((char*) name),
-					     g_strdup ((char*) content));
+					     g_strdup ((gchar *) name),
+					     g_strdup ((gchar *) content));
 
 		xmlFree (name);
 		xmlFree (content);
@@ -333,7 +310,7 @@ process_language_node (xmlTextReaderPtr reader, const gchar *filename)
 		if (tmp == NULL)
 			lang->priv->section = g_strdup (DEFAULT_SECTION);
 		else
-			lang->priv->section = g_strdup ((char*) tmp);
+			lang->priv->section = g_strdup ((gchar *) tmp);
 
 		xmlFree (tmp);
 	}
@@ -432,21 +409,78 @@ gtk_source_language_get_section	(GtkSourceLanguage *language)
 }
 
 /**
- * gtk_source_language_get_property:
+ * gtk_source_language_get_metadata:
  * @language: a #GtkSourceLanguage.
- * @name: property name.
+ * @name: metadata property name.
  *
- * Returns: value of property %name if it's set in @language
- * and %NULL otherwise.
+ * Returns: value of property @name stored in the metadata of @language
+ * or %NULL if language doesn't contain that metadata property.
+ * The returned string is owned by @language and should not be freed
+ * or modified.
  **/
 const gchar *
-gtk_source_language_get_property (GtkSourceLanguage *language,
+gtk_source_language_get_metadata (GtkSourceLanguage *language,
 				  const gchar       *name)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
 	g_return_val_if_fail (name != NULL, NULL);
 
 	return g_hash_table_lookup (language->priv->properties, name);
+}
+
+/**
+ * gtk_source_language_get_mime_types:
+ *
+ * @language: a #GtkSourceLanguage.
+ *
+ * Returns the mime types associated to this language. This is just
+ * an utility wrapper around gtk_source_language_get_metadata() to
+ * retrieve the "mimetypes" metadata property and split it into an
+ * array.
+ *
+ * Returns: a newly-allocated %NULL terminated array containing
+ * the mime types or %NULL if no mime types are found.
+ * The returned array must be freed with g_strfreev().
+ **/
+gchar **
+gtk_source_language_get_mime_types (GtkSourceLanguage *language)
+{
+	const gchar *mimetypes;
+
+	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
+
+	mimetypes = gtk_source_language_get_metadata (language, "mimetypes");
+	if (mimetypes == NULL)
+		return NULL;
+
+	return g_strsplit (mimetypes, ";", 0);
+}
+
+/**
+ * gtk_source_language_get_globs:
+ *
+ * @language: a #GtkSourceLanguage.
+ *
+ * Returns the globs associated to this language. This is just
+ * an utility wrapper around gtk_source_language_get_metadata() to
+ * retrieve the "globs" metadata property and split it into an array.
+ *
+ * Returns: a newly-allocated %NULL terminated array containing
+ * the globs or %NULL if no globs are found.
+ * The returned array must be freed with g_strfreev().
+ **/
+gchar **
+gtk_source_language_get_globs (GtkSourceLanguage *language)
+{
+	const gchar *globs;
+
+	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
+
+	globs = gtk_source_language_get_metadata (language, "globs");
+	if (globs == NULL)
+		return NULL;
+
+	return g_strsplit (globs, ";", 0);
 }
 
 /**

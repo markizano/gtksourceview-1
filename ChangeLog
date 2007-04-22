@@ -1,3 +1,12 @@
+2007-04-22  Paolo Borelli  <pborelli@katamail.com>
+
+	* gtksourceview/gtksourcelanguage.c:
+	* gtksourceview/gtksourcelanguage.h:
+
+	Add utility methods to get mime_types and globs, rename
+	get_property to get_metadata in order to not conflict
+	with gpbject's get_property in language bindings.
+
 2006-04-22  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	* gtksourceview/gtksourcebuffer.[ch]: turned can-undo and can-redo into
