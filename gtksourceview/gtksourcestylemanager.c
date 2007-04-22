@@ -25,7 +25,6 @@
 #include <string.h>
 
 #define SCHEME_FILE_SUFFIX	".styles"
-// #define SOURCEVIEW_DIR		"gtksourceview-2.0"
 #define STYLES_DIR		"styles"
 
 
@@ -49,46 +48,6 @@ enum {
 static guint signals[N_SIGNALS];
 
 G_DEFINE_TYPE (GtkSourceStyleManager, gtk_source_style_manager, G_TYPE_OBJECT)
-
-
-static void	 gtk_source_style_manager_finalize	 	(GObject	*object);
-static void	 gtk_source_style_manager_set_property		(GObject	*object,
-					   			 guint		 prop_id,
-			    		   			 const GValue 	*value,
-					   			 GParamSpec	*pspec);
-static void	 gtk_source_style_manager_get_property		(GObject 	*object,
-					   			 guint 	 	 prop_id,
-			    		   			 GValue 	*value,
-					   			 GParamSpec	*pspec);
-
-
-static void
-gtk_source_style_manager_class_init (GtkSourceStyleManagerClass *klass)
-{
-	GObjectClass *object_class = G_OBJECT_CLASS (klass);
-
-	object_class->finalize	= gtk_source_style_manager_finalize;
-	object_class->set_property = gtk_source_style_manager_set_property;
-	object_class->get_property = gtk_source_style_manager_get_property;
-
-	g_object_class_install_property (object_class,
-					 PROP_SEARCH_PATH,
-					 g_param_spec_boxed ("search-path",
-						 	     _("Style scheme directories"),
-							     _("List of directories where the "
-							       "style scheme files (.styles) "
-							       "are located"),
-							     G_TYPE_STRV,
-							     G_PARAM_READWRITE));
-
-	signals[CHANGED] = g_signal_new ("changed",
-					 G_OBJECT_CLASS_TYPE (object_class),
-					 G_SIGNAL_RUN_LAST,
-					 G_STRUCT_OFFSET (GtkSourceStyleManagerClass, changed),
-					 NULL, NULL,
-					 _gtksourceview_marshal_VOID__VOID,
-					 G_TYPE_NONE, 0);
-}
 
 static void
 gtk_source_style_manager_set_property (GObject 	    *object,
@@ -139,15 +98,6 @@ gtk_source_style_manager_get_property (GObject    *object,
 }
 
 static void
-gtk_source_style_manager_init (GtkSourceStyleManager *mgr)
-{
-	mgr->priv = g_new0 (GtkSourceStyleManagerPrivate, 1);
-	mgr->priv->schemes = NULL;
-	mgr->priv->_dirs = NULL;
-	mgr->priv->need_reload = TRUE;
-}
-
-static void
 gtk_source_style_manager_finalize (GObject *object)
 {
 	GtkSourceStyleManager *mgr;
@@ -160,9 +110,48 @@ gtk_source_style_manager_finalize (GObject *object)
 	g_slist_foreach (schemes, (GFunc) g_object_unref, NULL);
 	g_slist_free (schemes);
 	g_strfreev (mgr->priv->_dirs);
-	g_free (mgr->priv);
 
 	G_OBJECT_CLASS (gtk_source_style_manager_parent_class)->finalize (object);
+}
+
+static void
+gtk_source_style_manager_class_init (GtkSourceStyleManagerClass *klass)
+{
+	GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+	object_class->finalize	= gtk_source_style_manager_finalize;
+	object_class->set_property = gtk_source_style_manager_set_property;
+	object_class->get_property = gtk_source_style_manager_get_property;
+
+	g_object_class_install_property (object_class,
+					 PROP_SEARCH_PATH,
+					 g_param_spec_boxed ("search-path",
+						 	     _("Style scheme directories"),
+							     _("List of directories where the "
+							       "style scheme files (.styles) "
+							       "are located"),
+							     G_TYPE_STRV,
+							     G_PARAM_READWRITE));
+
+	signals[CHANGED] = g_signal_new ("changed",
+					 G_OBJECT_CLASS_TYPE (object_class),
+					 G_SIGNAL_RUN_LAST,
+					 G_STRUCT_OFFSET (GtkSourceStyleManagerClass, changed),
+					 NULL, NULL,
+					 _gtksourceview_marshal_VOID__VOID,
+					 G_TYPE_NONE, 0);
+
+	g_type_class_add_private (object_class, sizeof(GtkSourceStyleManagerPrivate));
+}
+
+static void
+gtk_source_style_manager_init (GtkSourceStyleManager *mgr)
+{
+	mgr->priv = G_TYPE_INSTANCE_GET_PRIVATE (mgr, GTK_TYPE_SOURCE_STYLE_MANAGER,
+						GtkSourceStyleManagerPrivate);
+	mgr->priv->schemes = NULL;
+	mgr->priv->_dirs = NULL;
+	mgr->priv->need_reload = TRUE;
 }
 
 GtkSourceStyleManager *

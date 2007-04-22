@@ -38,13 +38,7 @@
 
 #define DEFAULT_SECTION _("Others")
 
-#define GTK_SOURCE_LANGUAGE_GET_PRIVATE(object)(G_TYPE_INSTANCE_GET_PRIVATE ((object), \
-						GTK_TYPE_SOURCE_LANGUAGE, \
-						GtkSourceLanguagePrivate))
-
 G_DEFINE_TYPE (GtkSourceLanguage, gtk_source_language, G_TYPE_OBJECT)
-
-static void		  gtk_source_language_finalize 		(GObject 			*object);
 
 static GtkSourceLanguage *process_language_node 		(xmlTextReaderPtr 		 reader,
 								 const gchar 			*filename);
@@ -116,24 +110,6 @@ _gtk_source_language_new_from_file (const gchar              *filename,
 }
 
 static void
-gtk_source_language_class_init (GtkSourceLanguageClass *klass)
-{
-	GObjectClass *object_class = G_OBJECT_CLASS (klass);
-
-	object_class->finalize	= gtk_source_language_finalize;
-
-	g_type_class_add_private (object_class, sizeof(GtkSourceLanguagePrivate));
-}
-
-static void
-gtk_source_language_init (GtkSourceLanguage *lang)
-{
-	lang->priv = GTK_SOURCE_LANGUAGE_GET_PRIVATE (lang);
-	lang->priv->styles = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
-	lang->priv->properties = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
-}
-
-static void
 gtk_source_language_finalize (GObject *object)
 {
 	GtkSourceLanguage *lang;
@@ -155,6 +131,25 @@ gtk_source_language_finalize (GObject *object)
 	}
 
 	G_OBJECT_CLASS (gtk_source_language_parent_class)->finalize (object);
+}
+
+static void
+gtk_source_language_class_init (GtkSourceLanguageClass *klass)
+{
+	GObjectClass *object_class = G_OBJECT_CLASS (klass);
+
+	object_class->finalize	= gtk_source_language_finalize;
+
+	g_type_class_add_private (object_class, sizeof(GtkSourceLanguagePrivate));
+}
+
+static void
+gtk_source_language_init (GtkSourceLanguage *lang)
+{
+	lang->priv = G_TYPE_INSTANCE_GET_PRIVATE (lang, GTK_TYPE_SOURCE_LANGUAGE,
+						  GtkSourceLanguagePrivate);
+	lang->priv->styles = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
+	lang->priv->properties = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, g_free);
 }
 
 static gboolean

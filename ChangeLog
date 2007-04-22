@@ -1,5 +1,16 @@
 2007-04-22  Paolo Borelli  <pborelli@katamail.com>
 
+	 * gtksourceview/gtksourcelanguage.c:
+	 * gtksourceview/gtksourcestylemanager.c:
+	 * gtksourceview/gtksourcebuffer.c:
+	 * gtksourceview/gtksourceview.c:
+	 * gtksourceview/gtksourcelanguagemanager.c:
+	 * gtksourceview/gtksourceundomanager.c:
+
+	Use G_TYPE_INSTANCE_GET_PRIVATE in every object
+
+2007-04-22  Paolo Borelli  <pborelli@katamail.com>
+
 	* gtksourceview/gtksourcelanguage.c:
 	* gtksourceview/gtksourcelanguage.h:
 

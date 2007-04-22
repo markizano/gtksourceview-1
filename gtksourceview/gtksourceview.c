@@ -432,6 +432,8 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 				      GDK_F14,
 				      0,
 				      "undo", 0);
+
+	g_type_class_add_private (object_class, sizeof (GtkSourceViewPrivate));
 }
 
 static void
@@ -591,7 +593,8 @@ gtk_source_view_init (GtkSourceView *view)
 {
 	GtkTargetList *tl;
 
-	view->priv = g_new0 (GtkSourceViewPrivate, 1);
+	view->priv = G_TYPE_INSTANCE_GET_PRIVATE (view, GTK_TYPE_SOURCE_VIEW,
+						  GtkSourceViewPrivate);
 
 	view->priv->tabs_width = DEFAULT_TAB_WIDTH;
 	view->priv->margin = DEFAULT_MARGIN;
@@ -657,8 +660,6 @@ gtk_source_view_finalize (GObject *object)
 		g_hash_table_destroy (view->priv->pixmap_cache);
 
 	set_source_buffer (view, NULL);
-
-	g_free (view->priv);
 
 	G_OBJECT_CLASS (gtk_source_view_parent_class)->finalize (object);
 }

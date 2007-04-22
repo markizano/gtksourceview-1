@@ -98,7 +98,6 @@ struct _GtkSourceBufferPrivate
 	GtkSourceUndoManager  *undo_manager;
 };
 
-
 G_DEFINE_TYPE (GtkSourceBuffer, gtk_source_buffer, GTK_TYPE_TEXT_BUFFER)
 
 
@@ -255,6 +254,8 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 			  G_TYPE_NONE,
 			  1,
 			  GTK_TYPE_TEXT_ITER | G_SIGNAL_TYPE_STATIC_SCOPE);
+
+	g_type_class_add_private (object_class, sizeof(GtkSourceBufferPrivate));
 }
 
 static void
@@ -262,7 +263,8 @@ gtk_source_buffer_init (GtkSourceBuffer *buffer)
 {
 	GtkSourceBufferPrivate *priv;
 
-	priv = g_new0 (GtkSourceBufferPrivate, 1);
+	priv = G_TYPE_INSTANCE_GET_PRIVATE (buffer, GTK_TYPE_SOURCE_BUFFER,
+					    GtkSourceBufferPrivate);
 
 	buffer->priv = priv;
 
@@ -306,9 +308,6 @@ gtk_source_buffer_finalize (GObject *object)
 
 	if (buffer->priv->style_scheme)
 		g_object_unref (buffer->priv->style_scheme);
-
-	g_free (buffer->priv);
-	buffer->priv = NULL;
 
 	G_OBJECT_CLASS (gtk_source_buffer_parent_class)->finalize (object);
 }

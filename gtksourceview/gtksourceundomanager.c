@@ -194,12 +194,15 @@ gtk_source_undo_manager_class_init (GtkSourceUndoManagerClass *klass)
 			      G_TYPE_NONE,
 			      1,
 			      G_TYPE_BOOLEAN);
+
+	g_type_class_add_private (object_class, sizeof(GtkSourceUndoManagerPrivate));
 }
 
 static void
 gtk_source_undo_manager_init (GtkSourceUndoManager *um)
 {
-	um->priv = g_new0 (GtkSourceUndoManagerPrivate, 1);
+	um->priv = G_TYPE_INSTANCE_GET_PRIVATE (um, GTK_TYPE_SOURCE_UNDO_MANAGER,
+						GtkSourceUndoManagerPrivate);
 
 	um->priv->actions = NULL;
 	um->priv->next_redo = 0;
@@ -247,8 +250,6 @@ gtk_source_undo_manager_finalize (GObject *object)
 			  G_CALLBACK (gtk_source_undo_manager_begin_user_action_handler),
 			  um);
 
-	g_free (um->priv);
-
 	G_OBJECT_CLASS (gtk_source_undo_manager_parent_class)->finalize (object);
 }
 
@@ -257,7 +258,7 @@ gtk_source_undo_manager_new (GtkTextBuffer* buffer)
 {
  	GtkSourceUndoManager *um;
 
-	um = GTK_SOURCE_UNDO_MANAGER (g_object_new (GTK_SOURCE_TYPE_UNDO_MANAGER, NULL));
+	um = GTK_SOURCE_UNDO_MANAGER (g_object_new (GTK_TYPE_SOURCE_UNDO_MANAGER, NULL));
 
 	g_return_val_if_fail (um->priv != NULL, NULL);
   	um->priv->document = buffer;
