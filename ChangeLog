@@ -1,6 +1,13 @@
 2007-04-22  Paolo Borelli  <pborelli@katamail.com>
 
 	 * gtksourceview/gtksourcelanguage.c:
+
+	Made get_id, get_name, get_section return const strings
+	for consistency with other APIs.
+
+2007-04-22  Paolo Borelli  <pborelli@katamail.com>
+
+	 * gtksourceview/gtksourcelanguage.c:
 	 * gtksourceview/gtksourcestylemanager.c:
 	 * gtksourceview/gtksourcebuffer.c:
 	 * gtksourceview/gtksourceview.c:

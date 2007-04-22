@@ -53,11 +53,11 @@ struct _GtkSourceLanguageClass
 
 GType            	 gtk_source_language_get_type 			(void) G_GNUC_CONST;
 
-gchar	 		*gtk_source_language_get_id			(GtkSourceLanguage       *language);
+const gchar 		*gtk_source_language_get_id			(GtkSourceLanguage       *language);
 
-gchar	 		*gtk_source_language_get_name			(GtkSourceLanguage       *language);
+const gchar 		*gtk_source_language_get_name			(GtkSourceLanguage       *language);
 
-gchar			*gtk_source_language_get_section		(GtkSourceLanguage       *language);
+const gchar		*gtk_source_language_get_section		(GtkSourceLanguage       *language);
 
 const gchar		*gtk_source_language_get_metadata		(GtkSourceLanguage       *language,
 									 const gchar		 *name);

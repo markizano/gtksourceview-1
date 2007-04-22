@@ -356,15 +356,17 @@ process_language_node (xmlTextReaderPtr reader, const gchar *filename)
  *
  * Returns the ID of the language. The ID is not locale-dependent.
  *
- * Returns: the ID of @language, it must be freed it with g_free.
+ * Returns: the ID of @language.
+ * The returned string is owned by @language and should not be freed
+ * or modified.
  **/
-gchar *
+const gchar *
 gtk_source_language_get_id (GtkSourceLanguage *language)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
 	g_return_val_if_fail (language->priv->id != NULL, NULL);
 
-	return g_strdup (language->priv->id);
+	return language->priv->id;
 }
 
 /**
@@ -374,14 +376,16 @@ gtk_source_language_get_id (GtkSourceLanguage *language)
  * Returns the localized name of the language.
  *
  * Returns: the name of @language.
+ * The returned string is owned by @language and should not be freed
+ * or modified.
  **/
-gchar *
+const gchar *
 gtk_source_language_get_name (GtkSourceLanguage *language)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
 	g_return_val_if_fail (language->priv->name != NULL, NULL);
 
-	return g_strdup (language->priv->name);
+	return language->priv->name;
 }
 
 /**
@@ -393,14 +397,16 @@ gtk_source_language_get_name (GtkSourceLanguage *language)
  * Markup section).
  *
  * Returns: the section of @language.
+ * The returned string is owned by @language and should not be freed
+ * or modified.
  **/
-gchar *
+const gchar *
 gtk_source_language_get_section	(GtkSourceLanguage *language)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_LANGUAGE (language), NULL);
 	g_return_val_if_fail (language->priv->section != NULL, NULL);
 
-	return g_strdup (language->priv->section);
+	return language->priv->section;
 }
 
 /**
