@@ -55,10 +55,6 @@ struct _GtkSourceBufferClass
 {
 	GtkTextBufferClass parent_class;
 
-	void (* can_undo)		(GtkSourceBuffer *buffer,
-					 gboolean         can_undo);
-	void (* can_redo)		(GtkSourceBuffer *buffer,
-					 gboolean         can_redo);
 	/* views connect to this signal */
 	void (* highlight_updated)      (GtkSourceBuffer *buffer,
 					 GtkTextIter     *start,
@@ -94,10 +90,10 @@ GtkSourceLanguage 	*gtk_source_buffer_get_language 	(GtkSourceBuffer        *buf
 void			 gtk_source_buffer_set_language 	(GtkSourceBuffer        *buffer,
 								 GtkSourceLanguage      *language);
 
-/* Undo/redo methods */
 gboolean		 gtk_source_buffer_can_undo		(GtkSourceBuffer        *buffer);
 gboolean		 gtk_source_buffer_can_redo		(GtkSourceBuffer        *buffer);
 
+/* Undo/redo methods */
 void			 gtk_source_buffer_undo			(GtkSourceBuffer        *buffer);
 void			 gtk_source_buffer_redo			(GtkSourceBuffer        *buffer);
 

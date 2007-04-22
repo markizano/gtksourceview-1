@@ -1,5 +1,11 @@
 2006-04-22  Yevgen Muntyan  <muntyan@tamu.edu>
 
+	* gtksourceview/gtksourcebuffer.[ch]: turned can-undo and can-redo into
+        properties.
+	* gtksourceview/gtksourcelanguage.c: corrected gtk-doc comment.
+
+2006-04-22  Yevgen Muntyan  <muntyan@tamu.edu>
+
 	* gtksourceview/libegg/regex/eggregex.c (egg_regex_fetch_named): avoid
 	compiler warning.
 	* gtksourceview/gtksourceview-utils.h,

@@ -62,8 +62,6 @@
 
 /* Signals */
 enum {
-	CAN_UNDO = 0,
-	CAN_REDO,
 	HIGHLIGHT_UPDATED,
 	MARKER_UPDATED,
 	LAST_SIGNAL
@@ -72,6 +70,8 @@ enum {
 /* Properties */
 enum {
 	PROP_0,
+	PROP_CAN_UNDO,
+	PROP_CAN_REDO,
 	PROP_CHECK_BRACKETS,
 	PROP_HIGHLIGHT,
 	PROP_MAX_UNDO_LEVELS,
@@ -154,8 +154,6 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 	object_class->get_property = gtk_source_buffer_get_property;
 	object_class->set_property = gtk_source_buffer_set_property;
 
-	klass->can_undo 	 = NULL;
-	klass->can_redo 	 = NULL;
 	klass->highlight_updated = NULL;
 	klass->marker_updated    = NULL;
 
@@ -202,6 +200,22 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 							      GTK_TYPE_SOURCE_LANGUAGE,
 							      G_PARAM_READWRITE));
 
+	g_object_class_install_property (object_class,
+					 PROP_CAN_UNDO,
+					 g_param_spec_boolean ("can-undo",
+							       _("Can undo"),
+							       _("Whether Undo operation is possible"),
+							       FALSE,
+							       G_PARAM_READABLE));
+
+	g_object_class_install_property (object_class,
+					 PROP_CAN_REDO,
+					 g_param_spec_boolean ("can-redo",
+							       _("Can redo"),
+							       _("Whether Redo operation is possible"),
+							       FALSE,
+							       G_PARAM_READABLE));
+
 	/**
 	 * GtkSourceBuffer:style-scheme:
 	 *
@@ -218,28 +232,6 @@ gtk_source_buffer_class_init (GtkSourceBufferClass *klass)
 							      _("Style scheme"),
 							      GTK_TYPE_SOURCE_STYLE_SCHEME,
 							      G_PARAM_READWRITE));
-
-	buffer_signals[CAN_UNDO] =
-	    g_signal_new ("can_undo",
-			  G_OBJECT_CLASS_TYPE (object_class),
-			  G_SIGNAL_RUN_LAST,
-			  G_STRUCT_OFFSET (GtkSourceBufferClass, can_undo),
-			  NULL, NULL,
-			  _gtksourceview_marshal_VOID__BOOLEAN,
-			  G_TYPE_NONE,
-			  1,
-			  G_TYPE_BOOLEAN);
-
-	buffer_signals[CAN_REDO] =
-	    g_signal_new ("can_redo",
-			  G_OBJECT_CLASS_TYPE (object_class),
-			  G_SIGNAL_RUN_LAST,
-			  G_STRUCT_OFFSET (GtkSourceBufferClass, can_redo),
-			  NULL, NULL,
-			  _gtksourceview_marshal_VOID__BOOLEAN,
-			  G_TYPE_NONE,
-			  1,
-			  G_TYPE_BOOLEAN);
 
 	buffer_signals[HIGHLIGHT_UPDATED] =
 	    g_signal_new ("highlight_updated",
@@ -434,6 +426,14 @@ gtk_source_buffer_get_property (GObject    *object,
 			g_value_set_object (value, source_buffer->priv->style_scheme);
 			break;
 
+		case PROP_CAN_UNDO:
+			g_value_set_boolean (value, gtk_source_buffer_can_undo (source_buffer));
+			break;
+
+		case PROP_CAN_REDO:
+			g_value_set_boolean (value, gtk_source_buffer_can_redo (source_buffer));
+			break;
+
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 			break;
@@ -489,10 +489,7 @@ gtk_source_buffer_can_undo_handler (GtkSourceUndoManager  	*um,
 {
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 
-	g_signal_emit (G_OBJECT (buffer),
-		       buffer_signals[CAN_UNDO],
-		       0,
-		       can_undo);
+	g_object_notify (G_OBJECT (buffer), "can-undo");
 }
 
 static void
@@ -502,10 +499,7 @@ gtk_source_buffer_can_redo_handler (GtkSourceUndoManager  	*um,
 {
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (buffer));
 
-	g_signal_emit (G_OBJECT (buffer),
-		       buffer_signals[CAN_REDO],
-		       0,
-		       can_redo);
+	g_object_notify (G_OBJECT (buffer), "can-redo");
 }
 
 static GtkTextTag *
@@ -1205,7 +1199,6 @@ gtk_source_buffer_get_language (GtkSourceBuffer *buffer)
 
 /**
  * _gtk_source_buffer_update_highlight:
- *
  * @buffer: a #GtkSourceBuffer.
  * @start: start of the area to highlight.
  * @end: end of the area to highlight.
@@ -1230,7 +1223,6 @@ _gtk_source_buffer_update_highlight (GtkSourceBuffer   *buffer,
 
 /**
  * gtk_source_buffer_set_style_scheme:
- *
  * @buffer: a #GtkSourceBuffer.
  * @scheme: style scheme.
  *
@@ -1261,8 +1253,9 @@ gtk_source_buffer_set_style_scheme (GtkSourceBuffer      *buffer,
 
 /**
  * gtk_source_buffer_get_style_scheme:
- *
  * @buffer: a #GtkSourceBuffer.
+ *
+ * Returns the #GtkSourceStyleScheme currently used in @buffer.
  *
  * Returns: the #GtkSourceStyleScheme set by
  * gtk_source_buffer_set_style_scheme(), or %NULL.

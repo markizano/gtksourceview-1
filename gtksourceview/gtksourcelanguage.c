@@ -433,7 +433,6 @@ gtk_source_language_get_section	(GtkSourceLanguage *language)
 
 /**
  * gtk_source_language_get_property:
- *
  * @language: a #GtkSourceLanguage.
  * @name: property name.
  *
