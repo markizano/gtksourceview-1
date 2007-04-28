@@ -34,7 +34,6 @@ EXTRA_DIST =			\
 	AUTHORS			\
 	ChangeLog		\
 	COPYING			\
-	CVS			\
 	LICENCE			\
 	NEWS			\
 	README

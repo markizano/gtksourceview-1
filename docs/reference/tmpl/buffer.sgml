@@ -108,7 +108,10 @@ in a view widget.
 @parent_class: 
 @highlight_updated: 
 @marker_updated: 
-@debug: 
+@_gtk_source_reserved1: 
+@_gtk_source_reserved2: 
+@_gtk_source_reserved3: 
+@_gtk_source_reserved4: 
 
 <!-- ##### FUNCTION gtk_source_buffer_new ##### -->
 <para>

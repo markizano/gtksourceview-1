@@ -48,13 +48,31 @@ GtkSourceLanguage
 @Returns: 
 
 
-<!-- ##### FUNCTION gtk_source_language_get_property ##### -->
+<!-- ##### FUNCTION gtk_source_language_get_metadata ##### -->
 <para>
 
 </para>
 
 @language: 
 @name: 
+@Returns: 
+
+
+<!-- ##### FUNCTION gtk_source_language_get_mime_types ##### -->
+<para>
+
+</para>
+
+@language: 
+@Returns: 
+
+
+<!-- ##### FUNCTION gtk_source_language_get_globs ##### -->
+<para>
+
+</para>
+
+@language: 
 @Returns: 
 
 

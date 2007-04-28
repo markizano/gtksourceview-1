@@ -127,26 +127,3 @@ Printing a #GtkSourceBuffer.
 GtkSourcePrintJob
 
 
-<!-- ##### SIGNAL GtkSourceBuffer::can-redo ##### -->
-<para>
-
-</para>
-
-@sourcebuffer: the object which received the signal.
-@arg1: 
-
-<!-- ##### SIGNAL GtkSourceBuffer::can-undo ##### -->
-<para>
-
-</para>
-
-@sourcebuffer: the object which received the signal.
-@arg1: 
-
-<!-- ##### FUNCTION gtk_source_buffer_get_type ##### -->
-<para>
-
-</para>
-
-@Returns: 
-

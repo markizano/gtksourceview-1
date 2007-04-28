@@ -138,6 +138,7 @@ gtk_source_language_manager_init (GtkSourceLanguageManager *lm)
 {
 	lm->priv = G_TYPE_INSTANCE_GET_PRIVATE (lm, GTK_TYPE_SOURCE_LANGUAGE_MANAGER,
 						GtkSourceLanguageManagerPrivate);
+	lm->priv = g_new0 (GtkSourceLanguageManagerPrivate, 1);
 	lm->priv->language_ids = NULL;
 	lm->priv->available_languages = NULL;
 	lm->priv->lang_dirs = NULL;
@@ -245,7 +246,7 @@ prepend_lang (G_GNUC_UNUSED gchar      *id,
 	      GtkSourceLanguageManager *lm)
 {
 	lm->priv->available_languages =
-		g_slist_prepend (lm->priv->available_languages, lang);
+		g_slist_prepend (lm->priv->available_languages, g_object_ref (lang));
 }
 
 static void
@@ -256,7 +257,8 @@ ensure_languages (GtkSourceLanguageManager *lm)
 	if (lm->priv->language_ids != NULL)
 		return;
 
-	lm->priv->language_ids = g_hash_table_new (g_str_hash, g_str_equal);
+	lm->priv->language_ids = g_hash_table_new_full (g_str_hash, g_str_equal,
+							g_free, g_object_unref);
 
 	filenames = _gtk_source_view_get_file_list (gtk_source_language_manager_get_search_path (lm),
 						    LANG_FILE_SUFFIX);
@@ -279,7 +281,7 @@ ensure_languages (GtkSourceLanguageManager *lm)
 		if (g_hash_table_lookup (lm->priv->language_ids, lang->priv->id) == NULL)
 		{
 			g_hash_table_insert (lm->priv->language_ids,
-					     lang->priv->id,
+					     g_strdup (lang->priv->id),
 					     lang);
 		}
 		else

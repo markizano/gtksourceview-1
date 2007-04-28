@@ -107,7 +107,7 @@ if test x$build_tests = xtrue; then
 	msg_tests=yes
 	PKG_CHECK_MODULES(TESTS, gnome-vfs-2.0,
 			  AM_CONDITIONAL(USE_GNOME_VFS, true),
-			  [:])
+			  [PKG_CHECK_MODULES(TESTS, gthread-2.0)])
         # test-widget uses this to find lang files and gtksourcebuffer.c
         ABS_TOP_SRCDIR=`cd $srcdir && pwd`
         AC_SUBST(ABS_TOP_SRCDIR)

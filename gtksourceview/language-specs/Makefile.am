@@ -1,15 +1,16 @@
 LANGUAGES =			\
 	ada.lang		\
 	boo.lang		\
-	c.lang			\
 	changelog.lang		\
+	check.sh		\
+	c.lang			\
 	cpp.lang		\
 	csharp.lang		\
 	css.lang		\
-	d.lang			\
 	def.lang		\
 	desktop.lang		\
 	diff.lang		\
+	d.lang			\
 	dpatch.lang		\
 	dtd.lang		\
 	fortran.lang		\
@@ -24,6 +25,7 @@ LANGUAGES =			\
 	latex.lang		\
 	libtool.lang		\
 	lua.lang		\
+	m4.lang			\
 	makefile.lang		\
 	msil.lang		\
 	nemerle.lang		\
@@ -39,6 +41,7 @@ LANGUAGES =			\
 	scheme.lang		\
 	sh.lang			\
 	sql.lang		\
+	styles.rng		\
 	tcl.lang		\
 	texinfo.lang		\
 	vbnet.lang		\
