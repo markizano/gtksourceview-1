@@ -1,3 +1,8 @@
+2007-05-01  Paolo Borelli  <pborelli@katamail.com>
+
+	 * gtksourceview/gtksourcestylemanager.h: remove unused method
+	declarations.
+
 2007-04-27  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	 * gtksourceview/language-specs/sh.lang: highlight FIXME and such in comments.
