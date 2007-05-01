@@ -1,5 +1,16 @@
 2007-05-01  Paolo Borelli  <pborelli@katamail.com>
 
+	 * gtksourceview/language-specs/def.lang: shell like comments
+	cannot span multiple lines
+
+	 * gtksourceview/language-specs/perl.lang:
+	 * gtksourceview/language-specs/ruby.lang:
+	 * gtksourceview/language-specs/tcl.lang:
+
+	Use default contexts where possible.
+
+2007-05-01  Paolo Borelli  <pborelli@katamail.com>
+
 	 * gtksourceview/gtksourcestylemanager.h: remove unused method
 	declarations.
 
