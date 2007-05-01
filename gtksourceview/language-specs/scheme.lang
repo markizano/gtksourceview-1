@@ -8,20 +8,32 @@
 
   <styles>
     <style id="comment" _name="Comment" map-to="def:comment"/>
-    <style id="boolean" _name="Boolean" map-to="def:keyword"/>
+    <style id="boolean" _name="Boolean" map-to="def:preprocessor"/>
     <style id="string" _name="String" map-to="def:string"/>
     <style id="keyword" _name="Keyword" map-to="def:keyword"/>
-    <style id="others" _name="Others"/>
+    <style id="function" _name="Function" map-to="def:function"/>
   </styles>
 
   <definitions>
     <context id="line-comment" style-ref="comment" end-at-line-end="true">
       <start>;</start>
+      <include>
+        <context ref="def:in-comment"/>
+      </include>
     </context>
+
     <context id="string" style-ref="string">
       <start>"</start>
       <end>"</end>
     </context>
+
+    <!-- We cannot match \b at the end of a keyword automatically
+         because it fails for let* etc. So we need to manually add it to the
+         other keywords and match ([ \t]|$) for the one ending with a
+         special character. Unfortnately this also means that if the highlight
+         style for keywords sets the background color, for let* etc also the
+         trailing space will be highlighted. -->
+
     <context id="keyword" style-ref="keyword">
       <suffix></suffix>
       <keyword>and\b</keyword>
@@ -65,7 +77,8 @@
       <keyword>syntax-rules\b</keyword>
       <keyword>unquote\b</keyword>
     </context>
-    <context id="function" style-ref="others">
+
+    <context id="function" style-ref="function">
       <suffix></suffix>
       <keyword>abs\b</keyword>
       <keyword>acos\b</keyword>
@@ -250,9 +263,11 @@
       <keyword>write\b</keyword>
       <keyword>zero\?([ \t]|$)</keyword>
     </context>
+
     <context id="boolean-value" style-ref="boolean">
       <match>#(f|t)</match>
     </context>
+
     <context id="scheme">
       <include>
         <context ref="line-comment"/>
@@ -262,5 +277,6 @@
         <context ref="boolean-value"/>
       </include>
     </context>
+
   </definitions>
 </language>
