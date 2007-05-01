@@ -10,6 +10,7 @@
 	 * gtksourceview/language-specs/def.lang: shell like comments
 	cannot span multiple lines
 
+	 * gtksourceview/language-specs/desktop.lang:
 	 * gtksourceview/language-specs/fortran.lang:
 	 * gtksourceview/language-specs/perl.lang:
 	 * gtksourceview/language-specs/ruby.lang:
