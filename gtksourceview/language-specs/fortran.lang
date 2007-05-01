@@ -16,6 +16,7 @@
 
   <definitions>
 
+    <!-- Note: contains an hack to avoid considering ^COMMON a comment -->
     <context id="line-comment" style-ref="comment" end-at-line-end="true">
       <start>!|(^[Cc](\b|[^Oo]))</start>
       <include>
