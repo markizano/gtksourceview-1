@@ -2,6 +2,8 @@
 
 	 * gtksourceview/language-specs/scheme.lang: highlight TODOs
 	etc in comments.
+	 * gtksourceview/language-specs/csharp.lang: some niceties
+	taken from c.lang
 
 2007-05-01  Paolo Borelli  <pborelli@katamail.com>
 
