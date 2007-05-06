@@ -1,3 +1,14 @@
+2007-05-06  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	 * gtksourceview/gtksourceiter.c (exact_prefix_cmp): corrected
+         copy/paste error, it was G_UNICODE_NON_SPACING_MARK instead of
+         G_UNICODE_COMBINING_MARK.
+         * gtksourceview/language-specs/scheme.lang: made keywords use
+         <prefix> and <suffix>.
+         * gtksourceview/language-specs/octave.lang: put it into Scientific
+         section.
+         * gtksourceview/language-specs/gap.lang: new lang file, for GAP.
+
 2007-05-05  Paolo Borelli  <pborelli@katamail.com>
 
 	 * gtksourceview/language-specs/sh.lang: highlight $$ and $#
