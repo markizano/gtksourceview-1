@@ -65,6 +65,14 @@ struct _GtkSourceViewClass
 	void (*_gtk_source_reserved3) (void);
 };
 
+typedef enum
+{
+	GTKSOURCEVIEW_SMART_HOME_END_DISABLED,
+	GTKSOURCEVIEW_SMART_HOME_END_BEFORE,
+	GTKSOURCEVIEW_SMART_HOME_END_AFTER,
+	GTKSOURCEVIEW_SMART_HOME_END_ALWAYS
+} GtkSourceViewSmartHomeEndType;
+
 GType		 gtk_source_view_get_type 		(void) G_GNUC_CONST;
 
 /* Constructors */
@@ -118,9 +126,10 @@ void             gtk_source_view_set_marker_pixbuf      (GtkSourceView   *view,
 GdkPixbuf	*gtk_source_view_get_marker_pixbuf      (GtkSourceView   *view,
 				       			 const gchar     *marker_type);
 
-void		 gtk_source_view_set_smart_home_end	(GtkSourceView   *view,
-							 gboolean         enable);
-gboolean	 gtk_source_view_get_smart_home_end	(GtkSourceView   *view);
+void		 gtk_source_view_set_smart_home_end	(GtkSourceView                 *view,
+							 GtkSourceViewSmartHomeEndType  smart_he);
+GtkSourceViewSmartHomeEndType
+		 gtk_source_view_get_smart_home_end	(GtkSourceView   *view);
 
 G_END_DECLS
 #endif				/* end of SOURCE_VIEW_H__ */

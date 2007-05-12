@@ -100,6 +100,7 @@ static GtkActionEntry view_action_entries[] = {
 	{ "NewView", GTK_STOCK_NEW, "_New View", NULL,
 	  "Create a new view of the file", G_CALLBACK (new_view_cb) },
 	{ "TabsWidth", NULL, "_Tabs Width" },
+	{ "SmartHomeEnd", NULL, "_Smart Home/End" },
 	{ "DebugThing3", GTK_STOCK_FIND_AND_REPLACE, "Search and _Replace", "<control>R",
 	  "Search and Replace", G_CALLBACK (debug_thing_3_cb) },
 };
@@ -133,6 +134,17 @@ static GtkRadioActionEntry radio_entries[] = {
 	{ "TabsWidth12", NULL, "12", NULL, "Set tabulation width to 12 spaces", 12 }
 };
 
+static GtkRadioActionEntry smart_home_end_entries[] = {
+	{ "SmartHomeEndDisabled", NULL, "Disabled", NULL,
+	  "Smart Home/End disabled", GTKSOURCEVIEW_SMART_HOME_END_DISABLED },
+	{ "SmartHomeEndBefore", NULL, "Before", NULL,
+	  "Smart Home/End before", GTKSOURCEVIEW_SMART_HOME_END_BEFORE },
+	{ "SmartHomeEndAfter", NULL, "After", NULL,
+	  "Smart Home/End after", GTKSOURCEVIEW_SMART_HOME_END_AFTER },
+	{ "SmartHomeEndAlways", NULL, "Always", NULL,
+	  "Smart Home/End always", GTKSOURCEVIEW_SMART_HOME_END_ALWAYS }
+};
+
 static const gchar *view_ui_description =
 "<ui>"
 "  <menubar name=\"MainMenu\">"
@@ -158,6 +170,13 @@ static const gchar *view_ui_description =
 "        <menuitem action=\"TabsWidth8\"/>"
 "        <menuitem action=\"TabsWidth10\"/>"
 "        <menuitem action=\"TabsWidth12\"/>"
+"      </menu>"
+"      <separator/>"
+"      <menu action=\"SmartHomeEnd\">"
+"        <menuitem action=\"SmartHomeEndDisabled\"/>"
+"        <menuitem action=\"SmartHomeEndBefore\"/>"
+"        <menuitem action=\"SmartHomeEndAfter\"/>"
+"        <menuitem action=\"SmartHomeEndAlways\"/>"
 "      </menu>"
 "    </menu>"
 "  </menubar>"
@@ -488,6 +507,17 @@ tabs_toggled_cb (GtkAction *action,
 {
 	g_return_if_fail (GTK_IS_RADIO_ACTION (action) && GTK_IS_SOURCE_VIEW (user_data));
 	gtk_source_view_set_tabs_width (
+		GTK_SOURCE_VIEW (user_data),
+		gtk_radio_action_get_current_value (GTK_RADIO_ACTION (action)));
+}
+
+static void
+smart_home_end_toggled_cb (GtkAction *action,
+			   GtkAction *current,
+			   gpointer user_data)
+{
+	g_return_if_fail (GTK_IS_RADIO_ACTION (action) && GTK_IS_SOURCE_VIEW (user_data));
+	gtk_source_view_set_smart_home_end (
 		GTK_SOURCE_VIEW (user_data),
 		gtk_radio_action_get_current_value (GTK_RADIO_ACTION (action)));
 }
@@ -864,6 +894,9 @@ create_view_window (GtkSourceBuffer *buffer, GtkSourceView *from)
 	gtk_action_group_add_radio_actions (action_group, radio_entries,
 					    G_N_ELEMENTS (radio_entries),
 					    -1, G_CALLBACK (tabs_toggled_cb), view);
+	gtk_action_group_add_radio_actions (action_group, smart_home_end_entries,
+					    G_N_ELEMENTS (smart_home_end_entries),
+					    -1, G_CALLBACK (smart_home_end_toggled_cb), view);
 
 	ui_manager = gtk_ui_manager_new ();
 	gtk_ui_manager_insert_action_group (ui_manager, action_group, 0);

@@ -36,6 +36,7 @@
 #include "gtksourceview-i18n.h"
 
 #include "gtksourceview-marshal.h"
+#include "gtksourceview-typebuiltins.h"
 #include "gtksourceview.h"
 
 /*
@@ -103,7 +104,7 @@ struct _GtkSourceViewPrivate
 	gboolean	 indent_on_tab;
 	guint		 margin;
 	gint             cached_margin_width;
-	gboolean	 smart_home_end;
+	GtkSourceViewSmartHomeEndType smart_home_end;
 
 	GtkSourceStyleScheme *style_scheme;
 	GdkGC		*current_line_gc;
@@ -284,15 +285,23 @@ gtk_source_view_class_init (GtkSourceViewClass *klass)
 							    DEFAULT_MARGIN,
 							    G_PARAM_READWRITE));
 
+	/**
+	 * GtkSourceView:smart-home-end:
+	 *
+	 * Set the behavior of the HOME and END keys.
+	 *
+	 * Since: 2.0
+	 */
 	g_object_class_install_property (object_class,
 					 PROP_SMART_HOME_END,
-					 g_param_spec_boolean ("smart_home_end",
-							       _("Use smart home/end"),
-							       _("HOME and END keys move to first/last "
-								 "non whitespace characters on line before going "
-								 "to the start/end of the line"),
-							       TRUE,
-							       G_PARAM_READWRITE));
+					 g_param_spec_enum ("smart_home_end",
+							    _("Smart Home/End"),
+							    _("HOME and END keys move to first/last "
+							      "non whitespace characters on line before going "
+							      "to the start/end of the line"),
+							    GTK_TYPE_SOURCE_VIEW_SMART_HOME_END_TYPE,
+							    GTKSOURCEVIEW_SMART_HOME_END_DISABLED,
+							    G_PARAM_READWRITE));
 
 	g_object_class_install_property (object_class,
 					 PROP_HIGHLIGHT_CURRENT_LINE,
@@ -488,7 +497,7 @@ gtk_source_view_set_property (GObject      *object,
 
 		case PROP_SMART_HOME_END:
 			gtk_source_view_set_smart_home_end (view,
-							    g_value_get_boolean (value));
+							    g_value_get_enum (value));
 			break;
 
 		case PROP_HIGHLIGHT_CURRENT_LINE:
@@ -562,8 +571,8 @@ gtk_source_view_get_property (GObject    *object,
 			break;
 
 		case PROP_SMART_HOME_END:
-			g_value_set_boolean (value,
-					     gtk_source_view_get_smart_home_end (view));
+			g_value_set_flags (value,
+					   gtk_source_view_get_smart_home_end (view));
 			break;
 
 		case PROP_HIGHLIGHT_CURRENT_LINE:
@@ -600,7 +609,7 @@ gtk_source_view_init (GtkSourceView *view)
 	view->priv->margin = DEFAULT_MARGIN;
 	view->priv->cached_margin_width = -1;
 	view->priv->indent_on_tab = TRUE;
-	view->priv->smart_home_end = TRUE;
+	view->priv->smart_home_end = GTKSOURCEVIEW_SMART_HOME_END_DISABLED;
 
 	view->priv->pixmap_cache = g_hash_table_new_full (g_str_hash, g_str_equal,
 							  (GDestroyNotify) g_free,
@@ -923,6 +932,60 @@ move_cursor (GtkTextView       *text_view,
 }
 
 static void
+move_to_first_char (GtkTextIter *iter)
+{
+	gtk_text_iter_set_line_offset (iter, 0);
+
+	while (!gtk_text_iter_ends_line (iter))
+	{
+		gunichar c;
+
+		c = gtk_text_iter_get_char (iter);
+		if (g_unichar_isspace (c))
+			gtk_text_iter_forward_char (iter);
+		else
+			break;
+	}
+}
+
+static void
+move_to_last_char (GtkTextIter *iter)
+{
+	if (!gtk_text_iter_ends_line (iter))
+		gtk_text_iter_forward_to_line_end (iter);
+
+	while (!gtk_text_iter_starts_line (iter))
+	{
+		gunichar c;
+
+		gtk_text_iter_backward_char (iter);
+		c = gtk_text_iter_get_char (iter);
+		if (!g_unichar_isspace (c))
+		{
+			/* We've gone one character too far. */
+			gtk_text_iter_forward_char (iter);
+			break;
+		}
+	}
+}
+
+static void
+do_cursor_move (GtkTextView *text_view,
+	        GtkTextIter *cur,
+	        GtkTextIter *iter,
+	        gboolean     extend_selection)
+{
+	/* if we are clearing selection, we need to move_cursor even
+	 * if we are at proper iter because selection_bound may need
+	 * to be moved */
+	if (!gtk_text_iter_equal (cur, iter) || !extend_selection)
+	{
+		move_cursor (text_view, iter, extend_selection);
+		return;
+	}
+}
+
+static void
 gtk_source_view_move_cursor (GtkTextView    *text_view,
 			     GtkMovementStep step,
 			     gint            count,
@@ -937,67 +1000,73 @@ gtk_source_view_move_cursor (GtkTextView    *text_view,
 	gtk_text_buffer_get_iter_at_mark (buffer, &cur, mark);
 	iter = cur;
 
-	if (step == GTK_MOVEMENT_DISPLAY_LINE_ENDS &&
-	    source_view->priv->smart_home_end && count == -1)
+	if (step == GTK_MOVEMENT_DISPLAY_LINE_ENDS && count == -1)
 	{
-		/* Find the iter of the first character on the line. */
-		gtk_text_iter_set_line_offset (&cur, 0);
-		while (!gtk_text_iter_ends_line (&cur))
-		{
-			gunichar c = gtk_text_iter_get_char (&cur);
-			if (g_unichar_isspace (c))
-				gtk_text_iter_forward_char (&cur);
-			else
-				break;
-		}
+		move_to_first_char (&iter);
 
-		if (gtk_text_iter_starts_line (&iter) ||
-		    !gtk_text_iter_equal (&cur, &iter))
-		{
-			move_cursor (text_view, &cur, extend_selection);
-		}
-		else
-		{
-			gtk_text_iter_set_line_offset (&cur, 0);
-			move_cursor (text_view, &cur, extend_selection);
-		}
-	}
-	else if (step == GTK_MOVEMENT_DISPLAY_LINE_ENDS &&
-		 source_view->priv->smart_home_end && count == 1)
-	{
-		/* Find the iter of the last character on the line. */
-		if (!gtk_text_iter_ends_line (&cur))
-			gtk_text_iter_forward_to_line_end (&cur);
-		while (!gtk_text_iter_starts_line (&cur))
-		{
-			gunichar c;
-			gtk_text_iter_backward_char (&cur);
-			c = gtk_text_iter_get_char (&cur);
-			if (!g_unichar_isspace (c))
+		switch (source_view->priv->smart_home_end) {
+
+		case GTKSOURCEVIEW_SMART_HOME_END_BEFORE:
+			if (!gtk_text_iter_equal (&cur, &iter) ||
+			    gtk_text_iter_starts_line (&cur))
 			{
-				/* We've gone one character too far. */
-				gtk_text_iter_forward_char (&cur);
-				break;
+				do_cursor_move (text_view, &cur, &iter, extend_selection);
+				return;
 			}
-		}
+			break;
 
-		if (gtk_text_iter_ends_line (&iter) ||
-		    !gtk_text_iter_equal (&cur, &iter))
-		{
-			move_cursor (text_view, &cur, extend_selection);
-		}
-		else
-		{
-			gtk_text_iter_forward_to_line_end (&cur);
-			move_cursor (text_view, &cur, extend_selection);
+		case GTKSOURCEVIEW_SMART_HOME_END_AFTER:
+			if (gtk_text_iter_starts_line (&cur))
+			{
+				do_cursor_move (text_view, &cur, &iter, extend_selection);
+				return;
+			}
+			break;
+
+		case GTKSOURCEVIEW_SMART_HOME_END_ALWAYS:
+			do_cursor_move (text_view, &cur, &iter, extend_selection);
+			return;
+
+		default:
+			break;
 		}
 	}
-	else
+	else if (step == GTK_MOVEMENT_DISPLAY_LINE_ENDS && count == 1)
 	{
-		GTK_TEXT_VIEW_CLASS (gtk_source_view_parent_class)->move_cursor (text_view,
-										 step, count,
-										 extend_selection);
+		move_to_last_char (&iter);
+
+		switch (source_view->priv->smart_home_end) {
+
+		case GTKSOURCEVIEW_SMART_HOME_END_BEFORE:
+			if (!gtk_text_iter_equal (&cur, &iter) ||
+			    gtk_text_iter_ends_line (&cur))
+			{
+				do_cursor_move (text_view, &cur, &iter, extend_selection);
+				return;
+			}
+			break;
+
+		case GTKSOURCEVIEW_SMART_HOME_END_AFTER:
+			if (gtk_text_iter_ends_line (&cur))
+			{
+				do_cursor_move (text_view, &cur, &iter, extend_selection);
+				return;
+			}
+			break;
+
+		case GTKSOURCEVIEW_SMART_HOME_END_ALWAYS:
+			do_cursor_move (text_view, &cur, &iter, extend_selection);
+			return;
+
+		default:
+			break;
+		}
 	}
+
+	GTK_TEXT_VIEW_CLASS (gtk_source_view_parent_class)->move_cursor (text_view,
+									 step,
+									 count,
+									 extend_selection);
 }
 
 static void
@@ -2731,23 +2800,21 @@ gtk_source_view_set_margin (GtkSourceView *view, guint margin)
 /**
  * gtk_source_view_set_smart_home_end:
  * @view: a #GtkSourceView.
- * @enable: whether to enable smart behavior for HOME and END keys.
+ * @smart_he: the desired behavior among #GtkSourceViewSmartHomeEndType
  *
- * If %TRUE HOME and END keys will move to the first/last non-space
- * character of the line before moving to the start/end.
- *
+ * Set the desired movement of the cursor when HOME and END keys
+ * are pressed.
  **/
 void
-gtk_source_view_set_smart_home_end (GtkSourceView *view, gboolean enable)
+gtk_source_view_set_smart_home_end (GtkSourceView                 *view,
+				    GtkSourceViewSmartHomeEndType  smart_he)
 {
 	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
 
-	enable = (enable != FALSE);
-
-	if (view->priv->smart_home_end == enable)
+	if (view->priv->smart_home_end == smart_he)
 		return;
 
-	view->priv->smart_home_end = enable;
+	view->priv->smart_home_end = smart_he;
 
 	g_object_notify (G_OBJECT (view), "smart_home_end");
 }
@@ -2756,12 +2823,10 @@ gtk_source_view_set_smart_home_end (GtkSourceView *view, gboolean enable)
  * gtk_source_view_get_smart_home_end:
  * @view: a #GtkSourceView.
  *
- * Returns whether HOME and END keys will move to the first/last non-space
- * character of the line before moving to the start/end.
- *
- * Return value: %TRUE if smart behavior for HOME and END keys is enabled.
+ * Returns a #GtkSourceViewSmartHomeEndTypeend value specifying
+ * how the cursor will move when HOME and END keys are pressed.
  **/
-gboolean
+GtkSourceViewSmartHomeEndType
 gtk_source_view_get_smart_home_end (GtkSourceView *view)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
