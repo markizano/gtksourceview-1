@@ -30,7 +30,7 @@
         </context>
 
         <context id="character-reference" style-ref="entity">
-            <match>&amp;#[0-9]+;</match>
+            <match>&amp;#([0-9]+|x[a-fA-F0-9]+);</match>
         </context>
 
         <context id="unallowed-chars" style-ref="error" extend-parent="false">
