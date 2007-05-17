@@ -1,3 +1,9 @@
+2007-05-16  Yevgen Muntyan  <muntyan@tamu.edu>
+
+	 * gtksourceview/language-specs/gap.lang: highlight all escaped chars.
+	 * gtksourceview/language-specs/m4.lang: highlight AC_CHECK_LIB and 
+         AC_SEARCH_LIBS properly.
+
 2007-05-16  Paolo Borelli  <pborelli@katamail.com>
 
 	 * gtksourceview/language-specs/xml.lang: highlight hex
