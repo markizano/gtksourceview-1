@@ -1,3 +1,8 @@
+2007-05-19  Paolo Borelli  <pborelli@katamail.com>
+
+	* gtksourceview/language-specs/css.lang: improve css
+	highlighting
+
 2007-05-16  Yevgen Muntyan  <muntyan@tamu.edu>
 
 	 * gtksourceview/language-specs/gap.lang: highlight all escaped chars.
@@ -6,7 +11,7 @@
 
 2007-05-16  Paolo Borelli  <pborelli@katamail.com>
 
-	 * gtksourceview/language-specs/xml.lang: highlight hex
+	* gtksourceview/language-specs/xml.lang: highlight hex
 	character references as well.
 
 2007-05-15  Paolo Borelli  <pborelli@katamail.com>
