@@ -2,6 +2,8 @@
 
 	* gtksourceview/language-specs/css.lang: improve css
 	highlighting
+	* gtksourceview/language-specs/css.lang: improve comments
+	highlighting
 
 2007-05-16  Yevgen Muntyan  <muntyan@tamu.edu>
 
