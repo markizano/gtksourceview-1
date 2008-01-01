@@ -1943,8 +1943,7 @@ gtk_source_view_set_tab_width (GtkSourceView *view,
 guint
 gtk_source_view_get_tab_width (GtkSourceView *view)
 {
-	g_return_val_if_fail (view != NULL, FALSE);
-	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
+	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), DEFAULT_TAB_WIDTH);
 
 	return view->priv->tab_width;
 }

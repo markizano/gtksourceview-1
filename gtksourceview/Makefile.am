@@ -72,6 +72,8 @@ libgtksourceview_2_0_la_SOURCES = 	\
 	gtksourceengine.c		\
 	gtksourcecontextengine.h	\
 	gtksourcecontextengine.c	\
+	gtksourceprintcompositor.h      \
+	gtksourceprintcompositor.c      \
 	$(libgtksourceview_headers)
 
 # do not distribute generated files

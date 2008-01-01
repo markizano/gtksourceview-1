@@ -34,6 +34,7 @@
 #include <gtksourceview/gtksourcelanguage.h>
 #include <gtksourceview/gtksourcelanguagemanager.h>
 #include <gtksourceview/gtksourcestyleschememanager.h>
+#include <gtksourceview/gtksourceprintcompositor.h>
 #ifdef TEST_XML_MEM
 #include <libxml/xmlreader.h>
 #endif
@@ -60,6 +61,8 @@ static GtkSourceStyleScheme *style_scheme = NULL;
 
 static void       open_file_cb                   (GtkAction       *action,
 						  gpointer         user_data);
+static void       print_file_cb                  (GtkAction       *action,
+						  gpointer         user_data);						  
 static void       debug_thing_3_cb		 (GtkAction       *action,
 						  gpointer         user_data);
 
@@ -95,6 +98,8 @@ static GtkWidget *create_view_window             (GtkSourceBuffer *buffer,
 static GtkActionEntry buffer_action_entries[] = {
 	{ "Open", GTK_STOCK_OPEN, "_Open", "<control>O",
 	  "Open a file", G_CALLBACK (open_file_cb) },
+	{ "Print", GTK_STOCK_PRINT, "_Print", "<control>P",
+	  "Print the current file", G_CALLBACK (print_file_cb) },
 	{ "Quit", GTK_STOCK_QUIT, "_Quit", "<control>Q",
 	  "Exit the application", G_CALLBACK (gtk_main_quit) }
 };
@@ -214,6 +219,7 @@ static const gchar *buffer_ui_description =
 "  <menubar name=\"MainMenu\">"
 "    <menu action=\"FileMenu\">"
 "      <menuitem action=\"Open\"/>"
+"      <menuitem action=\"Print\"/>"
 "      <menuitem action=\"DebugThing3\"/>"
 "      <separator/>"
 "      <menuitem action=\"Quit\"/>"
@@ -801,6 +807,62 @@ open_file_cb (GtkAction *action, gpointer user_data)
 	gtk_widget_destroy (chooser);
 }
 
+static void
+begin_print (GtkPrintOperation        *operation, 
+	     GtkPrintContext          *context,
+	     GtkSourcePrintCompositor *compositor)
+{
+	g_debug ("begin_print");
+	
+	gtk_source_print_compositor_paginate (compositor, context);
+	
+	gtk_print_operation_set_n_pages (operation, 1);
+}
+
+static void
+draw_page (GtkPrintOperation *operation,
+	   GtkPrintContext   *context,
+	   gint               page_nr,
+	   gpointer           user_data)
+{
+}
+
+static void
+end_print (GtkPrintOperation        *operation, 
+	   GtkPrintContext          *context,
+	   GtkSourcePrintCompositor *compositor)
+{
+	g_object_unref (compositor);
+}
+
+static void
+print_file_cb (GtkAction *action, gpointer user_data)
+{
+	GtkSourcePrintCompositor *compositor;
+	GtkPrintOperation *operation;
+
+	g_return_if_fail (GTK_IS_SOURCE_BUFFER (user_data));
+
+	g_debug ("print_file_cb");
+	
+	compositor = gtk_source_print_compositor_new (GTK_SOURCE_BUFFER (user_data));
+	
+	operation = gtk_print_operation_new ();
+	
+  	g_signal_connect (G_OBJECT (operation), "begin-print", 
+			  G_CALLBACK (begin_print), compositor);		          
+	g_signal_connect (G_OBJECT (operation), "draw-page", 
+			  G_CALLBACK (draw_page), compositor);
+	g_signal_connect (G_OBJECT (operation), "end-print", 
+			  G_CALLBACK (end_print), compositor);
+
+	g_debug ("CIAO");
+	gtk_print_operation_run (operation, 
+				 GTK_PRINT_OPERATION_ACTION_PRINT_DIALOG,
+				 NULL, NULL);
+
+	g_object_unref (operation);
+}
 
 /* View UI callbacks ------------------------------------------------------------------ */
 

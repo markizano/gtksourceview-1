@@ -1,0 +1,648 @@
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8; coding: utf-8 -*-
+ *
+ * gtksourceprintcompositor.c
+ * This file is part of GtkSourceView 
+ *
+ * Copyright (C) 2000, 2001 Chema Celorio  
+ * Copyright (C) 2003  Gustavo Giráldez
+ * Copyright (C) 2004  Red Hat, Inc.
+ * Copyright (C) 2001-2007  Paolo Maggi
+ *
+ * GtkSourceView is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ * 
+ * GtkSourceView is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ * 
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+ 
+#ifdef HAVE_CONFIG_H
+#include <config.h>
+#endif
+
+#include <string.h>
+#include <time.h>
+
+#include "gtksourceview-i18n.h" 
+#include "gtksourceprintcompositor.h"
+
+
+#define ENABLE_DEBUG
+#define ENABLE_PROFILE
+
+/*
+#undef ENABLE_DEBUG
+#undef ENABLE_PROFILE
+*/
+#ifdef ENABLE_DEBUG
+#define DEBUG(x) (x)
+#else
+#define DEBUG(x)
+#endif
+
+#ifdef ENABLE_PROFILE
+#define PROFILE(x) (x)
+#else
+#define PROFILE(x)
+#endif
+
+#define DEFAULT_TAB_WIDTH 		8
+#define MAX_TAB_WIDTH			32
+
+#define DEFAULT_FONT_NAME   "Monospace 10"
+
+#define MM(v) ((v) * 10 * 72.0 / 2.54)
+
+#define NUMBERS_TEXT_SEPARATION MM(5)
+#define HEADER_FOOTER_SIZE_FACTOR 2.5
+
+typedef enum 
+{
+	/* Initial state: properties can be changed only when the paginator
+	   is in the INIT state */
+	INIT,
+	
+	/* Paginating state: paginator goes in this state when the paginate
+	   function is called for the first time */
+	PAGINATING,
+	
+	/* Done state: paginator goes in this state when the entire document
+	   has been paginated */
+	DONE
+} PaginatorState;
+
+struct _GtkSourcePrintCompositorPrivate
+{
+	GtkSourceBuffer         *buffer;
+
+	/* Properties */
+	guint			 tab_width;
+	GtkWrapMode		 wrap_mode;
+	gboolean                 highlight_syntax;
+	guint                    print_line_numbers;
+	
+	PangoFontDescription    *body_font;
+	PangoFontDescription    *line_numbers_font;
+	PangoFontDescription    *header_font;
+	PangoFontDescription    *footer_font;
+
+	/* These are stored in mm */
+	gdouble                  margin_top;
+	gdouble                  margin_bottom;
+	gdouble                  margin_left;
+	gdouble                  margin_right;
+
+	gboolean                 print_header;
+	gboolean                 print_footer;
+
+	gchar                   *header_format_left;
+	gchar                   *header_format_center;
+	gchar                   *header_format_right;
+	gboolean                 header_separator;
+	gchar                   *footer_format_left;
+	gchar                   *footer_format_center;
+	gchar                   *footer_format_right;
+	gboolean                 footer_separator;	
+
+	/* State */
+	PaginatorState           state;
+	
+	GArray                  *pages; /* pages[i] contains the begin offset
+	                                   of i-th  */
+	
+	guint                    paginated_lines;
+	gint                     n_pages;
+	
+	gdouble                  header_height;
+	gdouble                  footer_height;
+	gdouble                  line_numbers_width;
+
+	/* printable (for the document itself) size */
+	gdouble                  text_width;
+	gdouble                  text_height;
+	
+	gdouble                  real_margin_top;
+	gdouble                  real_margin_bottom;
+	gdouble                  real_margin_left;
+	gdouble                  real_margin_right;
+	
+	PangoLanguage           *language;	
+};
+
+enum
+{
+	PROP_0,
+	PROP_BUFFER
+};
+
+G_DEFINE_TYPE (GtkSourcePrintCompositor, gtk_source_print_compositor, G_TYPE_OBJECT)
+
+/*
+static void 	 gtk_source_print_compositor_finalize		(GObject                 *object);
+*/
+static void      gtk_source_print_compositor_set_property	(GObject                 *object,
+								 guint                    prop_id,
+								 const GValue            *value,
+								 GParamSpec              *pspec);
+static void      gtk_source_print_compositor_get_property	(GObject                 *object,
+								 guint                    prop_id,
+								 GValue                  *value,
+								 GParamSpec              *pspec);
+
+static void						 
+gtk_source_print_compositor_class_init (GtkSourcePrintCompositorClass *klass)
+{
+	GObjectClass *object_class;
+	
+	object_class = G_OBJECT_CLASS (klass);
+
+/*
+	object_class->finalize	   = gtk_source_print_compositor_finalize;
+*/
+	object_class->get_property = gtk_source_print_compositor_get_property;
+	object_class->set_property = gtk_source_print_compositor_set_property;
+
+	/**
+	 * GtkSourcePrintCompositor:tab-width:
+	 *
+	 * The GtkSourceBuffer object to print.
+	 */
+	g_object_class_install_property (object_class,
+					 PROP_BUFFER,
+					 g_param_spec_object ("buffer",
+							      _("Source Buffer"),
+							      _("The GtkSourceBuffer object to print"),
+							      GTK_TYPE_SOURCE_BUFFER,
+							      G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+	g_type_class_add_private (object_class, sizeof(GtkSourcePrintCompositorPrivate));	
+}
+
+static void
+gtk_source_print_compositor_init (GtkSourcePrintCompositor *compositor)
+{
+	GtkSourcePrintCompositorPrivate *priv;
+
+	g_debug ("gtk_source_print_compositor_init");
+	
+	priv = G_TYPE_INSTANCE_GET_PRIVATE (compositor, 
+					    GTK_TYPE_SOURCE_PRINT_COMPOSITOR,
+					    GtkSourcePrintCompositorPrivate);
+
+	compositor->priv = priv;
+	
+	priv->buffer = NULL;
+	
+	priv->tab_width = DEFAULT_TAB_WIDTH;
+	priv->wrap_mode = GTK_WRAP_NONE;
+	priv->highlight_syntax = TRUE;
+	priv->print_line_numbers = 0;
+
+	priv->body_font = pango_font_description_from_string (DEFAULT_FONT_NAME);
+	priv->line_numbers_font = NULL;
+	priv->header_font = NULL;
+	priv->footer_font = NULL;
+	
+	priv->margin_top = 0.0;
+	priv->margin_bottom = 0.0;
+	priv->margin_left = 0.0;
+	priv->margin_right = 0.0;
+
+	priv->print_header = FALSE;
+	priv->print_footer = FALSE;
+
+	priv->header_format_left = NULL;
+	priv->header_format_center = NULL;
+	priv->header_format_right = NULL;
+	priv->header_separator = FALSE;
+	
+	priv->footer_format_left = NULL;
+	priv->footer_format_center = NULL;
+	priv->footer_format_right = NULL;
+	priv->footer_separator = FALSE;
+	
+	priv->state = INIT;
+	
+	priv->pages = NULL;
+	
+	priv->paginated_lines = 0;
+	priv->n_pages = -1;
+	
+	priv->language = gtk_get_default_language ();
+
+	/* Negative values mean uninitialized */
+	priv->header_height = -1.0; 
+	priv->footer_height = -1.0;
+	priv->line_numbers_width = -1.0;
+	priv->text_width = -1.0;
+	priv->text_height = -1.0;
+}
+
+static void 
+gtk_source_print_compositor_get_property (GObject    *object,
+					  guint       prop_id,
+					  GValue     *value,
+					  GParamSpec *pspec)
+{
+	GtkSourcePrintCompositor *compositor = GTK_SOURCE_PRINT_COMPOSITOR (object);
+
+	switch (prop_id)
+	{			
+		case PROP_BUFFER:
+			g_value_set_object (value, compositor->priv->buffer);
+			break;
+			
+		default:
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+			break;
+	}
+}
+
+static void 
+gtk_source_print_compositor_set_property (GObject      *object,
+					  guint         prop_id,
+					  const GValue *value,
+					  GParamSpec   *pspec)
+{
+	GtkSourcePrintCompositor *compositor = GTK_SOURCE_PRINT_COMPOSITOR (object);
+
+	g_debug ("gtk_source_print_compositor_set_property");
+	
+	switch (prop_id)
+	{
+		case PROP_BUFFER:
+			compositor->priv->buffer = GTK_SOURCE_BUFFER (g_value_get_object (value));
+			break;
+
+		default:
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+			break;
+	}
+}
+/**
+ * gtk_source_print_compositor_new:
+ * @buffer: the #GtkSourceBuffer to print
+ * 
+ * Creates a new print compositor that can be used to print @buffer.
+ * 
+ * Return value: a new print compositor object.
+ **/
+
+GtkSourcePrintCompositor *
+gtk_source_print_compositor_new (GtkSourceBuffer *buffer)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), NULL);
+	
+	return g_object_new (GTK_TYPE_SOURCE_PRINT_COMPOSITOR,
+			     "buffer", buffer,
+			     NULL);
+}
+
+/**
+ * gtk_source_print_compositor_get_buffer:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * 
+ * Gets the #GtkSourceBuffer associated with the compositor. The returned
+ * object reference is owned by the compositor object and
+ * should not be unreferenced.
+ * 
+ * Return value: the #GtkSourceBuffer associated with the compositor.
+ **/
+GtkSourceBuffer *
+gtk_source_print_compositor_get_buffer (GtkSourcePrintCompositor *compositor)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), NULL);
+	
+	return compositor->priv->buffer;
+}
+
+/**
+ * gtk_source_print_compositor_setup_from_view:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @view: a #GtkSourceView to get configuration from.
+ * 
+ * Convenience function to set several configuration options at once,
+ * so that the printed output matches @view.  The options set are
+ * tab-width, highligh-syntax, wrap-mode and font-name.
+ **/
+void
+gtk_source_print_compositor_setup_from_view (GtkSourcePrintCompositor *compositor,
+					     GtkSourceView            *view)
+{
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
+	g_return_if_fail (compositor->priv->state == INIT);	
+	/* TODO */
+}
+
+/**
+ * gtk_source_print_compositor_set_tab_width:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @width: width of tab in characters.
+ *
+ * Sets the width of tabulation in characters for printed text. 
+ *
+ * This function cannot be called anymore after the first call to the 
+ * "paginate" function.
+ */
+void
+gtk_source_print_compositor_set_tab_width (GtkSourcePrintCompositor *compositor,
+					   guint                     width)
+{
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	g_return_if_fail (width > 0 && width <= MAX_TAB_WIDTH);
+	g_return_if_fail (compositor->priv->state == INIT);
+	
+	if (width == compositor->priv->tab_width)
+		return;
+	
+	compositor->priv->tab_width = width;
+
+	g_object_notify (G_OBJECT (compositor), "tab-width");
+}
+
+/**
+ * gtk_source_print_compositor_get_tab_width:
+ * @compositor: a #GtkSourcePrintCompositor.
+ *
+ * Returns the width of tabulation in characters for printed text.
+ *
+ * Return value: width of tab.
+ */
+guint
+gtk_source_print_compositor_get_tab_width (GtkSourcePrintCompositor *compositor)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), DEFAULT_TAB_WIDTH);
+	
+	return compositor->priv->tab_width;
+}
+
+
+/**
+ * gtk_source_print_compositor_set_wrap_mode:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @wrap_mode: a #GtkWrapMode.
+ *
+ * Sets the line wrapping mode for the printed text.
+ *
+ * This function cannot be called anymore after the first call to the 
+ * "paginate" function.  
+ */
+void
+gtk_source_print_compositor_set_wrap_mode (GtkSourcePrintCompositor *compositor,
+					   GtkWrapMode               wrap_mode)
+{
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	g_return_if_fail (compositor->priv->state == INIT);
+
+	if (wrap_mode == compositor->priv->wrap_mode)
+		return;
+	
+	compositor->priv->wrap_mode = wrap_mode;
+
+	g_object_notify (G_OBJECT (compositor), "wrap-mode");
+}
+
+/**
+ * gtk_source_print_compositor_get_wrap_mode:
+ * @compositor: a #GtkSourcePrintCompositor.
+ *
+ * Gets the line wrapping mode for the printed text.
+ *
+ * Return value: the line wrap mode.
+ */
+GtkWrapMode
+gtk_source_print_compositor_get_wrap_mode (GtkSourcePrintCompositor *compositor)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), GTK_WRAP_NONE);
+	
+	return compositor->priv->wrap_mode;
+}
+
+/**
+ * gtk_source_print_compositor_get_n_pages:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * 
+ * Returns the number of pages in the document or <code>-1</code> if the 
+ * document has not been completely paginated.
+ *
+ * Return value: the number of pages in the document or <code>-1</code> if the 
+ * document has not been completely paginated.
+ */
+gint
+gtk_source_print_compositor_get_n_pages	(GtkSourcePrintCompositor *compositor)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), -1);
+	
+	if (compositor->priv->state != DONE)
+		return -1;
+		
+	return compositor->priv->n_pages;
+}
+
+static gsize
+get_n_digits (guint n)
+{
+	gsize d = 1;
+
+	while (n /= 10)
+		d++;
+
+	return d;
+}
+
+static void
+calculate_line_numbers_width (GtkSourcePrintCompositor *compositor,
+			      GtkPrintContext          *context)
+{
+	gint line_count;
+	gdouble digit_width;
+	PangoContext *pango_context;
+	PangoFontMetrics* font_metrics;
+	
+	if (compositor->priv->print_line_numbers <= 0)
+	{
+		compositor->priv->line_numbers_width = 0.0;	
+		
+		return;
+	}
+
+	if (compositor->priv->line_numbers_font == NULL)
+		compositor->priv->line_numbers_font = pango_font_description_copy_static (compositor->priv->body_font);
+	
+	pango_context = gtk_print_context_create_pango_context (context);
+	pango_context_set_font_description (pango_context, compositor->priv->line_numbers_font);
+	
+	font_metrics = pango_context_get_metrics (pango_context,
+						  compositor->priv->line_numbers_font,
+						  compositor->priv->language);
+
+	digit_width = (gdouble) pango_font_metrics_get_approximate_digit_width (font_metrics) / PANGO_SCALE;
+	
+	pango_font_metrics_unref (font_metrics);
+	g_object_unref (pango_context);
+	
+	line_count = gtk_text_buffer_get_line_count (GTK_TEXT_BUFFER (compositor->priv->buffer));
+
+	compositor->priv->line_numbers_width = digit_width * get_n_digits (line_count) + NUMBERS_TEXT_SEPARATION;
+}
+
+static gdouble
+calculate_header_footer_height (GtkSourcePrintCompositor *compositor,
+		                GtkPrintContext          *context,
+		                PangoFontDescription     *font)
+{
+	PangoContext *pango_context;
+	PangoFontMetrics* font_metrics;
+	gdouble ascent;
+	gdouble descent;
+	
+	pango_context = gtk_print_context_create_pango_context (context);
+	pango_context_set_font_description (pango_context, font);
+	
+	font_metrics = pango_context_get_metrics (pango_context,
+						  font,
+						  compositor->priv->language);
+
+	ascent = (gdouble) pango_font_metrics_get_ascent (font_metrics) / PANGO_SCALE;
+	descent = (gdouble) pango_font_metrics_get_descent (font_metrics) / PANGO_SCALE;
+
+	pango_font_metrics_unref (font_metrics);
+	g_object_unref (pango_context);
+		
+	return HEADER_FOOTER_SIZE_FACTOR * (ascent + descent);
+	
+}
+
+static void
+calculate_header_height (GtkSourcePrintCompositor *compositor,
+		         GtkPrintContext          *context)
+{
+	if (!compositor->priv->print_header ||
+	    (compositor->priv->header_format_left == NULL &&
+	     compositor->priv->header_format_center == NULL &&
+	     compositor->priv->header_format_right == NULL))
+	{
+		compositor->priv->header_height = 0.0;
+
+		return;
+	}
+	
+	if (compositor->priv->header_font == NULL)
+		compositor->priv->header_font = pango_font_description_copy_static (compositor->priv->body_font);
+	
+	compositor->priv->header_height = calculate_header_footer_height (compositor,
+									  context,
+									  compositor->priv->header_font);
+}
+			         
+static void
+calculate_footer_height (GtkSourcePrintCompositor *compositor,
+		         GtkPrintContext          *context)
+{
+	if (!compositor->priv->print_footer ||
+	    (compositor->priv->footer_format_left == NULL &&
+	     compositor->priv->footer_format_center == NULL &&
+	     compositor->priv->footer_format_right == NULL))
+	{
+		compositor->priv->footer_height = 0.0;
+
+		return;
+	}
+	
+	if (compositor->priv->footer_font == NULL)
+		compositor->priv->footer_font = pango_font_description_copy_static (compositor->priv->body_font);
+	
+	compositor->priv->footer_height = calculate_header_footer_height (compositor,
+									  context,
+									  compositor->priv->footer_font);
+}
+
+static void
+calculate_page_size_and_margins (GtkSourcePrintCompositor *compositor,
+			         GtkPrintContext          *context)
+{
+	GtkPageSetup *page_setup;
+
+	/* calculate_line_numbers_width and calculate_header_footer_height 
+	   functions must be called before calculate_page_size_and_margins */	
+	g_return_if_fail (compositor->priv->line_numbers_width >= 0.0);
+	g_return_if_fail (compositor->priv->header_height >= 0.0);
+	g_return_if_fail (compositor->priv->footer_height >= 0.0);			
+	
+	page_setup = gtk_print_context_get_page_setup (context);
+	
+	/* Calculate real margins: the margins specified in the GtkPageSetup object are the "print margins".
+	   they are used to determine the minimal size for the layout margins. */
+	compositor->priv->real_margin_top = MAX (gtk_page_setup_get_top_margin (page_setup, GTK_UNIT_MM),
+						 compositor->priv->margin_top);
+	compositor->priv->real_margin_bottom = MAX (gtk_page_setup_get_bottom_margin (page_setup, GTK_UNIT_MM),
+						 compositor->priv->margin_bottom);
+	compositor->priv->real_margin_left = MAX (gtk_page_setup_get_left_margin (page_setup, GTK_UNIT_MM),
+						 compositor->priv->margin_left);
+	compositor->priv->real_margin_right = MAX (gtk_page_setup_get_right_margin (page_setup, GTK_UNIT_MM),
+						 compositor->priv->margin_right);
+
+	DEBUG ({
+		g_debug ("real_margin_top: %f mm", compositor->priv->real_margin_top);
+		g_debug ("real_margin_bottom: %f  mm", compositor->priv->real_margin_bottom);
+		g_debug ("real_margin_left: %f mm", compositor->priv->real_margin_left);
+		g_debug ("real_margin_righ: %f mm", compositor->priv->real_margin_right);
+	});
+
+#if 0					 
+	job->priv->text_width = (job->priv->page_width -
+				 job->priv->doc_margin_left - job->priv->doc_margin_right -
+				 job->priv->margin_left - job->priv->margin_right -
+				 job->priv->numbers_width);
+	
+	job->priv->text_height = (job->priv->page_height -
+				  job->priv->doc_margin_top - job->priv->doc_margin_bottom -
+				  job->priv->margin_top - job->priv->margin_bottom -
+				  job->priv->header_height - job->priv->footer_height);
+
+	/* FIXME: put some saner values than 5cm - Gustavo */
+	g_return_val_if_fail (job->priv->text_width > CM(5.0), FALSE);
+	g_return_val_if_fail (job->priv->text_height > CM(5.0), FALSE);
+#endif							 
+}
+
+/* Returns TRUE if the document has been completely paginated. otherwise FALSE. 
+   It paginates the document in small chunks and so it must be called multiple times to paginate the entire
+   document. It has been designed to be called in the ::paginate handler. If you don't need to do pagination in 
+   chunks, you can simply do it all in the ::begin-print handler. If you want
+   to use the ::paginate signal to perform pagination in async way, it is suggested to
+   ensure the buffer is not modified until pagination terminates. */
+gboolean
+gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
+				      GtkPrintContext          *context)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), TRUE);
+	g_return_val_if_fail (GTK_IS_PRINT_CONTEXT (context), TRUE);
+
+	if (compositor->priv->state == DONE)
+		return TRUE;
+		
+	if (compositor->priv->state == INIT)
+	{
+		g_return_val_if_fail (compositor->priv->pages == NULL, TRUE);
+		
+		compositor->priv->pages = g_array_new (FALSE, FALSE, sizeof (gint));
+	
+		calculate_line_numbers_width (compositor, context);
+		calculate_footer_height (compositor, context);
+		calculate_header_height (compositor, context);
+		calculate_page_size_and_margins (compositor, context);
+	}
+		
+	return FALSE;
+}
+
+
