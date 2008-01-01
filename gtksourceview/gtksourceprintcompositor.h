@@ -70,13 +70,12 @@ void			  gtk_source_print_compositor_set_wrap_mode	(GtkSourcePrintCompositor *co
 									 GtkWrapMode               wrap_mode);
 GtkWrapMode		  gtk_source_print_compositor_get_wrap_mode	(GtkSourcePrintCompositor *compositor);
 
-#if 0
 void			  gtk_source_print_compositor_set_highlight_syntax 
 									(GtkSourcePrintCompositor *compositor,
 									 gboolean                  highlight);
 gboolean		  gtk_source_print_compositor_get_highlight_syntax
 									(GtkSourcePrintCompositor *compositor);
-#endif
+
 void			  gtk_source_print_compositor_set_print_line_numbers
 									(GtkSourcePrintCompositor *compositor,
 									 guint                     interval);

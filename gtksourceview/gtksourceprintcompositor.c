@@ -143,23 +143,14 @@ struct _GtkSourcePrintCompositorPrivate
 enum
 {
 	PROP_0,
-	PROP_BUFFER
+	PROP_BUFFER,
+	PROP_TAB_WIDTH,
+	PROP_WRAP_MODE,
+	PROP_HIGHLIGHT_SYNTAX,
+	PROP_PRINT_LINE_NUMBERS
 };
 
 G_DEFINE_TYPE (GtkSourcePrintCompositor, gtk_source_print_compositor, G_TYPE_OBJECT)
-
-/*
-static void 	 gtk_source_print_compositor_finalize		(GObject                 *object);
-*/
-static void      gtk_source_print_compositor_set_property	(GObject                 *object,
-								 guint                    prop_id,
-								 const GValue            *value,
-								 GParamSpec              *pspec);
-static void      gtk_source_print_compositor_get_property	(GObject                 *object,
-								 guint                    prop_id,
-								 GValue                  *value,
-								 GParamSpec              *pspec);
-
 
 #define MM_PER_INCH 25.4
 #define POINTS_PER_INCH 72
@@ -206,6 +197,88 @@ convert_from_mm (gdouble len, GtkUnit unit)
 	}
 }
 
+static void 
+gtk_source_print_compositor_get_property (GObject    *object,
+					  guint       prop_id,
+					  GValue     *value,
+					  GParamSpec *pspec)
+{
+	GtkSourcePrintCompositor *compositor = GTK_SOURCE_PRINT_COMPOSITOR (object);
+
+	switch (prop_id)
+	{			
+		case PROP_BUFFER:
+			g_value_set_object (value, compositor->priv->buffer);
+			break;
+		case PROP_TAB_WIDTH:
+			g_value_set_uint (value,
+					  gtk_source_print_compositor_get_tab_width (compositor));
+			break;
+		case PROP_WRAP_MODE:
+			g_value_set_enum (value,
+					  gtk_source_print_compositor_get_wrap_mode (compositor));
+			break;
+		case PROP_HIGHLIGHT_SYNTAX:
+			g_value_set_boolean (value,
+					     gtk_source_print_compositor_get_highlight_syntax (compositor));
+			break;
+		case PROP_PRINT_LINE_NUMBERS:
+			g_value_set_uint (value,
+					  gtk_source_print_compositor_get_print_line_numbers (compositor));
+			break;
+		default:
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+			break;
+	}
+}
+
+static void 
+gtk_source_print_compositor_set_property (GObject      *object,
+					  guint         prop_id,
+					  const GValue *value,
+					  GParamSpec   *pspec)
+{
+	GtkSourcePrintCompositor *compositor = GTK_SOURCE_PRINT_COMPOSITOR (object);
+
+	g_debug ("gtk_source_print_compositor_set_property");
+	
+	switch (prop_id)
+	{
+		case PROP_BUFFER:
+			compositor->priv->buffer = GTK_SOURCE_BUFFER (g_value_get_object (value));
+			break;
+		case PROP_TAB_WIDTH:
+			gtk_source_print_compositor_set_tab_width (compositor,
+								   g_value_get_uint (value));
+			break;
+		case PROP_WRAP_MODE:
+			gtk_source_print_compositor_set_wrap_mode (compositor,
+								   g_value_get_enum (value));
+			break;
+		case PROP_HIGHLIGHT_SYNTAX:
+			gtk_source_print_compositor_set_highlight_syntax (compositor,
+									  g_value_get_boolean (value));
+			break;
+		case PROP_PRINT_LINE_NUMBERS:
+			gtk_source_print_compositor_set_print_line_numbers (compositor,
+									    g_value_get_uint (value));
+			break;
+		default:
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+			break;
+	}
+}
+
+static void
+gtk_source_print_compositor_finalize (GObject *object)
+{
+	GtkSourcePrintCompositor *compositor;
+
+	compositor = GTK_SOURCE_PRINT_COMPOSITOR (object);
+
+	G_OBJECT_CLASS (gtk_source_print_compositor_parent_class)->finalize (object);
+}
+
 static void						 
 gtk_source_print_compositor_class_init (GtkSourcePrintCompositorClass *klass)
 {
@@ -213,11 +286,9 @@ gtk_source_print_compositor_class_init (GtkSourcePrintCompositorClass *klass)
 	
 	object_class = G_OBJECT_CLASS (klass);
 
-/*
-	object_class->finalize	   = gtk_source_print_compositor_finalize;
-*/
 	object_class->get_property = gtk_source_print_compositor_get_property;
 	object_class->set_property = gtk_source_print_compositor_set_property;
+	object_class->finalize = gtk_source_print_compositor_finalize;
 
 	/**
 	 * GtkSourcePrintCompositor:tab-width:
@@ -231,6 +302,41 @@ gtk_source_print_compositor_class_init (GtkSourcePrintCompositorClass *klass)
 							      _("The GtkSourceBuffer object to print"),
 							      GTK_TYPE_SOURCE_BUFFER,
 							      G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
+
+	g_object_class_install_property (object_class,
+					 PROP_TAB_WIDTH,
+					 g_param_spec_uint ("tab-width",
+							    _("Tab Width"),
+							    _("Width of a tab character expressed in spaces"),
+							    1,
+							    MAX_TAB_WIDTH,
+							    DEFAULT_TAB_WIDTH,
+							    G_PARAM_READWRITE));
+	g_object_class_install_property (object_class,
+					 PROP_WRAP_MODE,
+					 g_param_spec_enum ("wrap-mode",
+							    _("Wrap Mode"),
+							    _("Word wrapping mode"),
+							    GTK_TYPE_WRAP_MODE,
+							    GTK_WRAP_NONE,
+							    G_PARAM_READWRITE));
+	g_object_class_install_property (object_class,
+					 PROP_HIGHLIGHT_SYNTAX,
+					 g_param_spec_boolean ("highlight-syntax",
+							       _("Highlight Syntax"),
+							       _("Whether to print the "
+								 "document with highlighted "
+								 "syntax"),
+							       TRUE,
+							       G_PARAM_READWRITE));
+	g_object_class_install_property (object_class,
+					 PROP_PRINT_LINE_NUMBERS,
+					 g_param_spec_uint ("print-line-numbers",
+							    _("Print Line Numbers"),
+							    _("Interval of printed line numbers "
+							      "(0 means no numbers)"),
+							    0, 100, 1,
+							    G_PARAM_READWRITE));
 
 	g_type_class_add_private (object_class, sizeof(GtkSourcePrintCompositorPrivate));	
 }
@@ -296,48 +402,6 @@ gtk_source_print_compositor_init (GtkSourcePrintCompositor *compositor)
 	priv->line_numbers_width = -1.0;
 	priv->text_width = -1.0;
 	priv->text_height = -1.0;
-}
-
-static void 
-gtk_source_print_compositor_get_property (GObject    *object,
-					  guint       prop_id,
-					  GValue     *value,
-					  GParamSpec *pspec)
-{
-	GtkSourcePrintCompositor *compositor = GTK_SOURCE_PRINT_COMPOSITOR (object);
-
-	switch (prop_id)
-	{			
-		case PROP_BUFFER:
-			g_value_set_object (value, compositor->priv->buffer);
-			break;
-			
-		default:
-			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-			break;
-	}
-}
-
-static void 
-gtk_source_print_compositor_set_property (GObject      *object,
-					  guint         prop_id,
-					  const GValue *value,
-					  GParamSpec   *pspec)
-{
-	GtkSourcePrintCompositor *compositor = GTK_SOURCE_PRINT_COMPOSITOR (object);
-
-	g_debug ("gtk_source_print_compositor_set_property");
-	
-	switch (prop_id)
-	{
-		case PROP_BUFFER:
-			compositor->priv->buffer = GTK_SOURCE_BUFFER (g_value_get_object (value));
-			break;
-
-		default:
-			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
-			break;
-	}
 }
 
 /**
@@ -479,6 +543,47 @@ gtk_source_print_compositor_get_wrap_mode (GtkSourcePrintCompositor *compositor)
 }
 
 /**
+ * gtk_source_print_compositor_set_highlight_syntax:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @highlight: whether syntax should be highlighted.
+ * 
+ * Sets whether the printed text will be highlighted according to the
+ * buffer rules.  Both color and font style are applied.
+ **/
+void
+gtk_source_print_compositor_set_highlight_syntax (GtkSourcePrintCompositor *compositor,
+						  gboolean                  highlight)
+{
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	g_return_if_fail (compositor->priv->state == INIT);
+
+	if (highlight == compositor->priv->highlight_syntax)
+		return;
+
+	compositor->priv->highlight_syntax = highlight;
+
+	g_object_notify (G_OBJECT (compositor), "highlight-syntax");
+}
+
+/**
+ * gtk_source_print_compositor_get_highlight_syntax:
+ * @compositor: a #GtkSourcePrintCompositor.
+ *
+ * Determines whether the printed text will be highlighted according to the
+ * buffer rules.  Note that highlighting will happen
+ * only if the buffer to print has highlighting activated.
+ * 
+ * Return value: %TRUE if the printed output will be highlighted.
+ **/
+gboolean
+gtk_source_print_compositor_get_highlight_syntax (GtkSourcePrintCompositor *compositor)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), 0);
+
+	return compositor->priv->highlight_syntax;
+}
+
+/**
  * gtk_source_print_compositor_set_print_line_numbers:
  * @compositor: a #GtkSourcePrintCompositor.
  * @interval: interval for printed line numbers.
@@ -561,10 +666,10 @@ calculate_line_numbers_width (GtkSourcePrintCompositor *compositor,
 	PangoContext *pango_context;
 	PangoFontMetrics* font_metrics;
 	
-	if (compositor->priv->print_line_numbers <= 0)
+	if (compositor->priv->print_line_numbers == 0)
 	{
 		compositor->priv->line_numbers_width = 0.0;	
-		
+
 		DEBUG ({
 			g_debug ("line_numbers_width: %f mm", compositor->priv->line_numbers_width);
 		});
