@@ -857,6 +857,20 @@ layout_paragraph (GtkSourcePrintCompositor *compositor,
 }
 
 static void
+layout_line_number (GtkSourcePrintCompositor *compositor,
+		    PangoLayout              *layout,
+		    gint                      line_number)
+{
+	gchar *str;
+
+	str = g_strdup_printf ("%d", line_number + 1);
+	pango_layout_set_text (layout, str, -1);
+	g_free (str);
+
+	// TODO: baseline etc
+}
+
+static void
 get_layout_size (PangoLayout *layout,
                  double      *width,
                  double      *height)
@@ -1022,7 +1036,8 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 	cr = gtk_print_context_get_cairo_context (context);
 	cairo_set_source_rgb (cr, 0, 0, 0);
 
-	x = y = 0; /* FIXME: margins etc */
+	x = compositor->priv->line_numbers_width;
+	y = 0;
 
 	/* TODO: put the layout in priv to create it just once */
 	layout = gtk_print_context_create_pango_layout (context);
@@ -1050,8 +1065,26 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 
 	while (gtk_text_iter_compare (&start, &end) < 0)
 	{
-		double line_height;
+		gint line_number;
+		double line_number_height, line_height;
 
+		line_number = gtk_text_iter_get_line (&start);
+
+		/* print the line number if needed */
+		if (compositor->priv->print_line_numbers > 0 &&
+		    ((line_number % compositor->priv->print_line_numbers) == 0))
+		{
+			layout_line_number (compositor,
+					    layout, /* FIXME: use a separate layout */
+					    line_number);
+
+			get_layout_size (layout, NULL, &line_number_height);
+
+			cairo_move_to (cr, 0, y);
+			pango_cairo_show_layout (cr, layout);
+		}
+
+		/* print the paragraph */
 		if (gtk_text_iter_ends_line (&start))
 		{
 			pango_layout_set_text (layout, "", 0);
@@ -1073,9 +1106,8 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 					  &line_end);
 		}
 
-		/* TODO: print line numbers */
-
 		get_layout_size (layout, NULL, &line_height);
+		line_height = MAX (line_height, line_number_height);
 
 		cairo_move_to (cr, x, y);
 		pango_cairo_show_layout (cr, layout);
