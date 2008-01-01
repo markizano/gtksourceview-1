@@ -93,6 +93,10 @@ struct _GtkSourcePrintCompositorPrivate
 	PangoFontDescription    *header_font;
 	PangoFontDescription    *footer_font;
 
+	/* Page size, stored in pixels */
+	gdouble                  page_width;
+	gdouble                  page_height;
+
 	/* These are stored in mm */
 	gdouble                  margin_top;
 	gdouble                  margin_bottom;
@@ -116,10 +120,10 @@ struct _GtkSourcePrintCompositorPrivate
 	
 	GArray                  *pages; /* pages[i] contains the begin offset
 	                                   of i-th  */
-	
+
 	guint                    paginated_lines;
 	gint                     n_pages;
-	
+
 	gdouble                  header_height;
 	gdouble                  footer_height;
 	gdouble                  line_numbers_width;
@@ -255,7 +259,10 @@ gtk_source_print_compositor_init (GtkSourcePrintCompositor *compositor)
 	priv->line_numbers_font = NULL;
 	priv->header_font = NULL;
 	priv->footer_font = NULL;
-	
+
+	priv->page_width = 0.0;
+	priv->page_height = 0.0;
+
 	priv->margin_top = 0.0;
 	priv->margin_bottom = 0.0;
 	priv->margin_left = 0.0;
@@ -332,6 +339,7 @@ gtk_source_print_compositor_set_property (GObject      *object,
 			break;
 	}
 }
+
 /**
  * gtk_source_print_compositor_new:
  * @buffer: the #GtkSourceBuffer to print
@@ -340,7 +348,6 @@ gtk_source_print_compositor_set_property (GObject      *object,
  * 
  * Return value: a new print compositor object.
  **/
-
 GtkSourcePrintCompositor *
 gtk_source_print_compositor_new (GtkSourceBuffer *buffer)
 {
@@ -429,7 +436,6 @@ gtk_source_print_compositor_get_tab_width (GtkSourcePrintCompositor *compositor)
 	
 	return compositor->priv->tab_width;
 }
-
 
 /**
  * gtk_source_print_compositor_set_wrap_mode:
@@ -710,6 +716,9 @@ calculate_page_size_and_margins (GtkSourcePrintCompositor *compositor,
 		g_debug ("real_margin_righ: %f mm", compositor->priv->real_margin_right);
 	});
 
+	compositor->priv->page_width = gtk_print_context_get_width (context);
+	compositor->priv->page_height = gtk_print_context_get_height (context);
+
 #if 0					 
 	job->priv->text_width = (job->priv->page_width -
 				 job->priv->doc_margin_left - job->priv->doc_margin_right -
@@ -727,6 +736,37 @@ calculate_page_size_and_margins (GtkSourcePrintCompositor *compositor,
 #endif							 
 }
 
+static void
+layout_paragraph (GtkSourcePrintCompositor *compositor,
+		  PangoLayout              *layout,
+		  GtkTextIter              *start,
+		  GtkTextIter              *end)
+{
+	gchar *text;
+
+	text = gtk_text_iter_get_slice (start, end);
+	pango_layout_set_text (layout, text, -1);
+	g_free (text);
+
+	// TODO: styles
+}
+
+static void
+get_layout_size (PangoLayout *layout,
+                 double      *width,
+                 double      *height)
+{
+	PangoRectangle rect;
+
+	pango_layout_get_extents (layout, NULL, &rect);
+
+	if (width)
+		*width = (double) rect.width / (double) PANGO_SCALE;
+
+	if (height)
+		*height = (double) rect.height / (double) PANGO_SCALE;
+}
+
 /* Returns TRUE if the document has been completely paginated. otherwise FALSE. 
    It paginates the document in small chunks and so it must be called multiple times to paginate the entire
    document. It has been designed to be called in the ::paginate handler. If you don't need to do pagination in 
@@ -737,24 +777,113 @@ gboolean
 gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 				      GtkPrintContext          *context)
 {
+	GtkTextIter start, end;
+	PangoLayout *layout;
+	gint offset;
+	double page_height;
+
 	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), TRUE);
 	g_return_val_if_fail (GTK_IS_PRINT_CONTEXT (context), TRUE);
 
 	if (compositor->priv->state == DONE)
 		return TRUE;
-		
+
 	if (compositor->priv->state == INIT)
 	{
 		g_return_val_if_fail (compositor->priv->pages == NULL, TRUE);
 		
 		compositor->priv->pages = g_array_new (FALSE, FALSE, sizeof (gint));
-	
+
 		calculate_line_numbers_width (compositor, context);
 		calculate_footer_height (compositor, context);
 		calculate_header_height (compositor, context);
 		calculate_page_size_and_margins (compositor, context);
+
+		compositor->priv->state = PAGINATING;
 	}
-		
+
+	g_return_val_if_fail (compositor->priv->state == PAGINATING, FALSE);
+
+	/* TODO: paginate just a chunk of text to
+	   - allow async pagination
+	   - allow to paginate/print just a part of the text
+
+#define PAGINATION_CHUNK_LINES 1000
+
+	gtk_text_buffer_get_iter_at_line (GTK_TEXT_BUFFER (compositor->priv->buffer),
+					  &start,
+					  compositor->priv->paginated_lines);
+
+	end = start;
+	gtk_text_iter_forward_lines (&end, PAGINATION_CHUNK_LINES);
+	 */
+
+	gtk_text_buffer_get_start_iter (GTK_TEXT_BUFFER (compositor->priv->buffer), &start);
+	gtk_text_buffer_get_end_iter (GTK_TEXT_BUFFER (compositor->priv->buffer), &end);
+
+	/* add the first page start */
+	offset = gtk_text_iter_get_offset (&start);
+	g_array_append_val (compositor->priv->pages, offset);
+
+	/* TODO: put the layout in priv to create it just once when paginating incrementally */
+	layout = gtk_print_context_create_pango_layout (context);
+
+	page_height = 0;
+
+	while (gtk_text_iter_compare (&start, &end) < 0)
+	{
+		GtkTextIter line_end;
+		double line_height;
+
+		line_end = start;
+		if (!gtk_text_iter_ends_line (&line_end))
+			gtk_text_iter_forward_to_line_end (&line_end);
+
+		layout_paragraph (compositor, layout, &start, &line_end);
+
+		get_layout_size (layout, NULL, &line_height);
+
+//		if (line_number_displayed (op, line_no))
+//			line_height = MAX (line_height, op->priv->ln_height);
+
+#define EPS (.1)
+		if (page_height > EPS &&
+		    page_height + line_height > compositor->priv->page_height + EPS)
+		{
+			// TODO: wrap multilines
+
+			offset = gtk_text_iter_get_offset (&start);
+			g_array_append_val (compositor->priv->pages, offset);
+			page_height = line_height;
+		}
+		else
+		{
+			page_height += line_height;
+		}
+
+		gtk_text_iter_forward_line (&start);
+	}
+#undef EPS
+
+	g_object_unref (layout);
+
+	{
+		int i;
+		g_print ("Pagination:\n");
+		for (i = 0; i < compositor->priv->pages->len; i += 1)
+		{
+			gint offset;
+			GtkTextIter iter;
+
+			offset = g_array_index (compositor->priv->pages, int, i);
+			gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (compositor->priv->buffer), &iter, offset);
+
+			g_print ("  page %d starts at line %d (offset %d)\n", i, gtk_text_iter_get_line (&iter), offset); 
+		}
+	}
+
+	compositor->priv->state = DONE;
+
 	return FALSE;
 }
 
