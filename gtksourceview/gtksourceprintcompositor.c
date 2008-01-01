@@ -884,7 +884,101 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 
 	compositor->priv->state = DONE;
 
+	compositor->priv->n_pages = compositor->priv->pages->len;
+
 	return FALSE;
 }
 
+gint
+gtk_source_print_compositor_get_pagination_progress (GtkSourcePrintCompositor *compositor)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), -1);
+
+	g_return_val_if_fail (compositor->priv->state == PAGINATING ||
+			      compositor->priv->state == DONE, -1);
+
+	return compositor->priv->n_pages;	
+}
+
+void
+gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
+				       GtkPrintContext          *context,
+				       gint                      page_nr)
+{
+	cairo_t *cr;
+	PangoLayout *layout;
+	GtkTextIter start, end;
+	gint offset;
+	double x, y;
+
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	g_return_if_fail (GTK_IS_PRINT_CONTEXT (context));
+
+	cr = gtk_print_context_get_cairo_context (context);
+	cairo_set_source_rgb (cr, 0, 0, 0);
+
+	x = y = 0; /* FIXME: margins etc */
+
+	/* TODO: put the layout in priv to create it just once */
+	layout = gtk_print_context_create_pango_layout (context);
+	pango_cairo_update_layout (cr, layout);
+
+	g_return_if_fail (compositor->priv->buffer != NULL);
+	g_return_if_fail (compositor->priv->pages != NULL);
+	g_return_if_fail (page_nr < compositor->priv->pages->len);
+
+	offset = g_array_index (compositor->priv->pages, int, page_nr);
+	gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (compositor->priv->buffer),
+					    &start, offset);
+
+	if (page_nr + 1 < compositor->priv->pages->len)
+	{
+		offset = g_array_index (compositor->priv->pages, int, page_nr + 1);
+		gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (compositor->priv->buffer),
+						    &end, offset);
+	}
+	else
+	{
+		gtk_text_buffer_get_end_iter (GTK_TEXT_BUFFER (compositor->priv->buffer),
+					      &end);
+	}
+
+	while (gtk_text_iter_compare (&start, &end) < 0)
+	{
+		double line_height;
+
+		if (gtk_text_iter_ends_line (&start))
+		{
+			pango_layout_set_text (layout, "", 0);
+			pango_layout_set_attributes (layout, NULL);
+		}
+		else
+		{
+			GtkTextIter line_end;
+
+			line_end = start;
+			gtk_text_iter_forward_to_line_end (&line_end);
+
+			if (gtk_text_iter_compare (&line_end, &end) > 0)
+				line_end = end;
+
+			layout_paragraph (compositor,
+					  layout,
+					  &start,
+					  &line_end);
+		}
+
+		/* TODO: print line numbers */
+
+		get_layout_size (layout, NULL, &line_height);
+
+		cairo_move_to (cr, x, y);
+		pango_cairo_show_layout (cr, layout);
+
+		y += line_height;
+		gtk_text_iter_forward_line (&start);
+	}
+
+	g_object_unref (layout);
+}
 

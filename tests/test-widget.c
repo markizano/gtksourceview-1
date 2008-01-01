@@ -812,19 +812,25 @@ begin_print (GtkPrintOperation        *operation,
 	     GtkPrintContext          *context,
 	     GtkSourcePrintCompositor *compositor)
 {
+	gint n_pages;
+
 	g_debug ("begin_print");
 	
 	gtk_source_print_compositor_paginate (compositor, context);
-	
-	gtk_print_operation_set_n_pages (operation, 1);
+
+	n_pages = gtk_source_print_compositor_get_n_pages (compositor);
+	gtk_print_operation_set_n_pages (operation, n_pages);
 }
 
 static void
-draw_page (GtkPrintOperation *operation,
-	   GtkPrintContext   *context,
-	   gint               page_nr,
-	   gpointer           user_data)
+draw_page (GtkPrintOperation        *operation,
+	   GtkPrintContext          *context,
+	   gint                      page_nr,
+	   GtkSourcePrintCompositor *compositor)
 {
+	g_debug ("draw_page %d", page_nr);
+
+	gtk_source_print_compositor_draw_page (compositor, context, page_nr);
 }
 
 static void

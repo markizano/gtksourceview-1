@@ -168,15 +168,14 @@ gint			  gtk_source_print_compositor_get_n_pages	(GtkSourcePrintCompositor *comp
    chunks, you can simply do it all in the ::begin-print handler */
 gboolean		  gtk_source_print_compositor_paginate		(GtkSourcePrintCompositor *compositor,
 									 GtkPrintContext          *context);
-#if 0
 /* Returns the number of already paginated lines */
-guint			  gtk_source_print_compositor_get_pagination_progress
+gint			  gtk_source_print_compositor_get_pagination_progress
 									(GtkSourcePrintCompositor *compositor);
 
-gboolean		  gtk_source_print_compositor_draw_page		(GtkSourcePrintCompositor *compositor,
+void			  gtk_source_print_compositor_draw_page		(GtkSourcePrintCompositor *compositor,
 									 GtkPrintContext          *context,
 									 gint                      page_nr);
-#endif
+
 /* TODO: do we need to add other functions to support print previewing? */
 G_END_DECLS
 
