@@ -76,13 +76,13 @@ void			  gtk_source_print_compositor_set_highlight_syntax
 									 gboolean                  highlight);
 gboolean		  gtk_source_print_compositor_get_highlight_syntax
 									(GtkSourcePrintCompositor *compositor);
-
+#endif
 void			  gtk_source_print_compositor_set_print_line_numbers
 									(GtkSourcePrintCompositor *compositor,
 									 guint                     interval);
 guint			  gtk_source_print_compositor_get_print_line_numbers
 									(GtkSourcePrintCompositor *compositor);
-
+#if 0
 void			  gtk_source_print_compositor_set_body_font_name
 									(GtkSourcePrintCompositor *compositor,
 									 const gchar              *font_name);

@@ -58,9 +58,9 @@
 
 #define DEFAULT_FONT_NAME   "Monospace 10"
 
-#define MM(v) ((v) * 10 * 72.0 / 2.54)
+/* 5 mm */
+#define NUMBERS_TEXT_SEPARATION convert_from_mm (5, GTK_UNIT_POINTS)
 
-#define NUMBERS_TEXT_SEPARATION MM(5)
 #define HEADER_FOOTER_SIZE_FACTOR 2.5
 
 typedef enum 
@@ -155,6 +155,52 @@ static void      gtk_source_print_compositor_get_property	(GObject              
 								 guint                    prop_id,
 								 GValue                  *value,
 								 GParamSpec              *pspec);
+
+
+#define MM_PER_INCH 25.4
+#define POINTS_PER_INCH 72
+
+static gdouble
+convert_to_mm (gdouble len, GtkUnit unit)
+{
+	switch (unit)
+	{
+		case GTK_UNIT_MM:
+			return len;
+
+		case GTK_UNIT_INCH:
+			return len * MM_PER_INCH;
+		
+		default:
+		case GTK_UNIT_PIXEL:
+			g_warning ("Unsupported unit");
+			/* Fall through */
+
+		case GTK_UNIT_POINTS:
+			return len * (MM_PER_INCH / POINTS_PER_INCH);
+    	}
+}
+
+static gdouble
+convert_from_mm (gdouble len, GtkUnit unit)
+{
+	switch (unit)
+	{
+		case GTK_UNIT_MM:
+			return len;
+		
+		case GTK_UNIT_INCH:
+			return len / MM_PER_INCH;
+			
+		default:
+		case GTK_UNIT_PIXEL:
+			g_warning ("Unsupported unit");
+			/* Fall through */
+
+		case GTK_UNIT_POINTS:
+			return len / (MM_PER_INCH / POINTS_PER_INCH);
+	}
+}
 
 static void						 
 gtk_source_print_compositor_class_init (GtkSourcePrintCompositorClass *klass)
@@ -427,6 +473,48 @@ gtk_source_print_compositor_get_wrap_mode (GtkSourcePrintCompositor *compositor)
 }
 
 /**
+ * gtk_source_print_compositor_set_print_line_numbers:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @interval: interval for printed line numbers.
+ * 
+ * Sets the interval for printed line numbers.  If @interval is 0 no
+ * numbers will be printed.  If greater than 0, a number will be
+ * printed every @interval lines (i.e. 1 will print all line numbers).
+ **/
+void
+gtk_source_print_compositor_set_print_line_numbers (GtkSourcePrintCompositor *compositor,
+						    guint                     interval)
+{
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	g_return_if_fail (compositor->priv->state == INIT);
+	
+	if (interval == compositor->priv->print_line_numbers)
+		return;
+	
+	compositor->priv->print_line_numbers = interval;
+
+	g_object_notify (G_OBJECT (compositor), "print-line-numbers");
+}
+
+/**
+ * gtk_source_print_compositor_get_print_line_numbers:
+ * @compositor: a #GtkSourcePrintCompositor.
+ *
+ * Returns the interval used for line number printing.  If the
+ * value is 0, no line numbers will be printed.  The default value is
+ * 1 (i.e. numbers printed in all lines).
+ * 
+ * Return value: the interval of printed line numbers.
+ **/
+guint
+gtk_source_print_compositor_get_print_line_numbers (GtkSourcePrintCompositor *compositor)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), 0);
+	
+	return compositor->priv->print_line_numbers;
+}
+
+/**
  * gtk_source_print_compositor_get_n_pages:
  * @compositor: a #GtkSourcePrintCompositor.
  * 
@@ -471,6 +559,10 @@ calculate_line_numbers_width (GtkSourcePrintCompositor *compositor,
 	{
 		compositor->priv->line_numbers_width = 0.0;	
 		
+		DEBUG ({
+			g_debug ("line_numbers_width: %f mm", compositor->priv->line_numbers_width);
+		});
+		
 		return;
 	}
 
@@ -492,6 +584,10 @@ calculate_line_numbers_width (GtkSourcePrintCompositor *compositor,
 	line_count = gtk_text_buffer_get_line_count (GTK_TEXT_BUFFER (compositor->priv->buffer));
 
 	compositor->priv->line_numbers_width = digit_width * get_n_digits (line_count) + NUMBERS_TEXT_SEPARATION;
+	
+	DEBUG ({
+		g_debug ("line_numbers_width: %f mm", convert_to_mm (compositor->priv->line_numbers_width, GTK_UNIT_POINTS));
+	});
 }
 
 static gdouble
@@ -525,28 +621,37 @@ static void
 calculate_header_height (GtkSourcePrintCompositor *compositor,
 		         GtkPrintContext          *context)
 {
+#if 0
 	if (!compositor->priv->print_header ||
 	    (compositor->priv->header_format_left == NULL &&
 	     compositor->priv->header_format_center == NULL &&
 	     compositor->priv->header_format_right == NULL))
 	{
 		compositor->priv->header_height = 0.0;
-
+	
+		DEBUG ({
+			g_debug ("header_height: %f mm", compositor->priv->header_height);
+		});
 		return;
 	}
-	
+#endif	
 	if (compositor->priv->header_font == NULL)
 		compositor->priv->header_font = pango_font_description_copy_static (compositor->priv->body_font);
 	
 	compositor->priv->header_height = calculate_header_footer_height (compositor,
 									  context,
 									  compositor->priv->header_font);
+
+	DEBUG ({
+		g_debug ("header_height: %f mm", convert_to_mm (compositor->priv->header_height, GTK_UNIT_POINTS));
+	});									  
 }
 			         
 static void
 calculate_footer_height (GtkSourcePrintCompositor *compositor,
 		         GtkPrintContext          *context)
 {
+#if 0
 	if (!compositor->priv->print_footer ||
 	    (compositor->priv->footer_format_left == NULL &&
 	     compositor->priv->footer_format_center == NULL &&
@@ -554,15 +659,23 @@ calculate_footer_height (GtkSourcePrintCompositor *compositor,
 	{
 		compositor->priv->footer_height = 0.0;
 
+		DEBUG ({
+			g_debug ("footer_height: %f mm", compositor->priv->footer_height);
+		});
+		
 		return;
 	}
-	
+#endif	
 	if (compositor->priv->footer_font == NULL)
 		compositor->priv->footer_font = pango_font_description_copy_static (compositor->priv->body_font);
 	
 	compositor->priv->footer_height = calculate_header_footer_height (compositor,
 									  context,
 									  compositor->priv->footer_font);
+									  
+	DEBUG ({
+		g_debug ("footer_height: %f", convert_to_mm (compositor->priv->footer_height, GTK_UNIT_POINTS));
+	});
 }
 
 static void

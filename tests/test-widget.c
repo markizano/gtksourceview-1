@@ -847,6 +847,8 @@ print_file_cb (GtkAction *action, gpointer user_data)
 	
 	compositor = gtk_source_print_compositor_new (GTK_SOURCE_BUFFER (user_data));
 	
+	gtk_source_print_compositor_set_print_line_numbers (compositor, 1);
+	
 	operation = gtk_print_operation_new ();
 	
   	g_signal_connect (G_OBJECT (operation), "begin-print", 
