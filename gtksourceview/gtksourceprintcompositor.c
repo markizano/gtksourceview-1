@@ -1246,7 +1246,7 @@ evaluate_format_string (GtkSourcePrintCompositor *compositor,
 			format = g_utf8_next_char (format);
 			ch = g_utf8_get_char (format);
 			if (ch == 'N')
-				g_string_append_printf (eval, "%d", compositor->priv->current_page);
+				g_string_append_printf (eval, "%d", compositor->priv->current_page + 1);
 			else if (ch == 'Q')
 				g_string_append_printf (eval, "%d", compositor->priv->n_pages);
 			else
