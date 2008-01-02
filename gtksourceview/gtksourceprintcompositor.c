@@ -1081,9 +1081,12 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 	PangoLayout *layout;
 	gint offset;
 	double page_height;
+	GTimer *timer;
 
 	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), TRUE);
 	g_return_val_if_fail (GTK_IS_PRINT_CONTEXT (context), TRUE);
+
+	timer = g_timer_new ();
 
 	if (compositor->priv->state == DONE)
 		return TRUE;
@@ -1177,7 +1180,7 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 
 	{
 		int i;
-		g_print ("Pagination:\n");
+		g_print ("Paginated in %f seconds:\n", g_timer_elapsed (timer, NULL));
 		for (i = 0; i < compositor->priv->pages->len; i += 1)
 		{
 			gint offset;
@@ -1189,6 +1192,8 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 			g_print ("  page %d starts at line %d (offset %d)\n", i, gtk_text_iter_get_line (&iter), offset); 
 		}
 	}
+
+	g_timer_destroy (timer);
 
 	compositor->priv->state = DONE;
 
