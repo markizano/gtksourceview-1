@@ -139,6 +139,9 @@ struct _GtkSourcePrintCompositorPrivate
 	gdouble                  real_margin_left;
 	gdouble                  real_margin_right;
 	
+	gdouble                  page_margin_top;
+	gdouble                  page_margin_left;	
+	
 	PangoLanguage           *language;	
 };
 
@@ -781,24 +784,6 @@ setup_pango_layouts (GtkSourcePrintCompositor *compositor,
 	/* TODO: header and footer layouts */
 }
 
-/*
-static void
-get_layout_size (PangoLayout *layout,
-                 double      *width,
-                 double      *height)
-{
-	PangoRectangle rect;
-
-	pango_layout_get_pixel_extents (layout, NULL, &rect);
-
-	if (width != NULL)
-		*width = rect.width;
-		
-	if (height != NULL)
-		*height = rect.height;
-}
-*/
-
 static void
 get_layout_size (PangoLayout *layout,
                  double      *width,
@@ -841,7 +826,7 @@ calculate_line_numbers_layout_size (GtkSourcePrintCompositor *compositor,
 
 		DEBUG ({
 			g_debug ("line_numbers_width: %f points (%f mm)", compositor->priv->line_numbers_width, convert_to_mm (compositor->priv->line_numbers_width, GTK_UNIT_POINTS));
-			g_debug ("line_numbers_width: %f points (%f mm)", compositor->priv->line_numbers_height, convert_to_mm (compositor->priv->line_numbers_height, GTK_UNIT_POINTS));
+			g_debug ("line_numbers_height: %f points (%f mm)", compositor->priv->line_numbers_height, convert_to_mm (compositor->priv->line_numbers_height, GTK_UNIT_POINTS));
 		});
 		
 		return;
@@ -860,7 +845,7 @@ calculate_line_numbers_layout_size (GtkSourcePrintCompositor *compositor,
 
 	DEBUG ({
 		g_debug ("line_numbers_width: %f points (%f mm)", compositor->priv->line_numbers_width, convert_to_mm (compositor->priv->line_numbers_width, GTK_UNIT_POINTS));
-		g_debug ("line_numbers_width: %f points (%f mm)", compositor->priv->line_numbers_height, convert_to_mm (compositor->priv->line_numbers_height, GTK_UNIT_POINTS));
+		g_debug ("line_numbers_height: %f points (%f mm)", compositor->priv->line_numbers_height, convert_to_mm (compositor->priv->line_numbers_height, GTK_UNIT_POINTS));
 	});
 }
 
@@ -964,14 +949,17 @@ calculate_page_size_and_margins (GtkSourcePrintCompositor *compositor,
 	g_return_if_fail (compositor->priv->footer_height >= 0.0);			
 	
 	page_setup = gtk_print_context_get_page_setup (context);
-	
+
+	compositor->priv->page_margin_top = gtk_page_setup_get_top_margin (page_setup, GTK_UNIT_POINTS);
+	compositor->priv->page_margin_left = gtk_page_setup_get_left_margin (page_setup, GTK_UNIT_POINTS);
+		
 	/* Calculate real margins: the margins specified in the GtkPageSetup object are the "print margins".
 	   they are used to determine the minimal size for the layout margins. */
-	compositor->priv->real_margin_top = MAX (gtk_page_setup_get_top_margin (page_setup, GTK_UNIT_POINTS),
+	compositor->priv->real_margin_top = MAX (compositor->priv->page_margin_top,
 						 convert_from_mm (compositor->priv->margin_top, GTK_UNIT_POINTS));
 	compositor->priv->real_margin_bottom = MAX (gtk_page_setup_get_bottom_margin (page_setup, GTK_UNIT_POINTS),
 						    convert_from_mm (compositor->priv->margin_bottom, GTK_UNIT_POINTS));
-	compositor->priv->real_margin_left = MAX (gtk_page_setup_get_left_margin (page_setup, GTK_UNIT_POINTS),
+	compositor->priv->real_margin_left = MAX (compositor->priv->page_margin_left,
 						  convert_from_mm (compositor->priv->margin_left, GTK_UNIT_POINTS));
 	compositor->priv->real_margin_right = MAX (gtk_page_setup_get_right_margin (page_setup, GTK_UNIT_POINTS),
 						   convert_from_mm (compositor->priv->margin_right, GTK_UNIT_POINTS));
@@ -987,8 +975,15 @@ calculate_page_size_and_margins (GtkSourcePrintCompositor *compositor,
 	compositor->priv->paper_height = gtk_page_setup_get_paper_height (page_setup, GTK_UNIT_POINTS);
 	
 	DEBUG ({
+		gdouble text_width;
+		gdouble text_height;
 		g_debug ("paper_width: %f points (%f mm)", compositor->priv->paper_width, convert_to_mm (compositor->priv->paper_width, GTK_UNIT_POINTS));
 		g_debug ("paper_heigth: %f points (%f mm)", compositor->priv->paper_height, convert_to_mm (compositor->priv->paper_height, GTK_UNIT_POINTS));
+		text_width = get_text_width (compositor);
+		text_height = get_text_height (compositor);
+		g_debug ("text_width: %f points (%f mm)", text_width, convert_to_mm (text_width, GTK_UNIT_POINTS));
+		g_debug ("text_height: %f points (%f mm)", text_height, convert_to_mm (text_height, GTK_UNIT_POINTS));		
+		
 	});						 
 }
 
@@ -1359,6 +1354,9 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 
 	cr = gtk_print_context_get_cairo_context (context);
 	cairo_set_source_rgb (cr, 0, 0, 0);
+	cairo_translate (cr, 
+			 -1 * compositor->priv->page_margin_left,
+			 -1 * compositor->priv->page_margin_top);
 
 	x = get_text_x (compositor);
 	y = get_text_y (compositor);
@@ -1366,15 +1364,23 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 
 	DEBUG ({
 		cairo_save (cr);
+		
 		cairo_set_line_width (cr, 1.);
+		cairo_set_source_rgb (cr, 0., 0., 1.);
+		cairo_rectangle (cr,
+				 compositor->priv->real_margin_left, 
+				 compositor->priv->real_margin_top,
+				 compositor->priv->paper_width - compositor->priv->real_margin_left - compositor->priv->real_margin_right,
+				 compositor->priv->paper_height - compositor->priv->real_margin_top - compositor->priv->real_margin_bottom);
+		cairo_stroke (cr);
+		
 		cairo_set_source_rgb (cr, 1., 0., 0.);
 		cairo_rectangle (cr,
 				 ln_x, y,
 				 compositor->priv->line_numbers_width,
 				 get_text_height (compositor));
 		cairo_stroke (cr);
-
-		cairo_set_line_width (cr, 1.);
+		
 		cairo_set_source_rgb (cr, 0., 1., 0.);
 		cairo_rectangle (cr,
 				 x, y,
@@ -1382,12 +1388,13 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 				 get_text_height (compositor));
 		cairo_stroke (cr);
 
-		cairo_set_source_rgb (cr, 0., 0., 1.);
+		cairo_set_source_rgb (cr, 1., 0., 0.);
 		cairo_rectangle (cr,
 				 0, 0,
 				 compositor->priv->paper_width,
 				 compositor->priv->paper_height);
 		cairo_stroke (cr);
+		
 		cairo_restore (cr);
 	});
 
