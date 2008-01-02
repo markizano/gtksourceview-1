@@ -889,7 +889,7 @@ set_font_description_from_name (PangoFontDescription **font,
 
 	new = pango_font_description_from_string (font_name);
 
-	if (!pango_font_description_equal (*font, new))
+	if (*font == NULL || !pango_font_description_equal (*font, new))
 	{
 		if (*font != NULL)
 			pango_font_description_free (*font);
@@ -1113,7 +1113,6 @@ setup_pango_layouts (GtkSourcePrintCompositor *compositor,
 		pango_layout_set_alignment (layout, PANGO_ALIGN_RIGHT);
 
 		g_return_if_fail (compositor->priv->line_numbers_layout == NULL);
-
 		compositor->priv->line_numbers_layout = layout;
 	}
 
@@ -1667,14 +1666,14 @@ static void
 set_pango_layouts_width (GtkSourcePrintCompositor *compositor)
 {
 	gdouble width;
-		
+
+	g_return_if_fail (compositor->priv->layout != NULL);
 	pango_layout_set_width (compositor->priv->layout,
 				get_text_width (compositor) * PANGO_SCALE);
 
 	if (compositor->priv->print_line_numbers)
 	{
 		g_return_if_fail (compositor->priv->line_numbers_layout != NULL);
-		
 		pango_layout_set_width (compositor->priv->line_numbers_layout,
 					compositor->priv->line_numbers_width * PANGO_SCALE);
 	}
