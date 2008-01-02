@@ -1685,6 +1685,7 @@ set_pango_layouts_width (GtkSourcePrintCompositor *compositor)
 	if (is_header_to_print (compositor))
 	{
 		g_return_if_fail (compositor->priv->header_layout != NULL);
+		g_debug ("Set width for header_layout: %f points", width);
 		pango_layout_set_width (compositor->priv->header_layout, width * PANGO_SCALE);
 	}
 
@@ -1879,7 +1880,7 @@ print_header_string (GtkSourcePrintCompositor *compositor,
 			cairo_set_source_rgb (cr, 0., 0., 1.);
 			cairo_rectangle (cr,
 					 compositor->priv->real_margin_left,
-					 compositor->priv->real_margin_top + baseline,
+					 compositor->priv->real_margin_top,
 					 w,
 					 h);
 			cairo_stroke (cr);
@@ -1964,13 +1965,13 @@ print_footer_string (GtkSourcePrintCompositor *compositor,
 		DEBUG ({
 			double w;
 			double h;
-			get_layout_size (compositor->priv->header_layout, &w, &h);
+			get_layout_size (compositor->priv->footer_layout, &w, &h);
 			cairo_save (cr);
 			cairo_set_line_width (cr, 1.);
 			cairo_set_source_rgb (cr, 0., 0., 1.);
 			cairo_rectangle (cr,
 					 compositor->priv->real_margin_left,
-					 compositor->priv->paper_height - compositor->priv->real_margin_bottom - compositor->priv->footer_font_descent,
+					 compositor->priv->paper_height - compositor->priv->real_margin_bottom - h,
 					 w,
 					 h);
 			cairo_stroke (cr);
