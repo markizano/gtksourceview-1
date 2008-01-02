@@ -152,7 +152,9 @@ enum
 	PROP_TAB_WIDTH,
 	PROP_WRAP_MODE,
 	PROP_HIGHLIGHT_SYNTAX,
-	PROP_PRINT_LINE_NUMBERS
+	PROP_PRINT_LINE_NUMBERS,
+	PROP_BODY_FONT_NAME,
+	PROP_LINE_NUMBERS_FONT_NAME
 };
 
 G_DEFINE_TYPE (GtkSourcePrintCompositor, gtk_source_print_compositor, G_TYPE_OBJECT)
@@ -231,6 +233,14 @@ gtk_source_print_compositor_get_property (GObject    *object,
 			g_value_set_uint (value,
 					  gtk_source_print_compositor_get_print_line_numbers (compositor));
 			break;
+		case PROP_BODY_FONT_NAME:
+			g_value_set_string (value,
+					    gtk_source_print_compositor_get_body_font_name (compositor));
+			break;
+		case PROP_LINE_NUMBERS_FONT_NAME:
+			g_value_set_string (value,
+					    gtk_source_print_compositor_get_line_numbers_font_name (compositor));
+			break;
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 			break;
@@ -267,6 +277,14 @@ gtk_source_print_compositor_set_property (GObject      *object,
 		case PROP_PRINT_LINE_NUMBERS:
 			gtk_source_print_compositor_set_print_line_numbers (compositor,
 									    g_value_get_uint (value));
+			break;
+		case PROP_BODY_FONT_NAME:
+			gtk_source_print_compositor_set_body_font_name (compositor,
+									g_value_get_string (value));
+			break;
+		case PROP_LINE_NUMBERS_FONT_NAME:
+			gtk_source_print_compositor_set_line_numbers_font_name (compositor,
+										g_value_get_string (value));
 			break;
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -347,6 +365,20 @@ gtk_source_print_compositor_class_init (GtkSourcePrintCompositorClass *klass)
 							      "(0 means no numbers)"),
 							    0, 100, 1,
 							    G_PARAM_READWRITE));
+	g_object_class_install_property (object_class,
+					 PROP_BODY_FONT_NAME,
+					 g_param_spec_string ("body-font-name",
+							      _("Body Font Name"),
+							      _("Font name to use for the text"),
+							      NULL,
+							      G_PARAM_READWRITE));
+	g_object_class_install_property (object_class,
+					 PROP_LINE_NUMBERS_FONT_NAME,
+					 g_param_spec_string ("line-numbers-font-name",
+							      _("Line Numbers Font Name"),
+							      _("Font name to use for the line numbers"),
+							      NULL,
+							      G_PARAM_READWRITE));
 
 	g_type_class_add_private (object_class, sizeof(GtkSourcePrintCompositorPrivate));	
 }
@@ -635,6 +667,76 @@ gtk_source_print_compositor_get_print_line_numbers (GtkSourcePrintCompositor *co
 	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), 0);
 	
 	return compositor->priv->print_line_numbers;
+}
+
+static gboolean
+set_font_description_from_name (PangoFontDescription **font,
+				const gchar           *font_name)
+{
+	PangoFontDescription *new;
+
+	new = pango_font_description_from_string (font_name);
+
+	if (!pango_font_description_equal (*font, new))
+	{
+		if (*font != NULL)
+			pango_font_description_free (*font);
+		*font = new;
+
+		return TRUE;
+	}
+	else
+	{
+		pango_font_description_free (new);
+
+		return FALSE;
+	}
+}
+
+void
+gtk_source_print_compositor_set_body_font_name (GtkSourcePrintCompositor *compositor,
+						const gchar              *font_name)
+{
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	g_return_if_fail (font_name != NULL);
+
+	if (set_font_description_from_name (&compositor->priv->body_font,
+					    font_name))
+	{
+		g_object_notify (G_OBJECT (compositor), "body-font-name");
+	}
+}
+
+gchar *
+gtk_source_print_compositor_get_body_font_name (GtkSourcePrintCompositor *compositor)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), NULL);
+
+	return pango_font_description_to_string (compositor->priv->body_font);
+}
+
+void
+gtk_source_print_compositor_set_line_numbers_font_name (GtkSourcePrintCompositor *compositor,
+							const gchar              *font_name)
+{
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	g_return_if_fail (font_name != NULL);
+
+	if (set_font_description_from_name (&compositor->priv->line_numbers_font,
+					    font_name))
+	{
+		g_object_notify (G_OBJECT (compositor), "line-numbers-font-name");
+	}
+}
+
+gchar *
+gtk_source_print_compositor_get_line_numbers_font_name (GtkSourcePrintCompositor *compositor)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), NULL);
+
+	return compositor->priv->line_numbers_font ?
+	       pango_font_description_to_string (compositor->priv->line_numbers_font) :
+	       NULL;
 }
 
 /**

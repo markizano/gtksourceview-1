@@ -815,7 +815,7 @@ begin_print (GtkPrintOperation        *operation,
 	gint n_pages;
 
 	g_debug ("begin_print");
-	
+
 	gtk_source_print_compositor_paginate (compositor, context);
 
 	n_pages = gtk_source_print_compositor_get_n_pages (compositor);
@@ -841,6 +841,8 @@ end_print (GtkPrintOperation        *operation,
 	g_object_unref (compositor);
 }
 
+#define LINE_NUMBERS_FONT_NAME   "Monospace 6"
+
 static void
 print_file_cb (GtkAction *action, gpointer user_data)
 {
@@ -852,9 +854,13 @@ print_file_cb (GtkAction *action, gpointer user_data)
 	g_debug ("print_file_cb");
 	
 	compositor = gtk_source_print_compositor_new (GTK_SOURCE_BUFFER (user_data));
-	
-	gtk_source_print_compositor_set_print_line_numbers (compositor, 1);
-	
+
+	gtk_source_print_compositor_set_print_line_numbers (compositor, 5);
+
+	/* To test line numbers font != text font */
+	gtk_source_print_compositor_set_line_numbers_font_name (compositor,
+								LINE_NUMBERS_FONT_NAME);
+
 	operation = gtk_print_operation_new ();
 	
   	g_signal_connect (G_OBJECT (operation), "begin-print", 
@@ -864,7 +870,6 @@ print_file_cb (GtkAction *action, gpointer user_data)
 	g_signal_connect (G_OBJECT (operation), "end-print", 
 			  G_CALLBACK (end_print), compositor);
 
-	g_debug ("CIAO");
 	gtk_print_operation_run (operation, 
 				 GTK_PRINT_OPERATION_ACTION_PRINT_DIALOG,
 				 NULL, NULL);

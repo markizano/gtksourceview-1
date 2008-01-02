@@ -81,19 +81,20 @@ void			  gtk_source_print_compositor_set_print_line_numbers
 									 guint                     interval);
 guint			  gtk_source_print_compositor_get_print_line_numbers
 									(GtkSourcePrintCompositor *compositor);
-#if 0
+
 void			  gtk_source_print_compositor_set_body_font_name
 									(GtkSourcePrintCompositor *compositor,
 									 const gchar              *font_name);
-const gchar		 *gtk_source_print_compositor_get_body_font_name
+gchar			 *gtk_source_print_compositor_get_body_font_name
 									(GtkSourcePrintCompositor *compositor);
 
 void			  gtk_source_print_compositor_set_line_numbers_font_name
 									(GtkSourcePrintCompositor *compositor,
 									 const gchar              *font_name);
-const gchar		 *gtk_source_print_compositor_get_line_numbers_font_name
+gchar			 *gtk_source_print_compositor_get_line_numbers_font_name
 									(GtkSourcePrintCompositor *compositor);
 
+#if 0
 void			  gtk_source_print_compositor_set_header_font_name
 									(GtkSourcePrintCompositor *compositor,
 									 const gchar              *font_name);
