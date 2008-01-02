@@ -1665,8 +1665,6 @@ line_is_numbered (GtkSourcePrintCompositor *compositor,
 static void
 set_pango_layouts_width (GtkSourcePrintCompositor *compositor)
 {
-	gdouble width;
-
 	g_return_if_fail (compositor->priv->layout != NULL);
 	pango_layout_set_width (compositor->priv->layout,
 				get_text_width (compositor) * PANGO_SCALE);
@@ -1676,23 +1674,6 @@ set_pango_layouts_width (GtkSourcePrintCompositor *compositor)
 		g_return_if_fail (compositor->priv->line_numbers_layout != NULL);
 		pango_layout_set_width (compositor->priv->line_numbers_layout,
 					compositor->priv->line_numbers_width * PANGO_SCALE);
-	}
-
-	width = compositor->priv->paper_width - 
-		compositor->priv->real_margin_left -
-		compositor->priv->real_margin_right;
-
-	if (is_header_to_print (compositor))
-	{
-		g_return_if_fail (compositor->priv->header_layout != NULL);
-		g_debug ("Set width for header_layout: %f points", width);
-		pango_layout_set_width (compositor->priv->header_layout, width * PANGO_SCALE);
-	}
-
-	if (is_footer_to_print (compositor))
-	{
-		g_return_if_fail (compositor->priv->footer_layout != NULL);
-		pango_layout_set_width (compositor->priv->footer_layout, width * PANGO_SCALE);
 	}
 }
 
@@ -1864,33 +1845,58 @@ print_header_string (GtkSourcePrintCompositor *compositor,
 		gdouble	baseline;
 		PangoLayoutIter *iter;
 		
-		pango_layout_set_alignment (compositor->priv->header_layout, alignment);
+		gdouble layout_width;
+		gdouble layout_height;		
+		gdouble header_width;
+		gdouble x;
+		
+		header_width = compositor->priv->paper_width - 
+			       compositor->priv->real_margin_left -
+			       compositor->priv->real_margin_right;
+						
 		pango_layout_set_text (compositor->priv->header_layout, text, -1);
-
+		
 		/* Print only the first line */
 		iter = pango_layout_get_iter (compositor->priv->header_layout);
 		baseline = (gdouble) pango_layout_iter_get_baseline (iter) / (gdouble) PANGO_SCALE;
 		
+		get_layout_size (compositor->priv->header_layout, &layout_width, &layout_height);
+
+		switch (alignment)
+		{
+			case PANGO_ALIGN_RIGHT:
+				x = compositor->priv->real_margin_left + header_width - layout_width;
+				break;
+				
+			case PANGO_ALIGN_CENTER:
+				x = compositor->priv->real_margin_left + header_width / 2 - layout_width / 2;
+				break;
+				
+			case PANGO_ALIGN_LEFT:
+			default:
+				x = compositor->priv->real_margin_left;
+				break;
+		}	
+				
 		DEBUG ({
-			double w;
-			double h;
-			get_layout_size (compositor->priv->header_layout, &w, &h);
+			
 			cairo_save (cr);
 			cairo_set_line_width (cr, 1.);
 			cairo_set_source_rgb (cr, 0., 0., 1.);
 			cairo_rectangle (cr,
-					 compositor->priv->real_margin_left,
+					 x,
 					 compositor->priv->real_margin_top,
-					 w,
-					 h);
+					 layout_width,
+					 layout_height);
 			cairo_stroke (cr);
 			cairo_restore (cr);
 		});
 
 		line = pango_layout_iter_get_line_readonly (iter);
-					
+				
+
 		cairo_move_to (cr,
-			       compositor->priv->real_margin_left, 
+			       x, 
 			       compositor->priv->real_margin_top + baseline);
 		
 		pango_cairo_show_layout_line (cr, line);
@@ -1956,9 +1962,34 @@ print_footer_string (GtkSourcePrintCompositor *compositor,
 	{		
 		PangoLayoutLine* line;		
 		
-		pango_layout_set_alignment (compositor->priv->footer_layout, alignment);
+		gdouble layout_width;
+		gdouble layout_height;		
+		gdouble footer_width;
+		gdouble x;
+		
+		footer_width = compositor->priv->paper_width - 
+			       compositor->priv->real_margin_left -
+			       compositor->priv->real_margin_right;
+			       		
 		pango_layout_set_text (compositor->priv->footer_layout, text, -1);
 
+		get_layout_size (compositor->priv->footer_layout, &layout_width, &layout_height);
+
+		switch (alignment)
+		{
+			case PANGO_ALIGN_RIGHT:
+				x = compositor->priv->real_margin_left + footer_width - layout_width;
+				break;
+				
+			case PANGO_ALIGN_CENTER:
+				x = compositor->priv->real_margin_left + footer_width / 2 - layout_width / 2;
+				break;
+				
+			case PANGO_ALIGN_LEFT:
+			default:
+				x = compositor->priv->real_margin_left;
+				break;
+		}	
 		/* Print only the first line */
 		line = pango_layout_get_line (compositor->priv->footer_layout, 0);
 
@@ -1970,16 +2001,16 @@ print_footer_string (GtkSourcePrintCompositor *compositor,
 			cairo_set_line_width (cr, 1.);
 			cairo_set_source_rgb (cr, 0., 0., 1.);
 			cairo_rectangle (cr,
-					 compositor->priv->real_margin_left,
+					 x,
 					 compositor->priv->paper_height - compositor->priv->real_margin_bottom - h,
-					 w,
-					 h);
+					 layout_width,
+					 layout_height);
 			cairo_stroke (cr);
 			cairo_restore (cr);
 		});
 					
 		cairo_move_to (cr,
-			       compositor->priv->real_margin_left, 
+			       x, 
 			       compositor->priv->paper_height - compositor->priv->real_margin_bottom - compositor->priv->footer_font_descent);
 		
 		pango_cairo_show_layout_line (cr, line);
