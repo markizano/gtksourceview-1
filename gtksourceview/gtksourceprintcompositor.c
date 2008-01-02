@@ -62,6 +62,8 @@
 #define NUMBERS_TEXT_SEPARATION convert_from_mm (5, GTK_UNIT_POINTS)
 
 #define HEADER_FOOTER_SIZE_FACTOR 2.5
+#define SEPARATOR_SPACING_FACTOR  0.4
+#define SEPARATOR_LINE_WIDTH      1.0
 
 typedef enum 
 {
@@ -123,16 +125,21 @@ struct _GtkSourcePrintCompositorPrivate
 
 	guint                    paginated_lines;
 	gint                     n_pages;
+	gint                     current_page;
 
 	/* Stored in points */
 	gdouble                  header_height;
 	gdouble                  footer_height;
 	gdouble                  line_numbers_width;
 	gdouble                  line_numbers_height;
+
+	gdouble                  footer_font_descent;
 	
 	/* layout objects */
 	PangoLayout             *layout;
 	PangoLayout             *line_numbers_layout;
+	PangoLayout             *header_layout;
+	PangoLayout             *footer_layout;	
 
 	gdouble                  real_margin_top;
 	gdouble                  real_margin_bottom;
@@ -301,8 +308,22 @@ gtk_source_print_compositor_finalize (GObject *object)
 
 	if (compositor->priv->layout != NULL)
 		g_object_unref (compositor->priv->layout);
+
 	if (compositor->priv->line_numbers_layout != NULL)
 		g_object_unref (compositor->priv->line_numbers_layout);
+
+	if (compositor->priv->header_layout != NULL)
+		g_object_unref (compositor->priv->header_layout);
+
+	if (compositor->priv->footer_layout != NULL)
+		g_object_unref (compositor->priv->footer_layout);
+
+	g_free (compositor->priv->header_format_left);
+	g_free (compositor->priv->header_format_right);
+	g_free (compositor->priv->header_format_center);
+	g_free (compositor->priv->footer_format_left);
+	g_free (compositor->priv->footer_format_right);
+	g_free (compositor->priv->footer_format_center);
 
 	G_OBJECT_CLASS (gtk_source_print_compositor_parent_class)->finalize (object);
 }
@@ -435,7 +456,8 @@ gtk_source_print_compositor_init (GtkSourcePrintCompositor *compositor)
 	
 	priv->paginated_lines = 0;
 	priv->n_pages = -1;
-
+	priv->current_page = -1;
+	
 	priv->layout = NULL;
 	priv->line_numbers_layout = NULL;
 
@@ -622,7 +644,7 @@ gtk_source_print_compositor_set_highlight_syntax (GtkSourcePrintCompositor *comp
 gboolean
 gtk_source_print_compositor_get_highlight_syntax (GtkSourcePrintCompositor *compositor)
 {
-	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), 0);
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), FALSE);
 
 	return compositor->priv->highlight_syntax;
 }
@@ -649,6 +671,196 @@ gtk_source_print_compositor_set_print_line_numbers (GtkSourcePrintCompositor *co
 	compositor->priv->print_line_numbers = interval;
 
 	g_object_notify (G_OBJECT (compositor), "print-line-numbers");
+}
+
+/**
+ * gtk_source_print_compositor_set_print_header:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @print: %TRUE if you want the header to be printed.
+ * 
+ * Sets whether you want to print a header in each page.  The 
+ * header consists of three pieces of text and an optional line
+ * separator, configurable with
+ * gtk_source_print_compositor_set_header_format().
+ *
+ * Note that by default the header format is unspecified, and if it's
+ * empty it will not be printed, regardless of this setting.
+ **/
+void
+gtk_source_print_compositor_set_print_header (GtkSourcePrintCompositor *compositor,
+					      gboolean                  print)
+{
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	g_return_if_fail (compositor->priv->state == INIT);
+	
+	print = (print != FALSE);
+	
+	if (print == compositor->priv->print_header)
+		return;
+	
+	compositor->priv->print_header = print;
+
+	g_object_notify (G_OBJECT (compositor), "print_header");	
+}
+
+/**
+ * gtk_source_print_compositor_get_print_header:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * 
+ * Determines if a header is set to be printed for each page.  A
+ * header will be printed if this function returns %TRUE
+ * <emphasis>and</emphasis> some format strings have been specified
+ * with gtk_source_print_compositor_set_header_format().
+ * 
+ * Return value: %TRUE if the header is set to be printed.
+ **/
+gboolean
+gtk_source_print_compositor_get_print_header (GtkSourcePrintCompositor *compositor)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), FALSE);
+
+	return compositor->priv->print_header;
+}
+
+/**
+ * gtk_source_print_compositor_set_print_footer:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @print: %TRUE if you want the footer to be printed.
+ * 
+ * Sets whether you want to print a footer in each page.  The 
+ * footer consists of three pieces of text and an optional line
+ * separator, configurable with
+ * gtk_source_print_compositor_set_footer_format().
+ *
+ * Note that by default the footer format is unspecified, and if it's
+ * empty it will not be printed, regardless of this setting.
+ **/
+void
+gtk_source_print_compositor_set_print_footer (GtkSourcePrintCompositor *compositor,
+					      gboolean                  print)
+{
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	g_return_if_fail (compositor->priv->state == INIT);
+	
+	print = (print != FALSE);
+	
+	if (print == compositor->priv->print_footer)
+		return;
+	
+	compositor->priv->print_footer = print;
+
+	g_object_notify (G_OBJECT (compositor), "print_footer");	
+}
+
+/**
+ * gtk_source_print_compositor_get_print_footer:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * 
+ * Determines if a footer is set to be printed for each page.  A
+ * footer will be printed if this function returns %TRUE
+ * <emphasis>and</emphasis> some format strings have been specified
+ * with gtk_source_print_compositor_set_footer_format().
+ * 
+ * Return value: %TRUE if the footer is set to be printed.
+ **/
+gboolean
+gtk_source_print_compositor_get_print_footer (GtkSourcePrintCompositor *compositor)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), FALSE);
+
+	return compositor->priv->print_footer;
+}
+
+/**
+ * gtk_source_print_compositor_set_header_format
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @separator: %TRUE if you want a separator line to be printed.
+ * @left: a format string to print on the left of the header.
+ * @center: a format string to print on the center of the header.
+ * @right: a format string to print on the right of the header.
+ * 
+ * Sets strftime like header format strings, to be printed on the
+ * left, center and right of the top of each page.  The strings may
+ * include strftime(3) codes which will be expanded at print time.
+ * All strftime() codes are accepted, with the addition of %N for the
+ * page number and %Q for the page count.
+ *
+ * @separator specifies if a solid line should be drawn to separate
+ * the header from the document text.
+ *
+ * If %NULL is given for any of the three arguments, that particular
+ * string will not be printed.
+ * 
+ * For the header to be printed, in
+ * addition to specifying format strings, you need to enable header
+ * printing with gtk_source_print_compositor_set_print_header().
+ **/
+void 
+gtk_source_print_compositor_set_header_format (GtkSourcePrintCompositor *compositor,
+					       gboolean                  separator,
+					       const gchar              *left,
+					       const gchar              *center,
+					       const gchar              *right)
+{
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	g_return_if_fail (compositor->priv->state == INIT);
+	
+	/* FIXME: validate given strings? */
+	g_free (compositor->priv->header_format_left);
+	g_free (compositor->priv->header_format_center);
+	g_free (compositor->priv->header_format_right);
+	
+	compositor->priv->header_separator = separator;
+
+	compositor->priv->header_format_left = g_strdup (left);
+	compositor->priv->header_format_center = g_strdup (center);
+	compositor->priv->header_format_right = g_strdup (right);		
+}
+
+/**
+ * gtk_source_print_compositor_set_footer_format
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @separator: %TRUE if you want a separator line to be printed.
+ * @left: a format string to print on the left of the footer.
+ * @center: a format string to print on the center of the footer.
+ * @right: a format string to print on the right of the footer.
+ * 
+ * Sets strftime like header format strings, to be printed on the
+ * left, center and right of the bottom of each page. The strings may
+ * include strftime(3) codes which will be expanded at print time.
+ * All strftime() codes are accepted, with the addition of %N for the
+ * page number and %Q for the page count.
+ *
+ * @separator specifies if a solid line should be drawn to separate
+ * the footer from the document text.
+ *
+ * If %NULL is given for any of the three arguments, that particular
+ * string will not be printed.
+ *
+ * For the footer to be printed, in
+ * addition to specifying format strings, you need to enable footer
+ * printing with gtk_source_print_compositor_set_print_footer().
+ **/
+void 
+gtk_source_print_compositor_set_footer_format (GtkSourcePrintCompositor *compositor,
+					       gboolean                  separator,
+					       const gchar              *left,
+					       const gchar              *center,
+					       const gchar              *right)
+{
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	g_return_if_fail (compositor->priv->state == INIT);
+
+	/* FIXME: validate given strings? */
+	g_free (compositor->priv->footer_format_left);
+	g_free (compositor->priv->footer_format_center);
+	g_free (compositor->priv->footer_format_right);
+	
+	compositor->priv->footer_separator = separator;
+		
+	compositor->priv->footer_format_left = g_strdup (left);
+	compositor->priv->footer_format_center = g_strdup (center);
+	compositor->priv->footer_format_right = g_strdup (right);
 }
 
 /**
@@ -834,6 +1046,25 @@ get_text_height (GtkSourcePrintCompositor *compositor)
 	return h;
 }
 
+static gboolean
+is_header_to_print (GtkSourcePrintCompositor *compositor)
+{
+	return (compositor->priv->print_header && 
+	       ((compositor->priv->header_format_left != NULL) ||
+	        (compositor->priv->header_format_center != NULL) ||
+	        (compositor->priv->header_format_right != NULL)));
+}
+
+static gboolean
+is_footer_to_print (GtkSourcePrintCompositor *compositor)
+{
+	return (compositor->priv->print_footer && 
+	       ((compositor->priv->footer_format_left != NULL) ||
+	        (compositor->priv->footer_format_center != NULL) ||
+	        (compositor->priv->footer_format_right != NULL)));
+}
+
+
 static void
 setup_pango_layouts (GtkSourcePrintCompositor *compositor,
 		     GtkPrintContext          *context)
@@ -867,23 +1098,175 @@ setup_pango_layouts (GtkSourcePrintCompositor *compositor,
 			break;
 	}
 
-	if (compositor->priv->layout != NULL)
-		g_object_unref (compositor->priv->layout);
+	g_return_if_fail (compositor->priv->layout == NULL);
+
 	compositor->priv->layout = layout;
 
 	/* Layout for line numbers */
-	layout = gtk_print_context_create_pango_layout (context);
+	if (compositor->priv->print_line_numbers > 0)
+	{
+		layout = gtk_print_context_create_pango_layout (context);
 
-	if (compositor->priv->line_numbers_font == NULL)
-		compositor->priv->line_numbers_font = pango_font_description_copy_static (compositor->priv->body_font);
-	pango_layout_set_font_description (layout, compositor->priv->line_numbers_font);
-	pango_layout_set_alignment (layout, PANGO_ALIGN_RIGHT);
+		if (compositor->priv->line_numbers_font == NULL)
+			compositor->priv->line_numbers_font = pango_font_description_copy_static (compositor->priv->body_font);
+		pango_layout_set_font_description (layout, compositor->priv->line_numbers_font);
+		pango_layout_set_alignment (layout, PANGO_ALIGN_RIGHT);
 
-	if (compositor->priv->line_numbers_layout != NULL)
-		g_object_unref (compositor->priv->line_numbers_layout);
-	compositor->priv->line_numbers_layout = layout;
+		g_return_if_fail (compositor->priv->line_numbers_layout == NULL);
 
-	/* TODO: header and footer layouts */
+		compositor->priv->line_numbers_layout = layout;
+	}
+
+	/* Layout for header */
+	if (is_header_to_print (compositor))
+	{
+		layout = gtk_print_context_create_pango_layout (context);
+
+		if (compositor->priv->header_font == NULL)
+			compositor->priv->header_font = pango_font_description_copy_static (compositor->priv->body_font);
+
+		pango_layout_set_font_description (layout, compositor->priv->header_font);
+
+		g_return_if_fail (compositor->priv->header_layout == NULL);
+		compositor->priv->header_layout = layout;
+	}
+	
+	/* Layout for footer */
+	if (is_footer_to_print (compositor))
+	{
+		layout = gtk_print_context_create_pango_layout (context);
+
+		if (compositor->priv->footer_font == NULL)
+			compositor->priv->footer_font = pango_font_description_copy_static (compositor->priv->body_font);
+
+		pango_layout_set_font_description (layout, compositor->priv->footer_font);
+
+		g_return_if_fail (compositor->priv->footer_layout == NULL);
+		compositor->priv->footer_layout = layout;
+	}	
+}
+
+/* ---- Header and footer ---- */
+
+/* Most of this code taken from GLib's g_date_strftime() in gdate.c
+ * GLIB - Library of useful routines for C programming
+ * Copyright (C) 1995-1997  Peter Mattis, Spencer Kimball and Josh MacDonald */
+
+static gchar *
+strdup_strftime (const gchar *format, const struct tm *tm)
+{
+	gsize locale_format_len = 0;
+	gchar *locale_format;
+	gsize tmplen;
+	gchar *tmpbuf;
+	gsize tmpbufsize;
+	gchar *convbuf;
+	gsize convlen = 0;
+	GError *error = NULL;
+
+	g_return_val_if_fail (format != NULL, NULL);
+	g_return_val_if_fail (tm != NULL, NULL);
+
+	locale_format = g_locale_from_utf8 (format, -1, NULL, &locale_format_len, &error);
+
+	if (error)
+	{
+		g_warning (G_STRLOC "Error converting format to locale encoding: %s",
+			   error->message);
+		g_error_free (error);
+		
+		return NULL;
+	}
+
+	tmpbufsize = MAX (128, locale_format_len * 2);
+	while (TRUE)
+	{
+		tmpbuf = g_malloc (tmpbufsize);
+		
+		/* Set the first byte to something other than '\0', to be able to
+		 * recognize whether strftime actually failed or just returned "".
+		 */
+		tmpbuf[0] = '\1';
+		tmplen = strftime (tmpbuf, tmpbufsize, locale_format, tm);
+		
+		if (tmplen == 0 && tmpbuf[0] != '\0')
+		{
+			g_free (tmpbuf);
+			tmpbufsize *= 2;
+			
+			if (tmpbufsize > 65536)
+			{
+				g_warning (G_STRLOC "Maximum buffer size for strdup_strftime "
+					   "exceeded: giving up");
+				g_free (locale_format);
+				return NULL;
+			}
+		}
+		else
+			break;
+	}
+	g_free (locale_format);
+
+	convbuf = g_locale_to_utf8 (tmpbuf, tmplen, NULL, &convlen, &error);
+	g_free (tmpbuf);
+
+	if (error)
+	{
+		g_warning (G_STRLOC "Error converting results of strftime to UTF-8: %s",
+			   error->message);
+		g_error_free (error);
+		
+		return NULL;
+	}
+
+	return convbuf;
+}
+
+static gchar *
+evaluate_format_string (GtkSourcePrintCompositor *compositor,
+			const gchar              *format)
+{
+	GString *eval;
+	gchar *eval_str, *retval;
+	const struct tm *tm;
+	time_t now;
+	gunichar ch;
+	
+	/* get time */
+	time (&now);
+	tm = localtime (&now);
+
+	/* analyze format string and replace the codes we know */
+	eval = g_string_new_len (NULL, strlen (format));
+	ch = g_utf8_get_char (format);
+	while (ch != 0)
+	{
+		if (ch == '%')
+		{
+			format = g_utf8_next_char (format);
+			ch = g_utf8_get_char (format);
+			if (ch == 'N')
+				g_string_append_printf (eval, "%d", compositor->priv->current_page);
+			else if (ch == 'Q')
+				g_string_append_printf (eval, "%d", compositor->priv->n_pages);
+			else
+			{
+				g_string_append_c (eval, '%');
+				g_string_append_unichar (eval, ch);
+			}
+		}
+		else
+			g_string_append_unichar (eval, ch);
+
+		format = g_utf8_next_char (format);
+		ch = g_utf8_get_char (format);
+	}
+
+	eval_str = g_string_free (eval, FALSE);
+	retval = strdup_strftime (eval_str, tm);
+	g_free (eval_str);
+
+	return retval;
 }
 
 static void
@@ -954,7 +1337,8 @@ calculate_line_numbers_layout_size (GtkSourcePrintCompositor *compositor,
 static gdouble
 calculate_header_footer_height (GtkSourcePrintCompositor *compositor,
 		                GtkPrintContext          *context,
-		                PangoFontDescription     *font)
+		                PangoFontDescription     *font,
+		                gdouble                  *d)
 {
 	PangoContext *pango_context;
 	PangoFontMetrics* font_metrics;
@@ -973,6 +1357,9 @@ calculate_header_footer_height (GtkSourcePrintCompositor *compositor,
 
 	pango_font_metrics_unref (font_metrics);
 	g_object_unref (pango_context);
+	
+	if (d != NULL)
+		*d = descent;
 		
 	return HEADER_FOOTER_SIZE_FACTOR * (ascent + descent);
 }
@@ -981,29 +1368,30 @@ static void
 calculate_header_height (GtkSourcePrintCompositor *compositor,
 		         GtkPrintContext          *context)
 {
-#if 0
-	if (!compositor->priv->print_header ||
-	    (compositor->priv->header_format_left == NULL &&
-	     compositor->priv->header_format_center == NULL &&
-	     compositor->priv->header_format_right == NULL))
+	if (!is_header_to_print(compositor))
 	{
 		compositor->priv->header_height = 0.0;
 	
 		DEBUG ({
-			g_debug ("header_height: %f mm", compositor->priv->header_height);
+			g_debug ("header_height: %f points (%f mm)", 
+				 compositor->priv->header_height,
+				 convert_to_mm (compositor->priv->header_height, GTK_UNIT_POINTS));
 		});
+		
 		return;
 	}
-#endif	
-	if (compositor->priv->header_font == NULL)
-		compositor->priv->header_font = pango_font_description_copy_static (compositor->priv->body_font);
+	
+	g_return_if_fail (compositor->priv->header_font != NULL);
 	
 	compositor->priv->header_height = calculate_header_footer_height (compositor,
 									  context,
-									  compositor->priv->header_font);
+									  compositor->priv->header_font,
+									  NULL);
 
 	DEBUG ({
-		g_debug ("header_height: %f mm", convert_to_mm (compositor->priv->header_height, GTK_UNIT_POINTS));
+		g_debug ("header_height: %f points (%f mm)", 
+			 compositor->priv->header_height,
+			 convert_to_mm (compositor->priv->header_height, GTK_UNIT_POINTS));
 	});									  
 }
 			         
@@ -1011,30 +1399,32 @@ static void
 calculate_footer_height (GtkSourcePrintCompositor *compositor,
 		         GtkPrintContext          *context)
 {
-#if 0
-	if (!compositor->priv->print_footer ||
-	    (compositor->priv->footer_format_left == NULL &&
-	     compositor->priv->footer_format_center == NULL &&
-	     compositor->priv->footer_format_right == NULL))
+	if (!is_footer_to_print (compositor))
 	{
 		compositor->priv->footer_height = 0.0;
 
 		DEBUG ({
-			g_debug ("footer_height: %f mm", compositor->priv->footer_height);
+			g_debug ("footer_height: %f points (%f mm)", 
+				 compositor->priv->footer_height,
+				 convert_to_mm (compositor->priv->footer_height, GTK_UNIT_POINTS));
 		});
+		
 		
 		return;
 	}
-#endif	
+
 	if (compositor->priv->footer_font == NULL)
 		compositor->priv->footer_font = pango_font_description_copy_static (compositor->priv->body_font);
 	
 	compositor->priv->footer_height = calculate_header_footer_height (compositor,
 									  context,
-									  compositor->priv->footer_font);
-									  
+									  compositor->priv->footer_font,
+									  &compositor->priv->footer_font_descent);
+												  
 	DEBUG ({
-		g_debug ("footer_height: %f mm", convert_to_mm (compositor->priv->footer_height, GTK_UNIT_POINTS));
+		g_debug ("footer_height: %f points (%f mm)", 
+			 compositor->priv->footer_height,
+			 convert_to_mm (compositor->priv->footer_height, GTK_UNIT_POINTS));
 	});
 }
 
@@ -1265,25 +1655,45 @@ layout_paragraph (GtkSourcePrintCompositor *compositor,
 	}
 }
 
-static void
-layout_line_number (GtkSourcePrintCompositor *compositor,
-		    gint                      line_number)
-{
-	gchar *str;
-
-	str = g_strdup_printf ("%d", line_number + 1);
-	pango_layout_set_text (compositor->priv->line_numbers_layout, str, -1);
-	g_free (str);
-
-	// TODO: baseline etc
-}
-
 static gboolean
 line_is_numbered (GtkSourcePrintCompositor *compositor,
-		     gint                      line_number)
+		  gint                      line_number)
 {
 	return (compositor->priv->print_line_numbers > 0) &&
 	       (line_number % compositor->priv->print_line_numbers == 0);
+}
+
+static void
+set_pango_layouts_width (GtkSourcePrintCompositor *compositor)
+{
+	gdouble width;
+		
+	pango_layout_set_width (compositor->priv->layout,
+				get_text_width (compositor) * PANGO_SCALE);
+
+	if (compositor->priv->print_line_numbers)
+	{
+		g_return_if_fail (compositor->priv->line_numbers_layout != NULL);
+		
+		pango_layout_set_width (compositor->priv->line_numbers_layout,
+					compositor->priv->line_numbers_width * PANGO_SCALE);
+	}
+
+	width = compositor->priv->paper_width - 
+		compositor->priv->real_margin_left -
+		compositor->priv->real_margin_right;
+
+	if (is_header_to_print (compositor))
+	{
+		g_return_if_fail (compositor->priv->header_layout != NULL);
+		pango_layout_set_width (compositor->priv->header_layout, width * PANGO_SCALE);
+	}
+
+	if (is_footer_to_print (compositor))
+	{
+		g_return_if_fail (compositor->priv->footer_layout != NULL);
+		pango_layout_set_width (compositor->priv->footer_layout, width * PANGO_SCALE);
+	}
 }
 
 /* Returns TRUE if the document has been completely paginated. otherwise FALSE. 
@@ -1311,7 +1721,7 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 		return TRUE;
 
 	if (compositor->priv->state == INIT)
-	{
+	{		
 		g_return_val_if_fail (compositor->priv->pages == NULL, TRUE);
 
 		compositor->priv->pages = g_array_new (FALSE, FALSE, sizeof (gint));
@@ -1323,12 +1733,10 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 		calculate_header_height (compositor, context);
 		calculate_page_size_and_margins (compositor, context);
 
-		/* cannot be done when setting up layouts since we need the width */
-		pango_layout_set_width (compositor->priv->layout,
-					get_text_width (compositor) * PANGO_SCALE);
-		pango_layout_set_width (compositor->priv->line_numbers_layout,
-					compositor->priv->line_numbers_width * PANGO_SCALE);
-
+		/* Set layouts width otherwise "aligh right" does not work as expected */
+		/* Cannot be done when setting up layouts since we need the width */
+		set_pango_layouts_width (compositor);		
+		
 		compositor->priv->state = PAGINATING;
 	}
 
@@ -1441,6 +1849,159 @@ gtk_source_print_compositor_get_pagination_progress (GtkSourcePrintCompositor *c
 	return compositor->priv->n_pages;	
 }
 
+static void
+print_header_string (GtkSourcePrintCompositor *compositor,
+		     cairo_t                  *cr,		
+		     PangoAlignment            alignment,
+		     const gchar              *format)
+{
+	gchar *text;
+			
+	text = evaluate_format_string (compositor, format);
+	if (text != NULL)
+	{		
+		PangoLayoutLine* line;		
+		gdouble	baseline;
+		PangoLayoutIter *iter;
+		
+		pango_layout_set_alignment (compositor->priv->header_layout, alignment);
+		pango_layout_set_text (compositor->priv->header_layout, text, -1);
+
+		/* Print only the first line */
+		iter = pango_layout_get_iter (compositor->priv->header_layout);
+		baseline = (gdouble) pango_layout_iter_get_baseline (iter) / (gdouble) PANGO_SCALE;
+
+		line = pango_layout_iter_get_line_readonly (iter);
+					
+		cairo_move_to (cr,
+			       compositor->priv->real_margin_left, 
+			       compositor->priv->real_margin_top + baseline);
+		
+		pango_cairo_show_layout_line (cr, line);
+
+		pango_layout_iter_free (iter);		
+		g_free (text);
+	}
+}
+
+static void 
+print_header (GtkSourcePrintCompositor *compositor,
+	      cairo_t                  *cr)
+{
+	pango_cairo_update_layout (cr, compositor->priv->header_layout);
+	
+	/* left format */
+	if (compositor->priv->header_format_left != NULL)
+		print_header_string (compositor, 
+				     cr,					    
+				     PANGO_ALIGN_LEFT,
+				     compositor->priv->header_format_left);
+	
+	/* right format */
+	if (compositor->priv->header_format_right != NULL)
+		print_header_string (compositor, 
+				     cr,					    
+				     PANGO_ALIGN_RIGHT,
+				     compositor->priv->header_format_right);
+
+	/* center format */
+	if (compositor->priv->header_format_center != NULL) 
+		print_header_string (compositor, 
+				     cr,					    
+				     PANGO_ALIGN_CENTER,
+				     compositor->priv->header_format_center);
+	
+	/* separator */
+	if (compositor->priv->header_separator)
+	{
+		gdouble y = compositor->priv->real_margin_top + (1 - SEPARATOR_SPACING_FACTOR) * compositor->priv->header_height;
+
+		cairo_save (cr);
+		
+		cairo_move_to (cr, compositor->priv->real_margin_left, y);
+		cairo_set_line_width (cr, SEPARATOR_LINE_WIDTH);
+	        cairo_line_to (cr, compositor->priv->paper_width - compositor->priv->real_margin_right, y);
+	        cairo_stroke (cr);
+
+		cairo_restore (cr);
+	}
+}
+
+static void
+print_footer_string (GtkSourcePrintCompositor *compositor,
+		     cairo_t                  *cr,		
+		     PangoAlignment            alignment,
+		     const gchar              *format)
+{
+	gchar *text;
+			
+	text = evaluate_format_string (compositor, format);
+	if (text != NULL)
+	{		
+		PangoLayoutLine* line;		
+		
+		pango_layout_set_alignment (compositor->priv->footer_layout, alignment);
+		pango_layout_set_text (compositor->priv->footer_layout, text, -1);
+
+		/* Print only the first line */
+
+		line = pango_layout_get_line (compositor->priv->footer_layout, 0);
+					
+		cairo_move_to (cr,
+			       compositor->priv->real_margin_left, 
+			       compositor->priv->paper_height - compositor->priv->real_margin_bottom - compositor->priv->footer_font_descent);
+		
+		pango_cairo_show_layout_line (cr, line);
+	
+		g_free (text);
+	}
+}
+
+static void 
+print_footer (GtkSourcePrintCompositor *compositor,
+	      cairo_t                  *cr)
+{
+	pango_cairo_update_layout (cr, compositor->priv->footer_layout);
+	
+	/* left format */
+	if (compositor->priv->footer_format_left != NULL)
+		print_footer_string (compositor, 
+				     cr,					    
+				     PANGO_ALIGN_LEFT,
+				     compositor->priv->footer_format_left);
+	
+	/* right format */
+	if (compositor->priv->footer_format_right != NULL)
+		print_footer_string (compositor, 
+				     cr,					    
+				     PANGO_ALIGN_RIGHT,
+				     compositor->priv->footer_format_right);
+
+	/* center format */
+	if (compositor->priv->footer_format_center != NULL) 
+		print_footer_string (compositor, 
+				     cr,					    
+				     PANGO_ALIGN_CENTER,
+				     compositor->priv->footer_format_center);
+	
+	/* separator */
+	if (compositor->priv->footer_separator)
+	{
+		gdouble y = compositor->priv->paper_height - 
+			    compositor->priv->real_margin_bottom -
+			    (1 - SEPARATOR_SPACING_FACTOR) * compositor->priv->footer_height;
+
+		cairo_save (cr);
+		
+		cairo_move_to (cr, compositor->priv->real_margin_left, y);
+		cairo_set_line_width (cr, SEPARATOR_LINE_WIDTH);
+	        cairo_line_to (cr, compositor->priv->paper_width - compositor->priv->real_margin_right, y);
+	        cairo_stroke (cr);
+
+		cairo_restore (cr);
+	}
+}
+
 void
 gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 				       GtkPrintContext          *context,
@@ -1454,12 +2015,24 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
 	g_return_if_fail (GTK_IS_PRINT_CONTEXT (context));
 
+	compositor->priv->current_page = page_nr;
+	
 	cr = gtk_print_context_get_cairo_context (context);
 	cairo_set_source_rgb (cr, 0, 0, 0);
 	cairo_translate (cr, 
 			 -1 * compositor->priv->page_margin_left,
 			 -1 * compositor->priv->page_margin_top);
 
+	if (is_header_to_print (compositor))
+	{
+		print_header (compositor, cr);
+	}
+	
+	if (is_footer_to_print (compositor))
+	{
+		print_footer (compositor, cr);
+	}
+	
 	x = get_text_x (compositor);
 	y = get_text_y (compositor);
 	ln_x = get_line_numbers_x (compositor);
@@ -1501,10 +2074,13 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 	});
 
 	g_return_if_fail (compositor->priv->layout != NULL);
-	g_return_if_fail (compositor->priv->line_numbers_layout != NULL);
-
 	pango_cairo_update_layout (cr, compositor->priv->layout);
-	pango_cairo_update_layout (cr, compositor->priv->line_numbers_layout);
+	
+	if (compositor->priv->print_line_numbers) 
+	{
+		g_return_if_fail (compositor->priv->line_numbers_layout != NULL);	
+		pango_cairo_update_layout (cr, compositor->priv->line_numbers_layout);
+	}
 
 	g_return_if_fail (compositor->priv->buffer != NULL);
 	g_return_if_fail (compositor->priv->pages != NULL);
@@ -1566,8 +2142,11 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 			double baseline;
 			double ln_baseline;
 			double ln_baseline_offset;
+			gchar *str;
 
-			layout_line_number (compositor, line_number);
+			str = g_strdup_printf ("%d", line_number + 1);	
+			pango_layout_set_text (compositor->priv->line_numbers_layout, str, -1);
+			g_free (str);
 
 			/* Adjust the baseline */
 			iter = pango_layout_get_iter (compositor->priv->layout);
@@ -1587,6 +2166,8 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 			}
 
 			cairo_move_to (cr, ln_x, y + ln_baseline_offset);
+			
+			g_return_if_fail (compositor->priv->line_numbers_layout != NULL);
 			pango_cairo_show_layout (cr, compositor->priv->line_numbers_layout);
 		}
 

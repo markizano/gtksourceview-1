@@ -848,7 +848,8 @@ print_file_cb (GtkAction *action, gpointer user_data)
 {
 	GtkSourcePrintCompositor *compositor;
 	GtkPrintOperation *operation;
-
+	const gchar *filename;
+	
 	g_return_if_fail (GTK_IS_SOURCE_BUFFER (user_data));
 
 	g_debug ("print_file_cb");
@@ -861,6 +862,23 @@ print_file_cb (GtkAction *action, gpointer user_data)
 	gtk_source_print_compositor_set_line_numbers_font_name (compositor,
 								LINE_NUMBERS_FONT_NAME);
 
+	gtk_source_print_compositor_set_header_format (compositor,
+						       TRUE,
+						       "Printed on %A",
+						       "test-widget",
+						       "%F");
+
+	filename = g_object_get_data (G_OBJECT (user_data), "filename");
+	
+	gtk_source_print_compositor_set_footer_format (compositor,
+						       TRUE,
+						       "%T",
+						       filename,
+						       "Page %N/%Q");
+
+	gtk_source_print_compositor_set_print_header (compositor, TRUE);
+	gtk_source_print_compositor_set_print_footer (compositor, TRUE);
+	
 	operation = gtk_print_operation_new ();
 	
   	g_signal_connect (G_OBJECT (operation), "begin-print", 

@@ -130,7 +130,7 @@ gdouble			  gtk_source_print_compositor_get_right_margin	(GtkSourcePrintComposit
 void			  gtk_source_print_compositor_set_right_margin	(GtkSourcePrintCompositor *compositor,
 									 gdouble                   margin,
 									 GtkUnit                   unit);
-
+#endif
 void			  gtk_source_print_compositor_set_print_header	(GtkSourcePrintCompositor *compositor,
 									 gboolean                  print);
 gboolean		  gtk_source_print_compositor_get_print_header	(GtkSourcePrintCompositor *compositor);
@@ -139,16 +139,17 @@ void			  gtk_source_print_compositor_set_print_footer	(GtkSourcePrintCompositor 
 									 gboolean                  print);
 gboolean		  gtk_source_print_compositor_get_print_footer	(GtkSourcePrintCompositor *compositor);
 
+
 /* format strings are strftime like */
 void			  gtk_source_print_compositor_set_header_format	(GtkSourcePrintCompositor *compositor,
-									 gboolean                  separator
+									 gboolean                  separator,
 									 const gchar              *left,
 									 const gchar              *center,
 									 const gchar              *right);
 /* TODO: add get_header_format */
 
 void			  gtk_source_print_compositor_set_footer_format	(GtkSourcePrintCompositor *compositor,
-									 gboolean                  separator
+									 gboolean                  separator,
 									 const gchar              *left,
 									 const gchar              *center,
 									 const gchar              *right);
@@ -156,8 +157,6 @@ void			  gtk_source_print_compositor_set_footer_format	(GtkSourcePrintCompositor
 									  
 /* TODO: set/get style scheme ??? */
 /* TODO: print right margin hint??? */
-
-#endif
 
 /* Returns the number of pages. Returns -1 until the document has been completely paginated */
 gint			  gtk_source_print_compositor_get_n_pages	(GtkSourcePrintCompositor *compositor);
