@@ -1530,6 +1530,7 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 	{
 		gint line_number;
 		double line_height;
+		double baseline_offset;
 
 		line_number = gtk_text_iter_get_line (&start);
 
@@ -1556,17 +1557,41 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 
 		get_layout_size (compositor->priv->layout, NULL, &line_height);
 
-		cairo_move_to (cr, x, y);
-		pango_cairo_show_layout (cr, compositor->priv->layout);
+		baseline_offset = 0;
 
 		/* print the line number if needed */
 		if (line_is_numbered (compositor, line_number))
 		{
+			PangoLayoutIter *iter;
+			double baseline;
+			double ln_baseline;
+			double ln_baseline_offset;
+
 			layout_line_number (compositor, line_number);
 
-			cairo_move_to (cr, ln_x, y);
+			/* Adjust the baseline */
+			iter = pango_layout_get_iter (compositor->priv->layout);
+			baseline = (double) pango_layout_iter_get_baseline (iter) / (double) PANGO_SCALE;
+			pango_layout_iter_free (iter);
+
+			iter = pango_layout_get_iter (compositor->priv->line_numbers_layout);
+			ln_baseline = (double) pango_layout_iter_get_baseline (iter) / (double) PANGO_SCALE;
+			pango_layout_iter_free (iter);
+
+			ln_baseline_offset = baseline - ln_baseline;
+
+			if (ln_baseline_offset < 0)
+			{
+				baseline_offset = -ln_baseline_offset;
+				ln_baseline_offset =  0;
+			}
+
+			cairo_move_to (cr, ln_x, y + ln_baseline_offset);
 			pango_cairo_show_layout (cr, compositor->priv->line_numbers_layout);
 		}
+
+		cairo_move_to (cr, x, y + baseline_offset);
+		pango_cairo_show_layout (cr, compositor->priv->layout);
 
 		line_height = MAX (line_height,
 				   compositor->priv->line_numbers_height);
