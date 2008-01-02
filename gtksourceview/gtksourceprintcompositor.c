@@ -1345,6 +1345,33 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 	y = get_text_y (compositor);
 	ln_x = get_line_numbers_x (compositor);
 
+	DEBUG ({
+		cairo_save (cr);
+		cairo_set_line_width (cr, 1.);
+		cairo_set_source_rgb (cr, 1., 0., 0.);
+		cairo_rectangle (cr,
+				 ln_x, y,
+				 compositor->priv->line_numbers_width,
+				 get_text_height (compositor));
+		cairo_stroke (cr);
+
+		cairo_set_line_width (cr, 1.);
+		cairo_set_source_rgb (cr, 0., 1., 0.);
+		cairo_rectangle (cr,
+				 x, y,
+				 get_text_width (compositor),
+				 get_text_height (compositor));
+		cairo_stroke (cr);
+
+		cairo_set_source_rgb (cr, 0., 0., 1.);
+		cairo_rectangle (cr,
+				 0, 0,
+				 compositor->priv->page_width,
+				 compositor->priv->page_height);
+		cairo_stroke (cr);
+		cairo_restore (cr);
+	});
+
 	g_return_if_fail (compositor->priv->layout != NULL);
 	g_return_if_fail (compositor->priv->line_numbers_layout != NULL);
 
