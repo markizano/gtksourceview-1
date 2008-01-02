@@ -127,6 +127,7 @@ struct _GtkSourcePrintCompositorPrivate
 	gdouble                  header_height;
 	gdouble                  footer_height;
 	gdouble                  line_numbers_width;
+	gdouble                  line_numbers_height;
 
 	/* printable (for the document itself) size */
 	gdouble                  text_width;
@@ -400,6 +401,7 @@ gtk_source_print_compositor_init (GtkSourcePrintCompositor *compositor)
 	priv->header_height = -1.0; 
 	priv->footer_height = -1.0;
 	priv->line_numbers_width = -1.0;
+	priv->line_numbers_height = -1.0;
 	priv->text_width = -1.0;
 	priv->text_height = -1.0;
 }
@@ -646,6 +648,22 @@ gtk_source_print_compositor_get_n_pages	(GtkSourcePrintCompositor *compositor)
 	return compositor->priv->n_pages;
 }
 
+static void
+get_layout_size (PangoLayout *layout,
+                 double      *width,
+                 double      *height)
+{
+	PangoRectangle rect;
+
+	pango_layout_get_extents (layout, NULL, &rect);
+
+	if (width)
+		*width = (double) rect.width / (double) PANGO_SCALE;
+
+	if (height)
+		*height = (double) rect.height / (double) PANGO_SCALE;
+}
+
 static gsize
 get_n_digits (guint n)
 {
@@ -662,16 +680,20 @@ calculate_line_numbers_width (GtkSourcePrintCompositor *compositor,
 			      GtkPrintContext          *context)
 {
 	gint line_count;
-	gdouble digit_width;
+	gint n_digits;
+	gchar *str;
 	PangoContext *pango_context;
-	PangoFontMetrics* font_metrics;
-	
+	PangoLayout *layout;
+
 	if (compositor->priv->print_line_numbers == 0)
 	{
-		compositor->priv->line_numbers_width = 0.0;	
+		compositor->priv->line_numbers_width = 0.0;
+		compositor->priv->line_numbers_height = 0.0;	
 
 		DEBUG ({
-			g_debug ("line_numbers_width: %f mm", compositor->priv->line_numbers_width);
+			g_debug ("line_numbers size: width: %f mm, height %f mm",
+				 convert_to_mm (compositor->priv->line_numbers_width, GTK_UNIT_POINTS),
+				 convert_to_mm (compositor->priv->line_numbers_height, GTK_UNIT_POINTS));
 		});
 		
 		return;
@@ -679,25 +701,31 @@ calculate_line_numbers_width (GtkSourcePrintCompositor *compositor,
 
 	if (compositor->priv->line_numbers_font == NULL)
 		compositor->priv->line_numbers_font = pango_font_description_copy_static (compositor->priv->body_font);
-	
+
 	pango_context = gtk_print_context_create_pango_context (context);
 	pango_context_set_font_description (pango_context, compositor->priv->line_numbers_font);
-	
-	font_metrics = pango_context_get_metrics (pango_context,
-						  compositor->priv->line_numbers_font,
-						  compositor->priv->language);
-
-	digit_width = (gdouble) pango_font_metrics_get_approximate_digit_width (font_metrics) / PANGO_SCALE;
-	
-	pango_font_metrics_unref (font_metrics);
+	layout = pango_layout_new (pango_context);
 	g_object_unref (pango_context);
-	
-	line_count = gtk_text_buffer_get_line_count (GTK_TEXT_BUFFER (compositor->priv->buffer));
 
-	compositor->priv->line_numbers_width = digit_width * get_n_digits (line_count) + NUMBERS_TEXT_SEPARATION;
-	
+	line_count = gtk_text_buffer_get_line_count (GTK_TEXT_BUFFER (compositor->priv->buffer));
+	n_digits = get_n_digits (line_count);
+	str = g_strnfill (n_digits, '9');
+	pango_layout_set_text (layout, str, -1);
+	g_free (str);
+
+	get_layout_size (layout,
+			 &compositor->priv->line_numbers_width,
+			 &compositor->priv->line_numbers_height);
+
+	g_object_unref (layout);
+
+	/* add some margin */
+	compositor->priv->line_numbers_width += NUMBERS_TEXT_SEPARATION;
+
 	DEBUG ({
-		g_debug ("line_numbers_width: %f mm", convert_to_mm (compositor->priv->line_numbers_width, GTK_UNIT_POINTS));
+		g_debug ("line_numbers size: width: %f mm, height %f mm",
+			 convert_to_mm (compositor->priv->line_numbers_width, GTK_UNIT_POINTS),
+			 convert_to_mm (compositor->priv->line_numbers_height, GTK_UNIT_POINTS));
 	});
 }
 
@@ -1031,20 +1059,12 @@ layout_line_number (GtkSourcePrintCompositor *compositor,
 	// TODO: baseline etc
 }
 
-static void
-get_layout_size (PangoLayout *layout,
-                 double      *width,
-                 double      *height)
+static gboolean
+line_is_numbered (GtkSourcePrintCompositor *compositor,
+		     gint                      line_number)
 {
-	PangoRectangle rect;
-
-	pango_layout_get_extents (layout, NULL, &rect);
-
-	if (width)
-		*width = (double) rect.width / (double) PANGO_SCALE;
-
-	if (height)
-		*height = (double) rect.height / (double) PANGO_SCALE;
+	return (compositor->priv->print_line_numbers > 0) &&
+	       (line_number % compositor->priv->print_line_numbers == 0);
 }
 
 /* Returns TRUE if the document has been completely paginated. otherwise FALSE. 
@@ -1112,8 +1132,11 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 
 	while (gtk_text_iter_compare (&start, &end) < 0)
 	{
+		gint line_number;
 		GtkTextIter line_end;
 		double line_height;
+
+		line_number = gtk_text_iter_get_line (&start);
 
 		line_end = start;
 		if (!gtk_text_iter_ends_line (&line_end))
@@ -1123,8 +1146,13 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 
 		get_layout_size (layout, NULL, &line_height);
 
-//		if (line_number_displayed (op, line_no))
-//			line_height = MAX (line_height, op->priv->ln_height);
+		if (line_is_numbered (compositor, line_number))
+		{
+			g_assert (compositor->priv->line_numbers_height > 0);
+
+			line_height = MAX (line_height,
+					   compositor->priv->line_numbers_height);
+		}
 
 #define EPS (.1)
 		if (page_height > EPS &&
@@ -1231,23 +1259,9 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 	while (gtk_text_iter_compare (&start, &end) < 0)
 	{
 		gint line_number;
-		double line_number_height, line_height;
+		double line_height;
 
 		line_number = gtk_text_iter_get_line (&start);
-
-		/* print the line number if needed */
-		if (compositor->priv->print_line_numbers > 0 &&
-		    ((line_number % compositor->priv->print_line_numbers) == 0))
-		{
-			layout_line_number (compositor,
-					    line_numbers_layout,
-					    line_number);
-
-			get_layout_size (layout, NULL, &line_number_height);
-
-			cairo_move_to (cr, 0, y);
-			pango_cairo_show_layout (cr, line_numbers_layout);
-		}
 
 		/* print the paragraph */
 		if (gtk_text_iter_ends_line (&start))
@@ -1272,10 +1286,23 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 		}
 
 		get_layout_size (layout, NULL, &line_height);
-		line_height = MAX (line_height, line_number_height);
 
 		cairo_move_to (cr, x, y);
 		pango_cairo_show_layout (cr, layout);
+
+		/* print the line number if needed */
+		if (line_is_numbered (compositor, line_number))
+		{
+			layout_line_number (compositor,
+					    line_numbers_layout,
+					    line_number);
+
+			cairo_move_to (cr, 0, y);
+			pango_cairo_show_layout (cr, line_numbers_layout);
+		}
+
+		line_height = MAX (line_height,
+				   compositor->priv->line_numbers_height);
 
 		y += line_height;
 		gtk_text_iter_forward_line (&start);
