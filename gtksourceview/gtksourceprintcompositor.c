@@ -841,6 +841,118 @@ calculate_page_size_and_margins (GtkSourcePrintCompositor *compositor,
 #endif							 
 }
 
+static gboolean
+ignore_tag (GtkSourcePrintCompositor *compositor,
+            GtkTextTag               *tag)
+{
+	/* TODO: ignore bracket match tags etc */
+
+	return FALSE;
+}
+
+static GSList *
+get_iter_attrs (GtkSourcePrintCompositor *compositor,
+		GtkTextIter              *iter,
+		GtkTextIter              *limit)
+{
+	GSList *attrs = NULL;
+	GSList *tags;
+	PangoAttribute *bg = NULL, *fg = NULL, *style = NULL, *ul = NULL;
+	PangoAttribute *weight = NULL, *st = NULL;
+
+	tags = gtk_text_iter_get_tags (iter);
+	gtk_text_iter_forward_to_tag_toggle (iter, NULL);
+
+	if (gtk_text_iter_compare (iter, limit) > 0)
+		*iter = *limit;
+
+	while (tags)
+	{
+		GtkTextTag *tag;
+		gboolean bg_set, fg_set, style_set, ul_set, weight_set, st_set;
+
+		tag = tags->data;
+		tags = g_slist_delete_link (tags, tags);
+
+		if (ignore_tag (compositor, tag))
+			continue;
+
+		g_object_get (tag,
+			     "background-set", &bg_set,
+			     "foreground-set", &fg_set,
+			     "style-set", &style_set,
+			     "underline-set", &ul_set,
+			     "weight-set", &weight_set,
+			     "strikethrough-set", &st_set,
+			     NULL);
+
+		if (bg_set)
+		{
+			GdkColor *color = NULL;
+			if (bg) pango_attribute_destroy (bg);
+			g_object_get (tag, "background-gdk", &color, NULL);
+			bg = pango_attr_background_new (color->red, color->green, color->blue);
+			gdk_color_free (color);
+		}
+
+		if (fg_set)
+		{
+			GdkColor *color = NULL;
+			if (fg) pango_attribute_destroy (fg);
+			g_object_get (tag, "foreground-gdk", &color, NULL);
+			fg = pango_attr_foreground_new (color->red, color->green, color->blue);
+			gdk_color_free (color);
+		}
+
+		if (style_set)
+		{
+			PangoStyle style_value;
+			if (style) pango_attribute_destroy (style);
+			g_object_get (tag, "style", &style_value, NULL);
+			style = pango_attr_style_new (style_value);
+		}
+
+		if (ul_set)
+		{
+			PangoUnderline underline;
+			if (ul) pango_attribute_destroy (ul);
+			g_object_get (tag, "underline", &underline, NULL);
+			ul = pango_attr_underline_new (underline);
+		}
+
+		if (weight_set)
+		{
+			PangoWeight weight_value;
+			if (weight) pango_attribute_destroy (weight);
+			g_object_get (tag, "weight", &weight_value, NULL);
+			weight = pango_attr_weight_new (weight_value);
+		}
+
+		if (st_set)
+		{
+			gboolean strikethrough;
+			if (st) pango_attribute_destroy (st);
+			g_object_get (tag, "strikethrough", &strikethrough, NULL);
+			st = pango_attr_strikethrough_new (strikethrough);
+		}
+	}
+
+	if (bg)
+		attrs = g_slist_prepend (attrs, bg);
+	if (fg)
+		attrs = g_slist_prepend (attrs, fg);
+	if (style)
+		attrs = g_slist_prepend (attrs, style);
+	if (ul)
+		attrs = g_slist_prepend (attrs, ul);
+	if (weight)
+		attrs = g_slist_prepend (attrs, weight);
+	if (st)
+		attrs = g_slist_prepend (attrs, st);
+
+	return attrs;
+}
+
 static void
 layout_paragraph (GtkSourcePrintCompositor *compositor,
 		  PangoLayout              *layout,
@@ -853,7 +965,56 @@ layout_paragraph (GtkSourcePrintCompositor *compositor,
 	pango_layout_set_text (layout, text, -1);
 	g_free (text);
 
-	// TODO: styles
+	if (compositor->priv->highlight_syntax)
+	{
+		PangoAttrList *attr_list = NULL;
+		GtkTextIter segm_start, segm_end;
+		int start_index;
+
+		/* Make sure it is highlighted even if it was not shown yet */
+		gtk_source_buffer_ensure_highlight (compositor->priv->buffer,
+						    start,
+						    end);
+
+		segm_start = *start;
+		start_index = gtk_text_iter_get_line_index (start);
+
+		while (gtk_text_iter_compare (&segm_start, end) < 0)
+		{
+			GSList *attrs;
+			int si, ei;
+
+			segm_end = segm_start;
+			attrs = get_iter_attrs (compositor, &segm_end, end);
+			if (attrs)
+			{
+				si = gtk_text_iter_get_line_index (&segm_start) - start_index;
+				ei = gtk_text_iter_get_line_index (&segm_end) - start_index;
+			}
+
+			while (attrs)
+			{
+				PangoAttribute *a = attrs->data;
+
+				a->start_index = si;
+				a->end_index = ei;
+
+				if (!attr_list)
+					attr_list = pango_attr_list_new ();
+
+				pango_attr_list_insert (attr_list, a);
+
+				attrs = g_slist_delete_link (attrs, attrs);
+			}
+
+			segm_start = segm_end;
+		}
+
+		pango_layout_set_attributes (layout, attr_list);
+
+		if (attr_list)
+			pango_attr_list_unref (attr_list);
+	}
 }
 
 static void
@@ -1026,6 +1187,7 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 {
 	cairo_t *cr;
 	PangoLayout *layout;
+	PangoLayout *line_numbers_layout;
 	GtkTextIter start, end;
 	gint offset;
 	double x, y;
@@ -1042,6 +1204,9 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 	/* TODO: put the layout in priv to create it just once */
 	layout = gtk_print_context_create_pango_layout (context);
 	pango_cairo_update_layout (cr, layout);
+
+	line_numbers_layout = gtk_print_context_create_pango_layout (context);
+	pango_cairo_update_layout (cr, line_numbers_layout);
 
 	g_return_if_fail (compositor->priv->buffer != NULL);
 	g_return_if_fail (compositor->priv->pages != NULL);
@@ -1075,13 +1240,13 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 		    ((line_number % compositor->priv->print_line_numbers) == 0))
 		{
 			layout_line_number (compositor,
-					    layout, /* FIXME: use a separate layout */
+					    line_numbers_layout,
 					    line_number);
 
 			get_layout_size (layout, NULL, &line_number_height);
 
 			cairo_move_to (cr, 0, y);
-			pango_cairo_show_layout (cr, layout);
+			pango_cairo_show_layout (cr, line_numbers_layout);
 		}
 
 		/* print the paragraph */
@@ -1117,5 +1282,6 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 	}
 
 	g_object_unref (layout);
+	g_object_unref (line_numbers_layout);
 }
 
