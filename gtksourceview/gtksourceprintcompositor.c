@@ -1869,6 +1869,22 @@ print_header_string (GtkSourcePrintCompositor *compositor,
 		/* Print only the first line */
 		iter = pango_layout_get_iter (compositor->priv->header_layout);
 		baseline = (gdouble) pango_layout_iter_get_baseline (iter) / (gdouble) PANGO_SCALE;
+		
+		DEBUG ({
+			double w;
+			double h;
+			get_layout_size (compositor->priv->header_layout, &w, &h);
+			cairo_save (cr);
+			cairo_set_line_width (cr, 1.);
+			cairo_set_source_rgb (cr, 0., 0., 1.);
+			cairo_rectangle (cr,
+					 compositor->priv->real_margin_left,
+					 compositor->priv->real_margin_top + baseline,
+					 w,
+					 h);
+			cairo_stroke (cr);
+			cairo_restore (cr);
+		});
 
 		line = pango_layout_iter_get_line_readonly (iter);
 					
@@ -1943,8 +1959,23 @@ print_footer_string (GtkSourcePrintCompositor *compositor,
 		pango_layout_set_text (compositor->priv->footer_layout, text, -1);
 
 		/* Print only the first line */
-
 		line = pango_layout_get_line (compositor->priv->footer_layout, 0);
+
+		DEBUG ({
+			double w;
+			double h;
+			get_layout_size (compositor->priv->header_layout, &w, &h);
+			cairo_save (cr);
+			cairo_set_line_width (cr, 1.);
+			cairo_set_source_rgb (cr, 0., 0., 1.);
+			cairo_rectangle (cr,
+					 compositor->priv->real_margin_left,
+					 compositor->priv->paper_height - compositor->priv->real_margin_bottom - compositor->priv->footer_font_descent,
+					 w,
+					 h);
+			cairo_stroke (cr);
+			cairo_restore (cr);
+		});
 					
 		cairo_move_to (cr,
 			       compositor->priv->real_margin_left, 
