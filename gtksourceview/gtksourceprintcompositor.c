@@ -129,6 +129,10 @@ struct _GtkSourcePrintCompositorPrivate
 	gdouble                  line_numbers_width;
 	gdouble                  line_numbers_height;
 
+	/* layout objects */
+	PangoLayout             *layout;
+	PangoLayout             *line_numbers_layout;
+
 	/* printable (for the document itself) size */
 	gdouble                  text_width;
 	gdouble                  text_height;
@@ -277,6 +281,11 @@ gtk_source_print_compositor_finalize (GObject *object)
 
 	compositor = GTK_SOURCE_PRINT_COMPOSITOR (object);
 
+	if (compositor->priv->layout != NULL)
+		g_object_unref (compositor->priv->layout);
+	if (compositor->priv->line_numbers_layout != NULL)
+		g_object_unref (compositor->priv->line_numbers_layout);
+
 	G_OBJECT_CLASS (gtk_source_print_compositor_parent_class)->finalize (object);
 }
 
@@ -394,7 +403,10 @@ gtk_source_print_compositor_init (GtkSourcePrintCompositor *compositor)
 	
 	priv->paginated_lines = 0;
 	priv->n_pages = -1;
-	
+
+	priv->layout = NULL;
+	priv->line_numbers_layout = NULL;
+
 	priv->language = gtk_get_default_language ();
 
 	/* Negative values mean uninitialized */
@@ -649,6 +661,58 @@ gtk_source_print_compositor_get_n_pages	(GtkSourcePrintCompositor *compositor)
 }
 
 static void
+setup_pango_layouts (GtkSourcePrintCompositor *compositor,
+		     GtkPrintContext          *context)
+{
+	PangoLayout *layout;
+
+	/* Layout for the text */
+	layout = gtk_print_context_create_pango_layout (context);
+	pango_layout_set_font_description (layout, compositor->priv->body_font);
+
+	switch (compositor->priv->wrap_mode)
+	{
+		case GTK_WRAP_CHAR:
+			pango_layout_set_wrap (layout, PANGO_WRAP_CHAR);
+			break;
+		case GTK_WRAP_WORD:
+			pango_layout_set_wrap (layout, PANGO_WRAP_WORD);
+			break;
+		case GTK_WRAP_WORD_CHAR:
+			pango_layout_set_wrap (layout, PANGO_WRAP_WORD_CHAR);
+			break;
+		case GTK_WRAP_NONE:
+			/* FIXME: hack 
+			 * Ellipsize the paragraph when text wrapping is disabled.
+			 * Another possibility would be to set the width so the text 
+			 * breaks into multiple lines, and paginate/render just the 
+			 * first one.
+			 * See also Comment #23 by Owen on bug #143874.
+			 */
+			pango_layout_set_ellipsize (layout, PANGO_ELLIPSIZE_END);
+			break;
+	}
+
+	if (compositor->priv->layout != NULL)
+		g_object_unref (compositor->priv->layout);
+	compositor->priv->layout = layout;
+
+	/* Layout for line numbers */
+	layout = gtk_print_context_create_pango_layout (context);
+
+	if (compositor->priv->line_numbers_font == NULL)
+		compositor->priv->line_numbers_font = pango_font_description_copy_static (compositor->priv->body_font);
+	pango_layout_set_font_description (layout, compositor->priv->line_numbers_font);
+	pango_layout_set_alignment (layout, PANGO_ALIGN_RIGHT);
+
+	if (compositor->priv->line_numbers_layout != NULL)
+		g_object_unref (compositor->priv->line_numbers_layout);
+	compositor->priv->line_numbers_layout = layout;
+
+	/* TODO: header and footer layouts */
+}
+
+static void
 get_layout_size (PangoLayout *layout,
                  double      *width,
                  double      *height)
@@ -682,8 +746,6 @@ calculate_line_numbers_width (GtkSourcePrintCompositor *compositor,
 	gint line_count;
 	gint n_digits;
 	gchar *str;
-	PangoContext *pango_context;
-	PangoLayout *layout;
 
 	if (compositor->priv->print_line_numbers == 0)
 	{
@@ -699,25 +761,15 @@ calculate_line_numbers_width (GtkSourcePrintCompositor *compositor,
 		return;
 	}
 
-	if (compositor->priv->line_numbers_font == NULL)
-		compositor->priv->line_numbers_font = pango_font_description_copy_static (compositor->priv->body_font);
-
-	pango_context = gtk_print_context_create_pango_context (context);
-	pango_context_set_font_description (pango_context, compositor->priv->line_numbers_font);
-	layout = pango_layout_new (pango_context);
-	g_object_unref (pango_context);
-
 	line_count = gtk_text_buffer_get_line_count (GTK_TEXT_BUFFER (compositor->priv->buffer));
 	n_digits = get_n_digits (line_count);
 	str = g_strnfill (n_digits, '9');
-	pango_layout_set_text (layout, str, -1);
+	pango_layout_set_text (compositor->priv->line_numbers_layout, str, -1);
 	g_free (str);
 
-	get_layout_size (layout,
+	get_layout_size (compositor->priv->layout,
 			 &compositor->priv->line_numbers_width,
 			 &compositor->priv->line_numbers_height);
-
-	g_object_unref (layout);
 
 	/* add some margin */
 	compositor->priv->line_numbers_width += NUMBERS_TEXT_SEPARATION;
@@ -753,7 +805,6 @@ calculate_header_footer_height (GtkSourcePrintCompositor *compositor,
 	g_object_unref (pango_context);
 		
 	return HEADER_FOOTER_SIZE_FACTOR * (ascent + descent);
-	
 }
 
 static void
@@ -852,7 +903,10 @@ calculate_page_size_and_margins (GtkSourcePrintCompositor *compositor,
 	compositor->priv->page_width = gtk_print_context_get_width (context);
 	compositor->priv->page_height = gtk_print_context_get_height (context);
 
-#if 0					 
+	compositor->priv->text_width = compositor->priv->page_width -
+				       compositor->priv->line_numbers_width;
+
+#if 0
 	job->priv->text_width = (job->priv->page_width -
 				 job->priv->doc_margin_left - job->priv->doc_margin_right -
 				 job->priv->margin_left - job->priv->margin_right -
@@ -983,14 +1037,13 @@ get_iter_attrs (GtkSourcePrintCompositor *compositor,
 
 static void
 layout_paragraph (GtkSourcePrintCompositor *compositor,
-		  PangoLayout              *layout,
 		  GtkTextIter              *start,
 		  GtkTextIter              *end)
 {
 	gchar *text;
 
 	text = gtk_text_iter_get_slice (start, end);
-	pango_layout_set_text (layout, text, -1);
+	pango_layout_set_text (compositor->priv->layout, text, -1);
 	g_free (text);
 
 	if (compositor->priv->highlight_syntax)
@@ -1038,7 +1091,8 @@ layout_paragraph (GtkSourcePrintCompositor *compositor,
 			segm_start = segm_end;
 		}
 
-		pango_layout_set_attributes (layout, attr_list);
+		pango_layout_set_attributes (compositor->priv->layout,
+					     attr_list);
 
 		if (attr_list)
 			pango_attr_list_unref (attr_list);
@@ -1047,13 +1101,12 @@ layout_paragraph (GtkSourcePrintCompositor *compositor,
 
 static void
 layout_line_number (GtkSourcePrintCompositor *compositor,
-		    PangoLayout              *layout,
 		    gint                      line_number)
 {
 	gchar *str;
 
 	str = g_strdup_printf ("%d", line_number + 1);
-	pango_layout_set_text (layout, str, -1);
+	pango_layout_set_text (compositor->priv->line_numbers_layout, str, -1);
 	g_free (str);
 
 	// TODO: baseline etc
@@ -1078,7 +1131,6 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 				      GtkPrintContext          *context)
 {
 	GtkTextIter start, end;
-	PangoLayout *layout;
 	gint offset;
 	double page_height;
 	GTimer *timer;
@@ -1094,18 +1146,28 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 	if (compositor->priv->state == INIT)
 	{
 		g_return_val_if_fail (compositor->priv->pages == NULL, TRUE);
-		
+
 		compositor->priv->pages = g_array_new (FALSE, FALSE, sizeof (gint));
+
+		setup_pango_layouts (compositor, context);
 
 		calculate_line_numbers_width (compositor, context);
 		calculate_footer_height (compositor, context);
 		calculate_header_height (compositor, context);
 		calculate_page_size_and_margins (compositor, context);
 
+		/* cannot be done when setting up layouts since we need the width */
+		pango_layout_set_width (compositor->priv->layout,
+					compositor->priv->text_width * PANGO_SCALE);
+		pango_layout_set_width (compositor->priv->line_numbers_layout,
+					(compositor->priv->line_numbers_width - NUMBERS_TEXT_SEPARATION)
+					* PANGO_SCALE);
+
 		compositor->priv->state = PAGINATING;
 	}
 
 	g_return_val_if_fail (compositor->priv->state == PAGINATING, FALSE);
+	g_return_val_if_fail (compositor->priv->layout != NULL, FALSE);
 
 	/* TODO: paginate just a chunk of text to
 	   - allow async pagination
@@ -1128,9 +1190,6 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 	offset = gtk_text_iter_get_offset (&start);
 	g_array_append_val (compositor->priv->pages, offset);
 
-	/* TODO: put the layout in priv to create it just once when paginating incrementally */
-	layout = gtk_print_context_create_pango_layout (context);
-
 	page_height = 0;
 
 	while (gtk_text_iter_compare (&start, &end) < 0)
@@ -1145,9 +1204,9 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 		if (!gtk_text_iter_ends_line (&line_end))
 			gtk_text_iter_forward_to_line_end (&line_end);
 
-		layout_paragraph (compositor, layout, &start, &line_end);
+		layout_paragraph (compositor, &start, &line_end);
 
-		get_layout_size (layout, NULL, &line_height);
+		get_layout_size (compositor->priv->layout, NULL, &line_height);
 
 		if (line_is_numbered (compositor, line_number))
 		{
@@ -1176,9 +1235,7 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 	}
 #undef EPS
 
-	g_object_unref (layout);
-
-	{
+	DEBUG ({
 		int i;
 		g_print ("Paginated in %f seconds:\n", g_timer_elapsed (timer, NULL));
 		for (i = 0; i < compositor->priv->pages->len; i += 1)
@@ -1191,7 +1248,7 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 
 			g_print ("  page %d starts at line %d (offset %d)\n", i, gtk_text_iter_get_line (&iter), offset); 
 		}
-	}
+	});
 
 	g_timer_destroy (timer);
 
@@ -1219,8 +1276,6 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 				       gint                      page_nr)
 {
 	cairo_t *cr;
-	PangoLayout *layout;
-	PangoLayout *line_numbers_layout;
 	GtkTextIter start, end;
 	gint offset;
 	double x, y;
@@ -1234,12 +1289,11 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 	x = compositor->priv->line_numbers_width;
 	y = 0;
 
-	/* TODO: put the layout in priv to create it just once */
-	layout = gtk_print_context_create_pango_layout (context);
-	pango_cairo_update_layout (cr, layout);
+	g_return_if_fail (compositor->priv->layout != NULL);
+	g_return_if_fail (compositor->priv->line_numbers_layout != NULL);
 
-	line_numbers_layout = gtk_print_context_create_pango_layout (context);
-	pango_cairo_update_layout (cr, line_numbers_layout);
+	pango_cairo_update_layout (cr, compositor->priv->layout);
+	pango_cairo_update_layout (cr, compositor->priv->line_numbers_layout);
 
 	g_return_if_fail (compositor->priv->buffer != NULL);
 	g_return_if_fail (compositor->priv->pages != NULL);
@@ -1271,8 +1325,8 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 		/* print the paragraph */
 		if (gtk_text_iter_ends_line (&start))
 		{
-			pango_layout_set_text (layout, "", 0);
-			pango_layout_set_attributes (layout, NULL);
+			pango_layout_set_text (compositor->priv->layout, "", 0);
+			pango_layout_set_attributes (compositor->priv->layout, NULL);
 		}
 		else
 		{
@@ -1285,25 +1339,22 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 				line_end = end;
 
 			layout_paragraph (compositor,
-					  layout,
 					  &start,
 					  &line_end);
 		}
 
-		get_layout_size (layout, NULL, &line_height);
+		get_layout_size (compositor->priv->layout, NULL, &line_height);
 
 		cairo_move_to (cr, x, y);
-		pango_cairo_show_layout (cr, layout);
+		pango_cairo_show_layout (cr, compositor->priv->layout);
 
 		/* print the line number if needed */
 		if (line_is_numbered (compositor, line_number))
 		{
-			layout_line_number (compositor,
-					    line_numbers_layout,
-					    line_number);
+			layout_line_number (compositor, line_number);
 
 			cairo_move_to (cr, 0, y);
-			pango_cairo_show_layout (cr, line_numbers_layout);
+			pango_cairo_show_layout (cr, compositor->priv->line_numbers_layout);
 		}
 
 		line_height = MAX (line_height,
@@ -1312,8 +1363,5 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 		y += line_height;
 		gtk_text_iter_forward_line (&start);
 	}
-
-	g_object_unref (layout);
-	g_object_unref (line_numbers_layout);
 }
 
