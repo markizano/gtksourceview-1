@@ -2094,8 +2094,8 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 			gtk_text_iter_forward_to_line_end (&line_end);
 
 		layout_paragraph (compositor, &start, &line_end);
-
-		get_layout_size (compositor->priv->layout, NULL, &line_height);
+double w;
+		get_layout_size (compositor->priv->layout, &w, &line_height);
 
 		if (line_is_numbered (compositor, line_number))
 		{
@@ -2106,8 +2106,7 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 		}
 
 #define EPS (.1)
-		if (cur_height > EPS &&
-		    cur_height + line_height > text_height + EPS)
+		if (cur_height + line_height > text_height + EPS)
 		{
 			/* if we have multiline paragraphs, see how much of
 			 * it we can fit in the current page */
@@ -2144,8 +2143,14 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 				}
 				while (pango_layout_iter_next_line (layout_iter));
 
-				/* move our start iter to the page break */
-				index = pango_layout_iter_get_index (layout_iter);
+				/* move our start iter to the page break:
+				 * note that text_iter_set_index mesures from
+				 * the start of the line, while our layout
+				 * may start in the middle of a line, so we have
+				 * to add.
+				 */
+				index = gtk_text_iter_get_line_index (&start);
+				index += pango_layout_iter_get_index (layout_iter);
 				gtk_text_iter_set_line_index (&start, index);
 
 				pango_layout_iter_free (layout_iter);
@@ -2288,7 +2293,6 @@ print_header_string (GtkSourcePrintCompositor *compositor,
 		});
 
 		line = pango_layout_iter_get_line_readonly (iter);
-				
 
 		cairo_move_to (cr,
 			       x, 
