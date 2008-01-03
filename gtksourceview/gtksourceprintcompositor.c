@@ -2109,15 +2109,57 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 		if (cur_height > EPS &&
 		    cur_height + line_height > text_height + EPS)
 		{
+			/* if we have multiline paragraphs, see how much of
+			 * it we can fit in the current page */
 			if (compositor->priv->wrap_mode != GTK_WRAP_NONE &&
 			    pango_layout_get_line_count (compositor->priv->layout) > 1)
 			{
-				// TODO: wrap multilines
+				PangoLayoutIter *layout_iter;
+				PangoRectangle logical_rect;
+				gboolean is_first_line = TRUE;
+				double part_height = 0;
+				gint index;
+
+				layout_iter = pango_layout_get_iter (compositor->priv->layout);
+
+				do
+				{
+					double layout_line_height;
+
+					pango_layout_iter_get_line_extents (layout_iter, NULL, &logical_rect);
+					layout_line_height = logical_rect.height / PANGO_SCALE;
+
+					if (is_first_line &&
+					    line_is_numbered (compositor, line_number))
+					{
+						layout_line_height = MAX (compositor->priv->line_numbers_height,
+									  layout_line_height);
+					}
+
+					if (cur_height + part_height + layout_line_height > text_height + EPS)
+						break;
+
+					part_height += layout_line_height;
+					is_first_line = FALSE;
+				}
+				while (pango_layout_iter_next_line (layout_iter));
+
+				/* move our start iter to the page break */
+				index = pango_layout_iter_get_index (layout_iter);
+				gtk_text_iter_set_line_index (&start, index);
+
+				/* reset cur_height for the next page */
+				cur_height = line_height - part_height;
+			}
+			else
+			{
+				/* reset cur_height for the next page */
+				cur_height = line_height;
 			}
 
+			/* store the start of the new page */
 			offset = gtk_text_iter_get_offset (&start);
 			g_array_append_val (compositor->priv->pages, offset);
-			cur_height = line_height;
 		}
 		else
 		{
