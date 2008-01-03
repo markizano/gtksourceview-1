@@ -2148,6 +2148,8 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 				index = pango_layout_iter_get_index (layout_iter);
 				gtk_text_iter_set_line_index (&start, index);
 
+				pango_layout_iter_free (layout_iter);
+
 				page_start_offset = gtk_text_iter_get_offset (&start);
 
 				/* if the remainder fits on the next page, go
