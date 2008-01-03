@@ -2021,7 +2021,7 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 				      GtkPrintContext          *context)
 {
 	GtkTextIter start, end;
-	gint offset;
+	gint page_start_offset;
 	double text_height;
 	double cur_height;
 	GTimer *timer;
@@ -2075,8 +2075,8 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 	gtk_text_buffer_get_end_iter (GTK_TEXT_BUFFER (compositor->priv->buffer), &end);
 
 	/* add the first page start */
-	offset = gtk_text_iter_get_offset (&start);
-	g_array_append_val (compositor->priv->pages, offset);
+	page_start_offset = gtk_text_iter_get_offset (&start);
+	g_array_append_val (compositor->priv->pages, page_start_offset);
 
 	cur_height = 0;
 	text_height = get_text_height (compositor);
@@ -2148,25 +2148,40 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 				index = pango_layout_iter_get_index (layout_iter);
 				gtk_text_iter_set_line_index (&start, index);
 
-				/* reset cur_height for the next page */
-				cur_height = line_height - part_height;
+				page_start_offset = gtk_text_iter_get_offset (&start);
+
+				/* if the remainder fits on the next page, go
+				 * on to the next line, otherwise restart pagination
+				 * from the page break we found */
+				if (line_height - part_height > text_height + EPS)
+				{
+					cur_height = 0;
+				}
+				else
+				{
+					/* reset cur_height for the next page */
+					cur_height = line_height - part_height;
+					gtk_text_iter_forward_line (&start);
+				}
 			}
 			else
 			{
+				page_start_offset = gtk_text_iter_get_offset (&start);
+
 				/* reset cur_height for the next page */
 				cur_height = line_height;
+				gtk_text_iter_forward_line (&start);
 			}
 
 			/* store the start of the new page */
-			offset = gtk_text_iter_get_offset (&start);
-			g_array_append_val (compositor->priv->pages, offset);
+			g_array_append_val (compositor->priv->pages,
+					    page_start_offset);
 		}
 		else
 		{
 			cur_height += line_height;
+			gtk_text_iter_forward_line (&start);
 		}
-
-		gtk_text_iter_forward_line (&start);
 	}
 #undef EPS
 
