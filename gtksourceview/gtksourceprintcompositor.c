@@ -2275,16 +2275,14 @@ print_header (GtkSourcePrintCompositor *compositor,
 		gdouble y = compositor->priv->real_margin_top + 
 			    (1 - SEPARATOR_SPACING_FACTOR) * compositor->priv->header_height;
 
-		DEBUG ({
-			cairo_save (cr);
-		
-			cairo_move_to (cr, compositor->priv->real_margin_left, y);
-			cairo_set_line_width (cr, SEPARATOR_LINE_WIDTH);
-			cairo_line_to (cr, compositor->priv->paper_width - compositor->priv->real_margin_right, y);
-			cairo_stroke (cr);
+		cairo_save (cr);
+	
+		cairo_move_to (cr, compositor->priv->real_margin_left, y);
+		cairo_set_line_width (cr, SEPARATOR_LINE_WIDTH);
+		cairo_line_to (cr, compositor->priv->paper_width - compositor->priv->real_margin_right, y);
+		cairo_stroke (cr);
 
-			cairo_restore (cr);
-		});
+		cairo_restore (cr);
 	}
 }
 
@@ -2393,16 +2391,14 @@ print_footer (GtkSourcePrintCompositor *compositor,
 			    compositor->priv->real_margin_bottom -
 			    (1 - SEPARATOR_SPACING_FACTOR) * compositor->priv->footer_height;
 
-		DEBUG ({
-			cairo_save (cr);
+		cairo_save (cr);
 
-			cairo_move_to (cr, compositor->priv->real_margin_left, y);
-			cairo_set_line_width (cr, SEPARATOR_LINE_WIDTH);
-			cairo_line_to (cr, compositor->priv->paper_width - compositor->priv->real_margin_right, y);
-			cairo_stroke (cr);
+		cairo_move_to (cr, compositor->priv->real_margin_left, y);
+		cairo_set_line_width (cr, SEPARATOR_LINE_WIDTH);
+		cairo_line_to (cr, compositor->priv->paper_width - compositor->priv->real_margin_right, y);
+		cairo_stroke (cr);
 
-			cairo_restore (cr);
-		});
+		cairo_restore (cr);
 	}
 }
 
