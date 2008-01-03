@@ -842,6 +842,8 @@ end_print (GtkPrintOperation        *operation,
 }
 
 #define LINE_NUMBERS_FONT_NAME   "Monospace 6"
+#define HEADER_FONT_NAME   "Serif Italic 12"
+#define FOOTER_FONT_NAME   "SansSerif Bold 8"
 
 static void
 print_file_cb (GtkAction *action, gpointer user_data)
@@ -878,6 +880,12 @@ print_file_cb (GtkAction *action, gpointer user_data)
 
 	gtk_source_print_compositor_set_print_header (compositor, TRUE);
 	gtk_source_print_compositor_set_print_footer (compositor, TRUE);
+
+	gtk_source_print_compositor_set_header_font_name (compositor,
+							  HEADER_FONT_NAME);
+
+	gtk_source_print_compositor_set_footer_font_name (compositor,
+							  FOOTER_FONT_NAME);
 	
 	operation = gtk_print_operation_new ();
 	

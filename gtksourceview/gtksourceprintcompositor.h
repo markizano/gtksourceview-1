@@ -94,19 +94,18 @@ void			  gtk_source_print_compositor_set_line_numbers_font_name
 gchar			 *gtk_source_print_compositor_get_line_numbers_font_name
 									(GtkSourcePrintCompositor *compositor);
 
-#if 0
 void			  gtk_source_print_compositor_set_header_font_name
 									(GtkSourcePrintCompositor *compositor,
 									 const gchar              *font_name);
-const gchar		 *gtk_source_print_compositor_get_header_font_name
+gchar			 *gtk_source_print_compositor_get_header_font_name
 									(GtkSourcePrintCompositor *compositor);
 
 void			  gtk_source_print_compositor_set_footer_font_name
 									(GtkSourcePrintCompositor *compositor,
 									 const gchar              *font_name);
-const gchar		 *gtk_source_print_compositor_get_footer_font_name
+gchar			 *gtk_source_print_compositor_get_footer_font_name
 									(GtkSourcePrintCompositor *compositor);
-
+#if 0
 gdouble			  gtk_source_print_compositor_get_top_margin	(GtkSourcePrintCompositor *compositor,
 									 GtkUnit                   unit);
 void			  gtk_source_print_compositor_set_top_margin	(GtkSourcePrintCompositor *compositor,

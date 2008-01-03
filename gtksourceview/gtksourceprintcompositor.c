@@ -160,8 +160,12 @@ enum
 	PROP_WRAP_MODE,
 	PROP_HIGHLIGHT_SYNTAX,
 	PROP_PRINT_LINE_NUMBERS,
+	PROP_PRINT_HEADER,
+	PROP_PRINT_FOOTER,
 	PROP_BODY_FONT_NAME,
-	PROP_LINE_NUMBERS_FONT_NAME
+	PROP_LINE_NUMBERS_FONT_NAME,
+	PROP_HEADER_FONT_NAME,
+	PROP_FOOTER_FONT_NAME	
 };
 
 G_DEFINE_TYPE (GtkSourcePrintCompositor, gtk_source_print_compositor, G_TYPE_OBJECT)
@@ -240,6 +244,14 @@ gtk_source_print_compositor_get_property (GObject    *object,
 			g_value_set_uint (value,
 					  gtk_source_print_compositor_get_print_line_numbers (compositor));
 			break;
+		case PROP_PRINT_HEADER:
+			g_value_set_boolean (value,
+					     gtk_source_print_compositor_get_print_header (compositor));
+			break;			
+		case PROP_PRINT_FOOTER:
+			g_value_set_boolean (value,
+					     gtk_source_print_compositor_get_print_footer (compositor));			
+			break;			
 		case PROP_BODY_FONT_NAME:
 			g_value_set_string (value,
 					    gtk_source_print_compositor_get_body_font_name (compositor));
@@ -248,6 +260,14 @@ gtk_source_print_compositor_get_property (GObject    *object,
 			g_value_set_string (value,
 					    gtk_source_print_compositor_get_line_numbers_font_name (compositor));
 			break;
+		case PROP_HEADER_FONT_NAME:
+			g_value_set_string (value,
+					    gtk_source_print_compositor_get_header_font_name (compositor));
+			break;
+		case PROP_FOOTER_FONT_NAME:
+			g_value_set_string (value,
+					    gtk_source_print_compositor_get_footer_font_name (compositor));
+			break;						
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 			break;
@@ -261,8 +281,6 @@ gtk_source_print_compositor_set_property (GObject      *object,
 					  GParamSpec   *pspec)
 {
 	GtkSourcePrintCompositor *compositor = GTK_SOURCE_PRINT_COMPOSITOR (object);
-
-	g_debug ("gtk_source_print_compositor_set_property");
 	
 	switch (prop_id)
 	{
@@ -285,6 +303,13 @@ gtk_source_print_compositor_set_property (GObject      *object,
 			gtk_source_print_compositor_set_print_line_numbers (compositor,
 									    g_value_get_uint (value));
 			break;
+		case PROP_PRINT_HEADER:
+			gtk_source_print_compositor_set_print_header (compositor, g_value_get_boolean (value));
+			break;
+
+		case PROP_PRINT_FOOTER:
+			gtk_source_print_compositor_set_print_footer (compositor, g_value_get_boolean (value));
+			break;						
 		case PROP_BODY_FONT_NAME:
 			gtk_source_print_compositor_set_body_font_name (compositor,
 									g_value_get_string (value));
@@ -293,6 +318,14 @@ gtk_source_print_compositor_set_property (GObject      *object,
 			gtk_source_print_compositor_set_line_numbers_font_name (compositor,
 										g_value_get_string (value));
 			break;
+		case PROP_HEADER_FONT_NAME:
+			gtk_source_print_compositor_set_header_font_name (compositor,
+									g_value_get_string (value));
+			break;
+		case PROP_FOOTER_FONT_NAME:
+			gtk_source_print_compositor_set_footer_font_name (compositor,
+									g_value_get_string (value));
+			break;			
 		default:
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
 			break;
@@ -318,6 +351,17 @@ gtk_source_print_compositor_finalize (GObject *object)
 	if (compositor->priv->footer_layout != NULL)
 		g_object_unref (compositor->priv->footer_layout);
 
+	pango_font_description_free (compositor->priv->body_font);
+
+	if (compositor->priv->line_numbers_font != NULL)
+		pango_font_description_free (compositor->priv->line_numbers_font);
+
+	if (compositor->priv->header_font != NULL)
+		pango_font_description_free (compositor->priv->header_font);
+
+	if (compositor->priv->footer_font != NULL)
+		pango_font_description_free (compositor->priv->footer_font);
+		
 	g_free (compositor->priv->header_format_left);
 	g_free (compositor->priv->header_format_right);
 	g_free (compositor->priv->header_format_center);
@@ -387,20 +431,55 @@ gtk_source_print_compositor_class_init (GtkSourcePrintCompositorClass *klass)
 							    0, 100, 1,
 							    G_PARAM_READWRITE));
 	g_object_class_install_property (object_class,
+					 PROP_PRINT_HEADER,
+					 g_param_spec_boolean ("print-header",
+							       _("Print Header"),
+							       _("Whether to print a header "
+								 "in each page"),
+							       FALSE,
+							       G_PARAM_READWRITE));
+	g_object_class_install_property (object_class,
+					 PROP_PRINT_FOOTER,
+					 g_param_spec_boolean ("print-footer",
+							       _("Print Footer"),
+							       _("Whether to print a footer "
+								 "in each page"),
+							       FALSE,
+							       G_PARAM_READWRITE));
+	g_object_class_install_property (object_class,
 					 PROP_BODY_FONT_NAME,
 					 g_param_spec_string ("body-font-name",
 							      _("Body Font Name"),
-							      _("Font name to use for the text"),
+							      _("Name of the font to use for the text body "
+							        "(e.g. \"Monospace 10\")"),
 							      NULL,
 							      G_PARAM_READWRITE));
 	g_object_class_install_property (object_class,
 					 PROP_LINE_NUMBERS_FONT_NAME,
 					 g_param_spec_string ("line-numbers-font-name",
 							      _("Line Numbers Font Name"),
-							      _("Font name to use for the line numbers"),
+							      _("Name of the font to use for the line numbers"
+							        "(e.g. \"Monospace 10\")"),							      
+							      NULL,
+							      G_PARAM_READWRITE));
+	g_object_class_install_property (object_class,
+					 PROP_HEADER_FONT_NAME,
+					 g_param_spec_string ("header-font-name",
+							      _("Header Font Name"),
+							      _("Name of the font to use for the page header"
+							        "(e.g. \"Monospace 10\")"),							      
 							      NULL,
 							      G_PARAM_READWRITE));
 
+	g_object_class_install_property (object_class,
+					 PROP_FOOTER_FONT_NAME,
+					 g_param_spec_string ("footer-font-name",
+							      _("Footer Font Name"),
+							      _("Name of the font to use for the page footer"
+							        "(e.g. \"Monospace 10\")"),							      
+							      NULL,
+							      G_PARAM_READWRITE));
+							      
 	g_type_class_add_private (object_class, sizeof(GtkSourcePrintCompositorPrivate));	
 }
 
@@ -408,8 +487,6 @@ static void
 gtk_source_print_compositor_init (GtkSourcePrintCompositor *compositor)
 {
 	GtkSourcePrintCompositorPrivate *priv;
-
-	g_debug ("gtk_source_print_compositor_init");
 	
 	priv = G_TYPE_INSTANCE_GET_PRIVATE (compositor, 
 					    GTK_TYPE_SOURCE_PRINT_COMPOSITOR,
@@ -615,6 +692,9 @@ gtk_source_print_compositor_get_wrap_mode (GtkSourcePrintCompositor *compositor)
  * 
  * Sets whether the printed text will be highlighted according to the
  * buffer rules.  Both color and font style are applied.
+ *
+ * This function cannot be called anymore after the first call to the 
+ * "paginate" function.   
  **/
 void
 gtk_source_print_compositor_set_highlight_syntax (GtkSourcePrintCompositor *compositor,
@@ -657,6 +737,9 @@ gtk_source_print_compositor_get_highlight_syntax (GtkSourcePrintCompositor *comp
  * Sets the interval for printed line numbers.  If @interval is 0 no
  * numbers will be printed.  If greater than 0, a number will be
  * printed every @interval lines (i.e. 1 will print all line numbers).
+ * 
+ * This function cannot be called anymore after the first call to the 
+ * "paginate" function.   
  **/
 void
 gtk_source_print_compositor_set_print_line_numbers (GtkSourcePrintCompositor *compositor,
@@ -685,6 +768,9 @@ gtk_source_print_compositor_set_print_line_numbers (GtkSourcePrintCompositor *co
  *
  * Note that by default the header format is unspecified, and if it's
  * empty it will not be printed, regardless of this setting.
+ *
+ * This function cannot be called anymore after the first call to the 
+ * "paginate" function.    
  **/
 void
 gtk_source_print_compositor_set_print_header (GtkSourcePrintCompositor *compositor,
@@ -734,6 +820,9 @@ gtk_source_print_compositor_get_print_header (GtkSourcePrintCompositor *composit
  *
  * Note that by default the footer format is unspecified, and if it's
  * empty it will not be printed, regardless of this setting.
+ *
+ * This function cannot be called anymore after the first call to the 
+ * "paginate" function.    
  **/
 void
 gtk_source_print_compositor_set_print_footer (GtkSourcePrintCompositor *compositor,
@@ -794,6 +883,9 @@ gtk_source_print_compositor_get_print_footer (GtkSourcePrintCompositor *composit
  * For the header to be printed, in
  * addition to specifying format strings, you need to enable header
  * printing with gtk_source_print_compositor_set_print_header().
+ *
+ * This function cannot be called anymore after the first call to the 
+ * "paginate" function.    
  **/
 void 
 gtk_source_print_compositor_set_header_format (GtkSourcePrintCompositor *compositor,
@@ -840,6 +932,9 @@ gtk_source_print_compositor_set_header_format (GtkSourcePrintCompositor *composi
  * For the footer to be printed, in
  * addition to specifying format strings, you need to enable footer
  * printing with gtk_source_print_compositor_set_print_footer().
+ *
+ * This function cannot be called anymore after the first call to the 
+ * "paginate" function.    
  **/
 void 
 gtk_source_print_compositor_set_footer_format (GtkSourcePrintCompositor *compositor,
@@ -882,12 +977,19 @@ gtk_source_print_compositor_get_print_line_numbers (GtkSourcePrintCompositor *co
 }
 
 static gboolean
-set_font_description_from_name (PangoFontDescription **font,
-				const gchar           *font_name)
+set_font_description_from_name (GtkSourcePrintCompositor  *compositor,
+				PangoFontDescription     **font,
+				const gchar               *font_name)
 {
 	PangoFontDescription *new;
 
-	new = pango_font_description_from_string (font_name);
+	if (font_name != NULL)	
+		new = pango_font_description_from_string (font_name);
+	else
+	{
+		g_return_val_if_fail (compositor->priv->body_font != NULL, FALSE);
+		new = pango_font_description_copy (compositor->priv->body_font);
+	}	
 
 	if (*font == NULL || !pango_font_description_equal (*font, new))
 	{
@@ -905,20 +1007,47 @@ set_font_description_from_name (PangoFontDescription **font,
 	}
 }
 
+/**
+ * gtk_source_print_compositor_set_body_font_name:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @font_name: the name of the default font for the body of text.
+ *
+ * Sets the default font for the printed text. 
+ *
+ * @font_name should be a
+ * string representation of a font description Pango can understand.
+ * (e.g. &quot;Monospace 10&quot;). See pango_font_description_from_string()
+ * for a description of the format of the string representation. 
+ * 
+ * This function cannot be called anymore after the first call to the 
+ * "paginate" function.   
+ */
 void
 gtk_source_print_compositor_set_body_font_name (GtkSourcePrintCompositor *compositor,
 						const gchar              *font_name)
 {
 	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
 	g_return_if_fail (font_name != NULL);
+	g_return_if_fail (compositor->priv->state == INIT);	
 
-	if (set_font_description_from_name (&compositor->priv->body_font,
+	if (set_font_description_from_name (compositor,
+					    &compositor->priv->body_font,
 					    font_name))
 	{
 		g_object_notify (G_OBJECT (compositor), "body-font-name");
 	}
 }
 
+/**
+ * gtk_source_print_compositor_get_body_font_name:
+ * @compositor: a #GtkSourcePrintCompositor.
+ *
+ * Returns the name of the font used to print the text body. The returned string
+ * must be freed with g_free())
+ *
+ * Return value: a new string containing the name of the font used to print the 
+ * text body.
+ */
 gchar *
 gtk_source_print_compositor_get_body_font_name (GtkSourcePrintCompositor *compositor)
 {
@@ -927,30 +1056,178 @@ gtk_source_print_compositor_get_body_font_name (GtkSourcePrintCompositor *compos
 	return pango_font_description_to_string (compositor->priv->body_font);
 }
 
+/**
+ * gtk_source_print_compositor_set_line_numbers_font_name:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @font_name: the name of the font for line numbers, or %NULL.
+ *
+ * Sets the font for printing line numbers on the left margin.  If
+ * %NULL is supplied, the default font (i.e. the one being used for the
+ * text) will be used instead.  
+ *
+ * @font_name should be a
+ * string representation of a font description Pango can understand.
+ * (e.g. &quot;Monospace 10&quot;). See pango_font_description_from_string()
+ * for a description of the format of the string representation. 
+ *
+ * This function cannot be called anymore after the first call to the 
+ * "paginate" function.    
+ */
 void
 gtk_source_print_compositor_set_line_numbers_font_name (GtkSourcePrintCompositor *compositor,
 							const gchar              *font_name)
 {
 	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
 	g_return_if_fail (font_name != NULL);
-
-	if (set_font_description_from_name (&compositor->priv->line_numbers_font,
+	g_return_if_fail (compositor->priv->state == INIT);	
+	
+	if (set_font_description_from_name (compositor,
+					    &compositor->priv->line_numbers_font,	
 					    font_name))
 	{
 		g_object_notify (G_OBJECT (compositor), "line-numbers-font-name");
 	}
 }
 
+/**
+ * gtk_source_print_compositor_get_line_numbers_font_name:
+ * @compositor: a #GtkSourcePrintCompositor.
+ *
+ * Returns the name of the font used to print line numbers on the left margin. 
+ * The returned string must be freed with g_free())
+ *
+ * Return value: a new string containing the name of the font used to print 
+ * line numbers on the left margin.
+ */
 gchar *
 gtk_source_print_compositor_get_line_numbers_font_name (GtkSourcePrintCompositor *compositor)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), NULL);
 
-	return compositor->priv->line_numbers_font ?
-	       pango_font_description_to_string (compositor->priv->line_numbers_font) :
-	       NULL;
+	if (compositor->priv->line_numbers_font == NULL)
+	{
+		g_return_val_if_fail (compositor->priv->body_font != NULL, NULL);
+		compositor->priv->line_numbers_font = pango_font_description_copy (compositor->priv->body_font);
+	}
+	
+	return pango_font_description_to_string (compositor->priv->line_numbers_font);
 }
 
+/**
+ * gtk_source_print_compositor_set_header_font_name:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @font_name: the name of the font for line numbers, or %NULL.
+ *
+ * Sets the font for printing the page header. If
+ * %NULL is supplied, the default font (i.e. the one being used for the
+ * text) will be used instead.  
+ *
+ * @font_name should be a
+ * string representation of a font description Pango can understand.
+ * (e.g. &quot;Monospace 10&quot;). See pango_font_description_from_string()
+ * for a description of the format of the string representation. 
+ *
+ * This function cannot be called anymore after the first call to the 
+ * "paginate" function.    
+ */
+void
+gtk_source_print_compositor_set_header_font_name (GtkSourcePrintCompositor *compositor,
+							const gchar              *font_name)
+{
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	g_return_if_fail (font_name != NULL);
+	g_return_if_fail (compositor->priv->state == INIT);	
+	
+	if (set_font_description_from_name (compositor,
+					    &compositor->priv->header_font,	
+					    font_name))
+
+	{
+		g_object_notify (G_OBJECT (compositor), "header-font-name");
+	}
+}
+
+/**
+ * gtk_source_print_compositor_get_header_font_name:
+ * @compositor: a #GtkSourcePrintCompositor.
+ *
+ * Returns the name of the font used to print the page header. 
+ * The returned string must be freed with g_free())
+ *
+ * Return value: a new string containing the name of the font used to print 
+ * the page header.
+ */
+gchar *
+gtk_source_print_compositor_get_header_font_name (GtkSourcePrintCompositor *compositor)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), NULL);
+
+	if (compositor->priv->header_font == NULL)
+	{
+		g_return_val_if_fail (compositor->priv->body_font != NULL, NULL);
+		compositor->priv->header_font = pango_font_description_copy (compositor->priv->body_font);
+	}
+	
+	return pango_font_description_to_string (compositor->priv->header_font);
+}
+
+/**
+ * gtk_source_print_compositor_set_footer_font_name:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @font_name: the name of the font for line numbers, or %NULL.
+ *
+ * Sets the font for printing the page footer. If
+ * %NULL is supplied, the default font (i.e. the one being used for the
+ * text) will be used instead.  
+ *
+ * @font_name should be a
+ * string representation of a font description Pango can understand.
+ * (e.g. &quot;Monospace 10&quot;). See pango_font_description_from_string()
+ * for a description of the format of the string representation. 
+ *
+ * This function cannot be called anymore after the first call to the 
+ * "paginate" function.    
+ */
+void
+gtk_source_print_compositor_set_footer_font_name (GtkSourcePrintCompositor *compositor,
+							const gchar              *font_name)
+{
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	g_return_if_fail (font_name != NULL);
+	g_return_if_fail (compositor->priv->state == INIT);	
+	
+	if (set_font_description_from_name (compositor,
+					    &compositor->priv->footer_font,	
+					    font_name))
+
+	{
+		g_object_notify (G_OBJECT (compositor), "footer-font-name");
+	}
+}
+
+/**
+ * gtk_source_print_compositor_get_footer_font_name:
+ * @compositor: a #GtkSourcePrintCompositor.
+ *
+ * Returns the name of the font used to print the page footer. 
+ * The returned string must be freed with g_free())
+ *
+ * Return value: a new string containing the name of the font used to print 
+ * the page footer.
+ */
+gchar *
+gtk_source_print_compositor_get_footer_font_name (GtkSourcePrintCompositor *compositor)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), NULL);
+
+	if (compositor->priv->footer_font == NULL)
+	{
+		g_return_val_if_fail (compositor->priv->body_font != NULL, NULL);
+		compositor->priv->footer_font = pango_font_description_copy (compositor->priv->body_font);
+	}
+	
+	return pango_font_description_to_string (compositor->priv->footer_font);
+}
 /**
  * gtk_source_print_compositor_get_n_pages:
  * @compositor: a #GtkSourcePrintCompositor.
@@ -1318,8 +1595,7 @@ calculate_line_numbers_layout_size (GtkSourcePrintCompositor *compositor,
 
 	line_count = gtk_text_buffer_get_line_count (GTK_TEXT_BUFFER (compositor->priv->buffer));
 	n_digits = get_n_digits (line_count);
-	str = g_strnfill (n_digits, '9');
-	g_debug ("str: %s", str);
+	str = g_strnfill (n_digits, '9');	
 	pango_layout_set_text (compositor->priv->line_numbers_layout, str, -1);
 	g_free (str);
 
@@ -1827,6 +2103,8 @@ gtk_source_print_compositor_get_pagination_progress (GtkSourcePrintCompositor *c
 	g_return_val_if_fail (compositor->priv->state == PAGINATING ||
 			      compositor->priv->state == DONE, -1);
 
+	// FIXME: returns paginated lines or characters
+	
 	return compositor->priv->n_pages;	
 }
 
