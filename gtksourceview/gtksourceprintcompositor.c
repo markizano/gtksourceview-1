@@ -410,14 +410,29 @@ gtk_source_print_compositor_class_init (GtkSourcePrintCompositorClass *klass)
 							    MAX_TAB_WIDTH,
 							    DEFAULT_TAB_WIDTH,
 							    G_PARAM_READWRITE));
+
+
+	/**
+	 * GtkSourcePrintCompositor:wrap-mode:
+	 *
+	 * Whether to wrap lines never, at word boundaries, or at character boundaries.
+	 */
 	g_object_class_install_property (object_class,
 					 PROP_WRAP_MODE,
 					 g_param_spec_enum ("wrap-mode",
 							    _("Wrap Mode"),
-							    _("Word wrapping mode"),
+							    _("Whether to wrap lines never, "
+							      "at word boundaries, or at "
+							      "character boundaries."),
 							    GTK_TYPE_WRAP_MODE,
 							    GTK_WRAP_NONE,
 							    G_PARAM_READWRITE));
+
+	/**
+	 * GtkSourcePrintCompositor:highlight-syntax:
+	 *
+	 * Whether to print the document with highlighted syntax.
+	 */
 	g_object_class_install_property (object_class,
 					 PROP_HIGHLIGHT_SYNTAX,
 					 g_param_spec_boolean ("highlight-syntax",
@@ -427,6 +442,14 @@ gtk_source_print_compositor_class_init (GtkSourcePrintCompositorClass *klass)
 								 "syntax"),
 							       TRUE,
 							       G_PARAM_READWRITE));
+
+	/*
+	 * GtkSourcePrintCompositor:print-line-numbers:
+	 *
+	 * Interval of printed line numbers. If this property is set to 0 no
+	 * numbers will be printed.  If greater than 0, a number will be
+ 	 * printed every "print-line-numbers" lines (i.e. 1 will print all line numbers).
+	 */
 	g_object_class_install_property (object_class,
 					 PROP_PRINT_LINE_NUMBERS,
 					 g_param_spec_uint ("print-line-numbers",
