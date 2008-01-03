@@ -384,7 +384,7 @@ gtk_source_print_compositor_class_init (GtkSourcePrintCompositorClass *klass)
 	object_class->finalize = gtk_source_print_compositor_finalize;
 
 	/**
-	 * GtkSourcePrintCompositor:tab-width:
+	 * GtkSourcePrintCompositor:buffer:
 	 *
 	 * The GtkSourceBuffer object to print.
 	 */
@@ -396,6 +396,11 @@ gtk_source_print_compositor_class_init (GtkSourcePrintCompositorClass *klass)
 							      GTK_TYPE_SOURCE_BUFFER,
 							      G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY));
 
+	/**
+	 * GtkSourcePrintCompositor:tab-width:
+	 *
+	 * Width of a tab character expressed in spaces.
+	 */
 	g_object_class_install_property (object_class,
 					 PROP_TAB_WIDTH,
 					 g_param_spec_uint ("tab-width",
@@ -479,7 +484,7 @@ gtk_source_print_compositor_class_init (GtkSourcePrintCompositorClass *klass)
 							        "(e.g. \"Monospace 10\")"),							      
 							      NULL,
 							      G_PARAM_READWRITE));
-							      
+
 	g_type_class_add_private (object_class, sizeof(GtkSourcePrintCompositorPrivate));	
 }
 
@@ -640,7 +645,7 @@ guint
 gtk_source_print_compositor_get_tab_width (GtkSourcePrintCompositor *compositor)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), DEFAULT_TAB_WIDTH);
-	
+
 	return compositor->priv->tab_width;
 }
 
@@ -1190,12 +1195,12 @@ gtk_source_print_compositor_get_header_font_name (GtkSourcePrintCompositor *comp
  */
 void
 gtk_source_print_compositor_set_footer_font_name (GtkSourcePrintCompositor *compositor,
-							const gchar              *font_name)
+						  const gchar              *font_name)
 {
 	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
 	g_return_if_fail (font_name != NULL);
 	g_return_if_fail (compositor->priv->state == INIT);	
-	
+
 	if (set_font_description_from_name (compositor,
 					    &compositor->priv->footer_font,	
 					    font_name))
@@ -1228,6 +1233,7 @@ gtk_source_print_compositor_get_footer_font_name (GtkSourcePrintCompositor *comp
 	
 	return pango_font_description_to_string (compositor->priv->footer_font);
 }
+
 /**
  * gtk_source_print_compositor_get_n_pages:
  * @compositor: a #GtkSourcePrintCompositor.
@@ -1341,6 +1347,34 @@ is_footer_to_print (GtkSourcePrintCompositor *compositor)
 	        (compositor->priv->footer_format_right != NULL)));
 }
 
+static void
+set_layout_tab_width (GtkSourcePrintCompositor *compositor,
+		      PangoLayout              *layout)
+{
+	gchar *str;
+	gint tab_width = 0;
+
+	str = g_strnfill (compositor->priv->tab_width, ' ');
+	pango_layout_set_text (layout, str, -1);
+	g_free (str);
+
+	pango_layout_get_size (layout, &tab_width, NULL);
+
+	if (tab_width > 0)
+	{
+		PangoTabArray *tab_array;
+
+		tab_array = pango_tab_array_new (1, FALSE);
+
+		pango_tab_array_set_tab (tab_array,
+					 0,
+					 PANGO_TAB_LEFT,
+					 tab_width);
+		pango_layout_set_tabs (layout, tab_array);
+
+		pango_tab_array_free (tab_array);
+	}
+}
 
 static void
 setup_pango_layouts (GtkSourcePrintCompositor *compositor,
@@ -1375,8 +1409,9 @@ setup_pango_layouts (GtkSourcePrintCompositor *compositor,
 			break;
 	}
 
-	g_return_if_fail (compositor->priv->layout == NULL);
+	set_layout_tab_width (compositor, layout);
 
+	g_return_if_fail (compositor->priv->layout == NULL);
 	compositor->priv->layout = layout;
 
 	/* Layout for line numbers */
@@ -1532,7 +1567,9 @@ evaluate_format_string (GtkSourcePrintCompositor *compositor,
 			}
 		}
 		else
+		{
 			g_string_append_unichar (eval, ch);
+		}
 
 		format = g_utf8_next_char (format);
 		ch = g_utf8_get_char (format);
@@ -2177,8 +2214,8 @@ print_header_string (GtkSourcePrintCompositor *compositor,
 		}	
 				
 		DEBUG ({
-			
 			cairo_save (cr);
+
 			cairo_set_line_width (cr, 1.);
 			cairo_set_source_rgb (cr, 0., 0., 1.);
 			cairo_rectangle (cr,
@@ -2187,6 +2224,7 @@ print_header_string (GtkSourcePrintCompositor *compositor,
 					 layout_width,
 					 layout_height);
 			cairo_stroke (cr);
+
 			cairo_restore (cr);
 		});
 
@@ -2237,14 +2275,16 @@ print_header (GtkSourcePrintCompositor *compositor,
 		gdouble y = compositor->priv->real_margin_top + 
 			    (1 - SEPARATOR_SPACING_FACTOR) * compositor->priv->header_height;
 
-		cairo_save (cr);
+		DEBUG ({
+			cairo_save (cr);
 		
-		cairo_move_to (cr, compositor->priv->real_margin_left, y);
-		cairo_set_line_width (cr, SEPARATOR_LINE_WIDTH);
-	        cairo_line_to (cr, compositor->priv->paper_width - compositor->priv->real_margin_right, y);
-	        cairo_stroke (cr);
+			cairo_move_to (cr, compositor->priv->real_margin_left, y);
+			cairo_set_line_width (cr, SEPARATOR_LINE_WIDTH);
+			cairo_line_to (cr, compositor->priv->paper_width - compositor->priv->real_margin_right, y);
+			cairo_stroke (cr);
 
-		cairo_restore (cr);
+			cairo_restore (cr);
+		});
 	}
 }
 
@@ -2353,14 +2393,16 @@ print_footer (GtkSourcePrintCompositor *compositor,
 			    compositor->priv->real_margin_bottom -
 			    (1 - SEPARATOR_SPACING_FACTOR) * compositor->priv->footer_height;
 
-		cairo_save (cr);
-		
-		cairo_move_to (cr, compositor->priv->real_margin_left, y);
-		cairo_set_line_width (cr, SEPARATOR_LINE_WIDTH);
-	        cairo_line_to (cr, compositor->priv->paper_width - compositor->priv->real_margin_right, y);
-	        cairo_stroke (cr);
+		DEBUG ({
+			cairo_save (cr);
 
-		cairo_restore (cr);
+			cairo_move_to (cr, compositor->priv->real_margin_left, y);
+			cairo_set_line_width (cr, SEPARATOR_LINE_WIDTH);
+			cairo_line_to (cr, compositor->priv->paper_width - compositor->priv->real_margin_right, y);
+			cairo_stroke (cr);
+
+			cairo_restore (cr);
+		});
 	}
 }
 

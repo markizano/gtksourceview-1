@@ -98,14 +98,14 @@ static GtkWidget *create_view_window             (GtkSourceBuffer *buffer,
 static GtkActionEntry buffer_action_entries[] = {
 	{ "Open", GTK_STOCK_OPEN, "_Open", "<control>O",
 	  "Open a file", G_CALLBACK (open_file_cb) },
-	{ "Print", GTK_STOCK_PRINT, "_Print", "<control>P",
-	  "Print the current file", G_CALLBACK (print_file_cb) },
 	{ "Quit", GTK_STOCK_QUIT, "_Quit", "<control>Q",
 	  "Exit the application", G_CALLBACK (gtk_main_quit) }
 };
 
 static GtkActionEntry view_action_entries[] = {
 	{ "FileMenu", NULL, "_File" },
+	{ "Print", GTK_STOCK_PRINT, "_Print", "<control>P",
+	  "Print the current file", G_CALLBACK (print_file_cb) },
 	{ "ViewMenu", NULL, "_View" },
 	{ "NewView", GTK_STOCK_NEW, "_New View", NULL,
 	  "Create a new view of the file", G_CALLBACK (new_view_cb) },
@@ -848,15 +848,23 @@ end_print (GtkPrintOperation        *operation,
 static void
 print_file_cb (GtkAction *action, gpointer user_data)
 {
+	GtkSourceView *view;
+	GtkSourceBuffer *buffer;
 	GtkSourcePrintCompositor *compositor;
 	GtkPrintOperation *operation;
 	const gchar *filename;
-	
-	g_return_if_fail (GTK_IS_SOURCE_BUFFER (user_data));
+
+	g_return_if_fail (GTK_IS_SOURCE_VIEW (user_data));
 
 	g_debug ("print_file_cb");
-	
-	compositor = gtk_source_print_compositor_new (GTK_SOURCE_BUFFER (user_data));
+
+	view = GTK_SOURCE_VIEW (user_data);
+	buffer = GTK_SOURCE_BUFFER (gtk_text_view_get_buffer (GTK_TEXT_VIEW (view))); 
+
+	compositor = gtk_source_print_compositor_new (buffer);
+
+	gtk_source_print_compositor_set_tab_width (compositor,
+						   gtk_source_view_get_tab_width (view));
 
 	gtk_source_print_compositor_set_print_line_numbers (compositor, 5);
 
