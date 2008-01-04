@@ -105,7 +105,7 @@ void			  gtk_source_print_compositor_set_footer_font_name
 									 const gchar              *font_name);
 gchar			 *gtk_source_print_compositor_get_footer_font_name
 									(GtkSourcePrintCompositor *compositor);
-#if 0
+
 gdouble			  gtk_source_print_compositor_get_top_margin	(GtkSourcePrintCompositor *compositor,
 									 GtkUnit                   unit);
 void			  gtk_source_print_compositor_set_top_margin	(GtkSourcePrintCompositor *compositor,
@@ -129,7 +129,7 @@ gdouble			  gtk_source_print_compositor_get_right_margin	(GtkSourcePrintComposit
 void			  gtk_source_print_compositor_set_right_margin	(GtkSourcePrintCompositor *compositor,
 									 gdouble                   margin,
 									 GtkUnit                   unit);
-#endif
+
 void			  gtk_source_print_compositor_set_print_header	(GtkSourcePrintCompositor *compositor,
 									 gboolean                  print);
 gboolean		  gtk_source_print_compositor_get_print_header	(GtkSourcePrintCompositor *compositor);

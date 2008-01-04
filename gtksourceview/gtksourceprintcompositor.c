@@ -1447,6 +1447,165 @@ gtk_source_print_compositor_get_footer_font_name (GtkSourcePrintCompositor *comp
 	return pango_font_description_to_string (compositor->priv->footer_font);
 }
 
+/**
+ * gtk_source_print_compositor_set_top_margin:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @margin: the new top margin in units of @unit
+ * @unit: the units for @margin
+ * 
+ * Sets the top margin used by @compositor.
+ *
+ * Since: 2.1.0
+ */
+void
+gtk_source_print_compositor_set_top_margin (GtkSourcePrintCompositor *compositor,
+					    gdouble                   margin,
+					    GtkUnit                   unit)
+{
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	
+	compositor->priv->margin_top = convert_to_mm (margin, unit);
+}
+
+/**
+ * gtk_source_print_compositor_get_top_margin:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @unit: the unit for the return value.
+ * 
+ * Gets the top margin in units of @unit.
+ * 
+ * Return value: the top margin.
+ *
+ * Since: 2.1.0
+ */
+gdouble
+gtk_source_print_compositor_get_top_margin (GtkSourcePrintCompositor *compositor,
+					    GtkUnit                   unit)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), 0);
+
+	return convert_from_mm (compositor->priv->margin_top, unit);
+}
+
+/**
+ * gtk_source_print_compositor_set_bottom_margin:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @margin: the new bottom margin in units of @unit
+ * @unit: the units for @margin
+ * 
+ * Sets the bottom margin used by @compositor.
+ *
+ * Since: 2.1.0
+ */
+void
+gtk_source_print_compositor_set_bottom_margin (GtkSourcePrintCompositor *compositor,
+					       gdouble                   margin,
+					       GtkUnit                   unit)
+{
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	
+	compositor->priv->margin_bottom = convert_to_mm (margin, unit);
+}
+
+/**
+ * gtk_source_print_compositor_get_bottom_margin:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @unit: the unit for the return value.
+ * 
+ * Gets the bottom margin in units of @unit.
+ * 
+ * Return value: the bottom margin.
+ *
+ * Since: 2.1.0
+ */
+gdouble
+gtk_source_print_compositor_get_bottom_margin (GtkSourcePrintCompositor *compositor,
+					       GtkUnit                   unit)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), 0);
+
+	return convert_from_mm (compositor->priv->margin_bottom, unit);
+}
+
+/**
+ * gtk_source_print_compositor_set_left_margin:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @margin: the new left margin in units of @unit
+ * @unit: the units for @margin
+ * 
+ * Sets the left margin used by @compositor.
+ *
+ * Since: 2.1.0
+ */
+void
+gtk_source_print_compositor_set_left_margin (GtkSourcePrintCompositor *compositor,
+					     gdouble                   margin,
+					     GtkUnit                   unit)
+{
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	
+	compositor->priv->margin_left = convert_to_mm (margin, unit);
+}
+
+/**
+ * gtk_source_print_compositor_get_left_margin:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @unit: the unit for the return value.
+ * 
+ * Gets the left margin in units of @unit.
+ * 
+ * Return value: the left margin
+ *
+ * Since: 2.1.0
+ */
+gdouble
+gtk_source_print_compositor_get_left_margin (GtkSourcePrintCompositor *compositor,
+					     GtkUnit                   unit)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), 0);
+
+	return convert_from_mm (compositor->priv->margin_left, unit);
+}
+
+/**
+ * gtk_source_print_compositor_set_right_margin:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @margin: the new right margin in units of @unit
+ * @unit: the units for @margin
+ * 
+ * Sets the right margin used by @compositor.
+ *
+ * Since: 2.1.0
+ */
+void
+gtk_source_print_compositor_set_right_margin (GtkSourcePrintCompositor *compositor,
+					      gdouble                   margin,
+					      GtkUnit                   unit)
+{
+	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
+	
+	compositor->priv->margin_right = convert_to_mm (margin, unit);
+}
+
+/**
+ * gtk_source_print_compositor_get_right_margin:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @unit: the unit for the return value.
+ * 
+ * Gets the right margin in units of @unit.
+ * 
+ * Return value: the top margin
+ *
+ * Since: 2.1.0
+ */
+gdouble
+gtk_source_print_compositor_get_right_margin (GtkSourcePrintCompositor *compositor,
+					      GtkUnit                   unit)
+{
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), 0);
+
+	return convert_from_mm (compositor->priv->margin_right, unit);
+}
 
 /**
  * gtk_source_print_compositor_get_n_pages:
