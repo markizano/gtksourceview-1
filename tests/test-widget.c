@@ -869,7 +869,7 @@ print_file_cb (GtkAction *action, gpointer user_data)
 	gtk_source_print_compositor_set_wrap_mode (compositor,
 						   gtk_text_view_get_wrap_mode (GTK_TEXT_VIEW (view)));
 
-	gtk_source_print_compositor_set_print_line_numbers (compositor, 5);
+	gtk_source_print_compositor_set_print_line_numbers (compositor, 1);
 
 	/* To test line numbers font != text font */
 	gtk_source_print_compositor_set_line_numbers_font_name (compositor,

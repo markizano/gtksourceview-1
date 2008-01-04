@@ -2925,7 +2925,7 @@ gtk_source_view_get_right_margin_position  (GtkSourceView *view)
 /**
  * gtk_source_view_set_right_margin_position:
  * @view: a #GtkSourceView.
- * @margin: the position of the margin to set.
+ * @pos: the position of the margin to set.
  *
  * Sets the position of the right margin in the given @view.
  **/
@@ -2950,7 +2950,7 @@ gtk_source_view_set_right_margin_position (GtkSourceView *view, guint pos)
 /**
  * gtk_source_view_set_smart_home_end:
  * @view: a #GtkSourceView.
- * @smart_he: the desired behavior among #GtkSourceSmartHomeEndType
+ * @smart_he: the desired behavior among #GtkSourceSmartHomeEndType.
  *
  * Set the desired movement of the cursor when HOME and END keys
  * are pressed.
@@ -2975,6 +2975,8 @@ gtk_source_view_set_smart_home_end (GtkSourceView             *view,
  *
  * Returns a #GtkSourceSmartHomeEndTypeend value specifying
  * how the cursor will move when HOME and END keys are pressed.
+ *
+ * Return value: a #GtkSourceSmartHomeEndTypeend value.
  **/
 GtkSourceSmartHomeEndType
 gtk_source_view_get_smart_home_end (GtkSourceView *view)
