@@ -215,15 +215,6 @@ documentation.
 @Returns: 
 
 
-<!-- ##### FUNCTION gtk_source_print_compositor_setup_from_view ##### -->
-<para>
-
-</para>
-
-@compositor: 
-@view: 
-
-
 <!-- ##### FUNCTION gtk_source_print_compositor_set_tab_width ##### -->
 <para>
 

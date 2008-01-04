@@ -48,20 +48,24 @@ struct _GtkSourcePrintCompositor
 struct _GtkSourcePrintCompositorClass
 {
 	GObjectClass parent_class;
+
+	/* Padding for future expansion */
+	void (*_gtk_source_reserved1) (void);
+	void (*_gtk_source_reserved2) (void);	
 };
 
 
 GType			  gtk_source_print_compositor_get_type		(void) G_GNUC_CONST;
 
-/* Constructor */
-GtkSourcePrintCompositor *gtk_source_print_compositor_new		(GtkSourceBuffer         *buffer);
+/* Constructors
+ */
+GtkSourcePrintCompositor *gtk_source_print_compositor_new		(GtkSourceBuffer          *buffer);
 
-GtkSourceBuffer   	 *gtk_source_print_compositor_get_buffer	(GtkSourcePrintCompositor *compositor);
-
-void			  gtk_source_print_compositor_setup_from_view	(GtkSourcePrintCompositor *compositor,
-									 GtkSourceView            *view);
+GtkSourcePrintCompositor *gtk_source_print_compositor_new_from_view	(GtkSourceView            *view);
 
 /* Properties */
+GtkSourceBuffer   	 *gtk_source_print_compositor_get_buffer	(GtkSourcePrintCompositor *compositor);
+
 void			  gtk_source_print_compositor_set_tab_width	(GtkSourcePrintCompositor *compositor,
 									 guint                     width);
 guint			  gtk_source_print_compositor_get_tab_width	(GtkSourcePrintCompositor *compositor);

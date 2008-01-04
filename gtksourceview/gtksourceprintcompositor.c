@@ -33,14 +33,14 @@
 #include "gtksourceview-i18n.h" 
 #include "gtksourceprintcompositor.h"
 
-
+/*
 #define ENABLE_DEBUG
 #define ENABLE_PROFILE
+*/
 
-/*
 #undef ENABLE_DEBUG
 #undef ENABLE_PROFILE
-*/
+
 #ifdef ENABLE_DEBUG
 #define DEBUG(x) (x)
 #else
@@ -733,6 +733,53 @@ gtk_source_print_compositor_new (GtkSourceBuffer *buffer)
 }
 
 /**
+ * gtk_source_print_compositor_new_from_view:
+ * @view: a #GtkSourceView to get configuration from.
+ * 
+ * Creates a new print compositor that can be used to print the buffer
+ * associated with @view.
+ * This constructor set some configuration properties to make the 
+ * printed output match @view as much as possible.  The properties set are
+ * #GtkSourcePrintCompositor:tab-width, #GtkSourcePrintCompositor:highlight-syntax, 
+ * #GtkSourcePrintCompositor:wrap-mode, #GtkSourcePrintCompositor:body-font-name and
+ * #GtkSourcePrintCompositor:print-line-numbers.
+ *
+ * Since: 2.1.0
+ **/
+GtkSourcePrintCompositor *
+gtk_source_print_compositor_new_from_view (GtkSourceView *view)
+{
+	GtkSourceBuffer *buffer = NULL;
+	PangoContext *pango_context;
+	PangoFontDescription* font_desc;
+	GtkSourcePrintCompositor *compositor;
+	
+	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), NULL);
+	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (gtk_text_view_get_buffer (GTK_TEXT_VIEW (view))), NULL);	
+
+	buffer = GTK_SOURCE_BUFFER (gtk_text_view_get_buffer (GTK_TEXT_VIEW (view)));
+	
+	compositor = GTK_SOURCE_PRINT_COMPOSITOR (
+			g_object_new (GTK_TYPE_SOURCE_PRINT_COMPOSITOR,
+				     "buffer", buffer,
+				     "tab-width", gtk_source_view_get_tab_width (view),
+				     "highlight-syntax", gtk_source_buffer_get_highlight_syntax (buffer),
+				     "wrap-mode", gtk_text_view_get_wrap_mode (GTK_TEXT_VIEW (view)),
+				     "print-line-numbers", gtk_source_view_get_show_line_numbers (view),
+				     NULL));
+
+	/* Set the body font directly since the property get a name while body_font is a PangoFontDescription */
+	pango_context = gtk_widget_get_pango_context (GTK_WIDGET (view));
+	
+	font_desc = pango_context_get_font_description (pango_context);
+	
+	compositor->priv->body_font = pango_font_description_copy (font_desc);
+	g_object_notify (G_OBJECT (compositor), "body-font-name"); // FIXME: is this needed?
+	
+	return compositor;
+}
+
+/**
  * gtk_source_print_compositor_get_buffer:
  * @compositor: a #GtkSourcePrintCompositor.
  * 
@@ -750,27 +797,6 @@ gtk_source_print_compositor_get_buffer (GtkSourcePrintCompositor *compositor)
 	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), NULL);
 	
 	return compositor->priv->buffer;
-}
-
-/**
- * gtk_source_print_compositor_setup_from_view:
- * @compositor: a #GtkSourcePrintCompositor.
- * @view: a #GtkSourceView to get configuration from.
- * 
- * Convenience function to set several configuration options at once,
- * so that the printed output matches @view.  The options set are
- * tab-width, highligh-syntax, wrap-mode and font-name.
- *
- * Since: 2.1.0
- **/
-void
-gtk_source_print_compositor_setup_from_view (GtkSourcePrintCompositor *compositor,
-					     GtkSourceView            *view)
-{
-	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
-	g_return_if_fail (GTK_IS_SOURCE_VIEW (view));
-	g_return_if_fail (compositor->priv->state == INIT);	
-	/* TODO */
 }
 
 /**

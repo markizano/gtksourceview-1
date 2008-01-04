@@ -845,22 +845,36 @@ end_print (GtkPrintOperation        *operation,
 #define HEADER_FONT_NAME   "Serif Italic 12"
 #define FOOTER_FONT_NAME   "SansSerif Bold 8"
 
+/*
+#define SETUP_FROM_VIEW 
+*/
+#undef SETUP_FROM_VIEW 
+
 static void
 print_file_cb (GtkAction *action, gpointer user_data)
 {
 	GtkSourceView *view;
 	GtkSourceBuffer *buffer;
 	GtkSourcePrintCompositor *compositor;
-	GtkPrintOperation *operation;
+	GtkPrintOperation *operation;	
 	const gchar *filename;
-
+	gchar *basename;
+	
 	g_return_if_fail (GTK_IS_SOURCE_VIEW (user_data));
 
 	g_debug ("print_file_cb");
 
 	view = GTK_SOURCE_VIEW (user_data);
-	buffer = GTK_SOURCE_BUFFER (gtk_text_view_get_buffer (GTK_TEXT_VIEW (view))); 
 
+	buffer = GTK_SOURCE_BUFFER (gtk_text_view_get_buffer (GTK_TEXT_VIEW (view))); 
+	
+	filename = g_object_get_data (G_OBJECT (buffer), "filename");	
+	basename = g_filename_display_basename (filename);
+	
+#ifdef SETUP_FROM_VIEW
+	compositor = gtk_source_print_compositor_new_from_view (view);
+#else
+	
 	compositor = gtk_source_print_compositor_new (buffer);
 
 	gtk_source_print_compositor_set_tab_width (compositor,
@@ -881,12 +895,10 @@ print_file_cb (GtkAction *action, gpointer user_data)
 						       "test-widget",
 						       "%F");
 
-	filename = g_object_get_data (G_OBJECT (user_data), "filename");
-	
 	gtk_source_print_compositor_set_footer_format (compositor,
 						       TRUE,
 						       "%T",
-						       filename,
+						       basename,
 						       "Page %N/%Q");
 
 	gtk_source_print_compositor_set_print_header (compositor, TRUE);
@@ -897,8 +909,12 @@ print_file_cb (GtkAction *action, gpointer user_data)
 
 	gtk_source_print_compositor_set_footer_font_name (compositor,
 							  FOOTER_FONT_NAME);
-	
+#endif	
 	operation = gtk_print_operation_new ();
+			
+	gtk_print_operation_set_job_name (operation, basename);
+	
+	gtk_print_operation_set_show_progress (operation, TRUE);
 	
   	g_signal_connect (G_OBJECT (operation), "begin-print", 
 			  G_CALLBACK (begin_print), compositor);		          
@@ -912,6 +928,7 @@ print_file_cb (GtkAction *action, gpointer user_data)
 				 NULL, NULL);
 
 	g_object_unref (operation);
+	g_free (basename);
 }
 
 /* View UI callbacks ------------------------------------------------------------------ */
