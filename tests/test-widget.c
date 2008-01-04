@@ -813,9 +813,7 @@ begin_print (GtkPrintOperation        *operation,
 	     GtkSourcePrintCompositor *compositor)
 {
 	gint n_pages;
-
-	g_debug ("begin_print");
-
+	
 	gtk_source_print_compositor_paginate (compositor, context);
 
 	n_pages = gtk_source_print_compositor_get_n_pages (compositor);
@@ -828,7 +826,7 @@ draw_page (GtkPrintOperation        *operation,
 	   gint                      page_nr,
 	   GtkSourcePrintCompositor *compositor)
 {
-	g_debug ("draw_page %d", page_nr);
+	/* g_debug ("draw_page %d", page_nr); */
 
 	gtk_source_print_compositor_draw_page (compositor, context, page_nr);
 }
@@ -848,7 +846,9 @@ end_print (GtkPrintOperation        *operation,
 /*
 #define SETUP_FROM_VIEW 
 */
+
 #undef SETUP_FROM_VIEW 
+
 
 static void
 print_file_cb (GtkAction *action, gpointer user_data)
@@ -861,9 +861,7 @@ print_file_cb (GtkAction *action, gpointer user_data)
 	gchar *basename;
 	
 	g_return_if_fail (GTK_IS_SOURCE_VIEW (user_data));
-
-	g_debug ("print_file_cb");
-
+	
 	view = GTK_SOURCE_VIEW (user_data);
 
 	buffer = GTK_SOURCE_BUFFER (gtk_text_view_get_buffer (GTK_TEXT_VIEW (view))); 

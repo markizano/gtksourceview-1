@@ -1061,7 +1061,7 @@ gtk_source_buffer_get_highlight_matching_brackets (GtkSourceBuffer *buffer)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), FALSE);
 
-	return buffer->priv->highlight_brackets;
+	return (buffer->priv->highlight_brackets != FALSE);
 }
 
 /**
@@ -1105,7 +1105,7 @@ gtk_source_buffer_get_highlight_syntax (GtkSourceBuffer *buffer)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_BUFFER (buffer), FALSE);
 
-	return buffer->priv->highlight_syntax;
+	return (buffer->priv->highlight_syntax != FALSE);
 }
 
 /**
@@ -1130,8 +1130,8 @@ gtk_source_buffer_set_highlight_syntax (GtkSourceBuffer *buffer,
 
 	if (buffer->priv->highlight_syntax != highlight)
 	{
-	buffer->priv->highlight_syntax = highlight;
-	g_object_notify (G_OBJECT (buffer), "highlight-syntax");
+		buffer->priv->highlight_syntax = highlight;
+		g_object_notify (G_OBJECT (buffer), "highlight-syntax");
 	}
 }
 

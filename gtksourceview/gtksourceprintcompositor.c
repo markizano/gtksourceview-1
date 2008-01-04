@@ -763,9 +763,9 @@ gtk_source_print_compositor_new_from_view (GtkSourceView *view)
 			g_object_new (GTK_TYPE_SOURCE_PRINT_COMPOSITOR,
 				     "buffer", buffer,
 				     "tab-width", gtk_source_view_get_tab_width (view),
-				     "highlight-syntax", gtk_source_buffer_get_highlight_syntax (buffer),
+				     "highlight-syntax", gtk_source_buffer_get_highlight_syntax (buffer) != FALSE,
 				     "wrap-mode", gtk_text_view_get_wrap_mode (GTK_TEXT_VIEW (view)),
-				     "print-line-numbers", gtk_source_view_get_show_line_numbers (view),
+				     "print-line-numbers", (gtk_source_view_get_show_line_numbers (view) == FALSE) ? 0 : 1,
 				     NULL));
 
 	/* Set the body font directly since the property get a name while body_font is a PangoFontDescription */
@@ -910,6 +910,8 @@ gtk_source_print_compositor_set_highlight_syntax (GtkSourcePrintCompositor *comp
 	g_return_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor));
 	g_return_if_fail (compositor->priv->state == INIT);
 
+	highlight = (highlight != FALSE);
+	
 	if (highlight == compositor->priv->highlight_syntax)
 		return;
 
@@ -2595,7 +2597,9 @@ double w;
 
 	DEBUG ({
 		int i;
-		g_print ("Paginated in %f seconds:\n", g_timer_elapsed (timer, NULL));
+		DEBUG ({
+			g_debug ("Paginated in %f seconds:\n", g_timer_elapsed (timer, NULL));
+		});
 		for (i = 0; i < compositor->priv->pages->len; i += 1)
 		{
 			gint offset;
@@ -2604,7 +2608,9 @@ double w;
 			offset = g_array_index (compositor->priv->pages, int, i);
 			gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (compositor->priv->buffer), &iter, offset);
 
-			g_print ("  page %d starts at line %d (offset %d)\n", i, gtk_text_iter_get_line (&iter), offset); 
+			DEBUG ({
+				g_debug ("  page %d starts at line %d (offset %d)\n", i, gtk_text_iter_get_line (&iter), offset); 
+			});
 		}
 	});
 

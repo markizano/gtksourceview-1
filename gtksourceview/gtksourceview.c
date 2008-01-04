@@ -1756,7 +1756,7 @@ gtk_source_view_get_show_line_numbers (GtkSourceView *view)
 	g_return_val_if_fail (view != NULL, FALSE);
 	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
 
-	return view->priv->show_line_numbers;
+	return (view->priv->show_line_numbers != FALSE);
 }
 
 /**
@@ -1823,7 +1823,7 @@ gtk_source_view_get_show_line_markers (GtkSourceView *view)
 	g_return_val_if_fail (view != NULL, FALSE);
 	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
 
-	return view->priv->show_line_markers;
+	return (view->priv->show_line_markers != FALSE);
 }
 
 /**
@@ -2648,7 +2648,7 @@ gtk_source_view_get_auto_indent (GtkSourceView *view)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
 
-	return view->priv->auto_indent;
+	return (view->priv->auto_indent != FALSE);
 }
 
 /**
@@ -2688,7 +2688,7 @@ gtk_source_view_get_insert_spaces_instead_of_tabs (GtkSourceView *view)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
 
-	return view->priv->insert_spaces;
+	return (view->priv->insert_spaces != FALSE);
 }
 
 /**
@@ -2731,7 +2731,7 @@ gtk_source_view_get_indent_on_tab (GtkSourceView *view)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
 
-	return view->priv->indent_on_tab;
+	return (view->priv->indent_on_tab != FALSE);
 }
 
 /**
@@ -2838,7 +2838,7 @@ gtk_source_view_get_highlight_current_line (GtkSourceView *view)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
 
-	return view->priv->highlight_current_line;
+	return (view->priv->highlight_current_line != FALSE);
 }
 
 /**
@@ -2878,7 +2878,7 @@ gtk_source_view_get_show_right_margin (GtkSourceView *view)
 {
 	g_return_val_if_fail (GTK_IS_SOURCE_VIEW (view), FALSE);
 
-	return view->priv->show_right_margin;
+	return (view->priv->show_right_margin != FALSE);
 }
 
 /**
