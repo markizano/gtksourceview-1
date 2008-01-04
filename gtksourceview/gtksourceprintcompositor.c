@@ -738,7 +738,7 @@ gtk_source_print_compositor_new (GtkSourceBuffer *buffer)
  * 
  * Creates a new print compositor that can be used to print the buffer
  * associated with @view.
- * This constructor set some configuration properties to make the 
+ * This constructor sets some configuration properties to make the 
  * printed output match @view as much as possible.  The properties set are
  * #GtkSourcePrintCompositor:tab-width, #GtkSourcePrintCompositor:highlight-syntax, 
  * #GtkSourcePrintCompositor:wrap-mode, #GtkSourcePrintCompositor:body-font-name and
