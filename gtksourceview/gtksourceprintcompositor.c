@@ -149,7 +149,7 @@ struct _GtkSourcePrintCompositorPrivate
 	gdouble                  page_margin_top;
 	gdouble                  page_margin_left;	
 	
-	PangoLanguage           *language;	
+	PangoLanguage           *language; /* must not be freed */
 };
 
 enum
@@ -344,6 +344,9 @@ gtk_source_print_compositor_finalize (GObject *object)
 
 	compositor = GTK_SOURCE_PRINT_COMPOSITOR (object);
 
+	if (compositor->priv->pages != NULL)
+		g_array_free (compositor->priv->pages, TRUE);
+		
 	if (compositor->priv->layout != NULL)
 		g_object_unref (compositor->priv->layout);
 
@@ -1004,7 +1007,7 @@ gtk_source_print_compositor_set_print_header (GtkSourcePrintCompositor *composit
 	
 	compositor->priv->print_header = print;
 
-	g_object_notify (G_OBJECT (compositor), "print_header");	
+	g_object_notify (G_OBJECT (compositor), "print-header");	
 }
 
 /**
@@ -1060,7 +1063,7 @@ gtk_source_print_compositor_set_print_footer (GtkSourcePrintCompositor *composit
 	
 	compositor->priv->print_footer = print;
 
-	g_object_notify (G_OBJECT (compositor), "print_footer");	
+	g_object_notify (G_OBJECT (compositor), "print-footer");	
 }
 
 /**
@@ -2488,8 +2491,8 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 	{
 		gint line_number;
 		GtkTextIter line_end;
-		double line_height;
-
+		gdouble line_height;
+		
 		line_number = gtk_text_iter_get_line (&start);
 
 		line_end = start;
@@ -2497,8 +2500,8 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 			gtk_text_iter_forward_to_line_end (&line_end);
 
 		layout_paragraph (compositor, &start, &line_end);
-double w;
-		get_layout_size (compositor->priv->layout, &w, &line_height);
+
+		get_layout_size (compositor->priv->layout, NULL, &line_height);
 
 		if (line_is_numbered (compositor, line_number))
 		{
@@ -2801,9 +2804,11 @@ print_footer_string (GtkSourcePrintCompositor *compositor,
 		line = pango_layout_get_line (compositor->priv->footer_layout, 0);
 
 		DEBUG ({
-			double w;
-			double h;
+			gdouble w;
+			gdouble h;
+			
 			get_layout_size (compositor->priv->footer_layout, &w, &h);
+			
 			cairo_save (cr);
 			cairo_set_line_width (cr, 1.);
 			cairo_set_source_rgb (cr, 0., 0., 1.);
