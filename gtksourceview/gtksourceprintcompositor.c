@@ -61,9 +61,9 @@
 /* 5 mm */
 #define NUMBERS_TEXT_SEPARATION convert_from_mm (5, GTK_UNIT_POINTS)
 
-#define HEADER_FOOTER_SIZE_FACTOR 2.5
+#define HEADER_FOOTER_SIZE_FACTOR 2.2
 #define SEPARATOR_SPACING_FACTOR  0.4
-#define SEPARATOR_LINE_WIDTH      1.0
+#define SEPARATOR_LINE_WIDTH      0.7
 
 typedef enum 
 {

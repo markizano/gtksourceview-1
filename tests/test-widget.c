@@ -839,10 +839,11 @@ end_print (GtkPrintOperation        *operation,
 	g_object_unref (compositor);
 }
 
-#define LINE_NUMBERS_FONT_NAME   "Monospace 6"
-#define HEADER_FONT_NAME   "Serif Italic 12"
-#define FOOTER_FONT_NAME   "SansSerif Bold 8"
-
+#define LINE_NUMBERS_FONT_NAME	"Sans 8"
+#define HEADER_FONT_NAME	"Sans 11"
+#define FOOTER_FONT_NAME	"Sans 11"
+#define BODY_FONT_NAME		"Monospace 9"
+	
 /*
 #define SETUP_FROM_VIEW 
 */
@@ -882,6 +883,9 @@ print_file_cb (GtkAction *action, gpointer user_data)
 						   gtk_text_view_get_wrap_mode (GTK_TEXT_VIEW (view)));
 
 	gtk_source_print_compositor_set_print_line_numbers (compositor, 1);
+
+	gtk_source_print_compositor_set_body_font_name (compositor,
+							BODY_FONT_NAME);
 
 	/* To test line numbers font != text font */
 	gtk_source_print_compositor_set_line_numbers_font_name (compositor,
