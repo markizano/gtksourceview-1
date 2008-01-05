@@ -7,6 +7,7 @@
  * Copyright (C) 2003  Gustavo Giráldez
  * Copyright (C) 2004  Red Hat, Inc.
  * Copyright (C) 2001-2007  Paolo Maggi
+ * Copyright (C) 2008  Paolo Maggi and Paolo Borelli
  *
  * GtkSourceView is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -33,13 +34,14 @@
 #include "gtksourceview-i18n.h" 
 #include "gtksourceprintcompositor.h"
 
-/*
+
 #define ENABLE_DEBUG
 #define ENABLE_PROFILE
-*/
 
+/*
 #undef ENABLE_DEBUG
 #undef ENABLE_PROFILE
+*/
 
 #ifdef ENABLE_DEBUG
 #define DEBUG(x) (x)
@@ -49,6 +51,7 @@
 
 #ifdef ENABLE_PROFILE
 #define PROFILE(x) (x)
+static GTimer *pagination_timer = NULL;
 #else
 #define PROFILE(x)
 #endif
@@ -64,6 +67,9 @@
 #define HEADER_FOOTER_SIZE_FACTOR 2.2
 #define SEPARATOR_SPACING_FACTOR  0.4
 #define SEPARATOR_LINE_WIDTH      0.7
+
+/* Number of pages paginated on each invocation of the paginate() method. */
+#define PAGINATION_CHUNK_SIZE 3
 
 typedef enum 
 {
@@ -150,6 +156,8 @@ struct _GtkSourcePrintCompositorPrivate
 	gdouble                  page_margin_left;	
 	
 	PangoLanguage           *language; /* must not be freed */
+	
+	GtkTextMark             *pagination_mark;
 };
 
 enum
@@ -2494,23 +2502,28 @@ set_pango_layouts_width (GtkSourcePrintCompositor *compositor)
 gboolean
 gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 				      GtkPrintContext          *context)
-{
+{	
 	GtkTextIter start, end;
 	gint page_start_offset;
 	double text_height;
 	double cur_height;
-	GTimer *timer;
+	
+	gboolean done;
+	gint pages_count;
 
 	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), TRUE);
 	g_return_val_if_fail (GTK_IS_PRINT_CONTEXT (context), TRUE);
-
-	timer = g_timer_new ();
-
+	
 	if (compositor->priv->state == DONE)
 		return TRUE;
 
 	if (compositor->priv->state == INIT)
-	{		
+	{
+		PROFILE ({
+			g_assert (pagination_timer == NULL);
+			pagination_timer = g_timer_new ();
+		});
+		
 		g_return_val_if_fail (compositor->priv->pages == NULL, TRUE);
 
 		compositor->priv->pages = g_array_new (FALSE, FALSE, sizeof (gint));
@@ -2532,31 +2545,39 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 	g_return_val_if_fail (compositor->priv->state == PAGINATING, FALSE);
 	g_return_val_if_fail (compositor->priv->layout != NULL, FALSE);
 
-	/* TODO: paginate just a chunk of text to
-	   - allow async pagination
-	   - allow to paginate/print just a part of the text
-
-#define PAGINATION_CHUNK_LINES 1000
-
-	gtk_text_buffer_get_iter_at_line (GTK_TEXT_BUFFER (compositor->priv->buffer),
-					  &start,
-					  compositor->priv->paginated_lines);
-
-	end = start;
-	gtk_text_iter_forward_lines (&end, PAGINATION_CHUNK_LINES);
-	 */
-
-	gtk_text_buffer_get_start_iter (GTK_TEXT_BUFFER (compositor->priv->buffer), &start);
+	if (compositor->priv->pagination_mark == NULL)
+	{
+		gtk_text_buffer_get_start_iter (GTK_TEXT_BUFFER (compositor->priv->buffer), &start);
+		
+		compositor->priv->pagination_mark = gtk_text_buffer_create_mark (GTK_TEXT_BUFFER (compositor->priv->buffer),
+										 NULL,
+										 &start,
+										 TRUE);
+										 
+		/* add the first page start */
+		page_start_offset = gtk_text_iter_get_offset (&start);
+		g_array_append_val (compositor->priv->pages, page_start_offset);
+	}
+	else
+	{
+		gtk_text_buffer_get_iter_at_mark (GTK_TEXT_BUFFER (compositor->priv->buffer),
+						  &start,
+						  compositor->priv->pagination_mark);
+	}
+	
+	DEBUG ({
+		g_debug ("Start paginating at %d", gtk_text_iter_get_offset (&start));
+	});
+		
 	gtk_text_buffer_get_end_iter (GTK_TEXT_BUFFER (compositor->priv->buffer), &end);
-
-	/* add the first page start */
-	page_start_offset = gtk_text_iter_get_offset (&start);
-	g_array_append_val (compositor->priv->pages, page_start_offset);
 
 	cur_height = 0;
 	text_height = get_text_height (compositor);
 
-	while (gtk_text_iter_compare (&start, &end) < 0)
+	done = gtk_text_iter_compare (&start, &end) >= 0;
+	pages_count = 0;
+	
+	while (!done && (pages_count < PAGINATION_CHUNK_SIZE))
 	{
 		gint line_number;
 		GtkTextIter line_end;
@@ -2632,6 +2653,10 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 
 				page_start_offset = gtk_text_iter_get_offset (&start);
 
+				gtk_text_buffer_move_mark (GTK_TEXT_BUFFER (compositor->priv->buffer),
+							   compositor->priv->pagination_mark,
+							   &start);
+
 				/* if the remainder fits on the next page, go
 				 * on to the next line, otherwise restart pagination
 				 * from the page break we found */
@@ -2649,6 +2674,10 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 			else
 			{
 				page_start_offset = gtk_text_iter_get_offset (&start);
+   
+				gtk_text_buffer_move_mark (GTK_TEXT_BUFFER (compositor->priv->buffer),
+							   compositor->priv->pagination_mark,
+							   &start);
 
 				/* reset cur_height for the next page */
 				cur_height = line_height;
@@ -2658,54 +2687,87 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 			/* store the start of the new page */
 			g_array_append_val (compositor->priv->pages,
 					    page_start_offset);
+	      
+			++pages_count;
 		}
 		else
 		{
 			cur_height += line_height;
 			gtk_text_iter_forward_line (&start);
 		}
+		
+		done = gtk_text_iter_compare (&start, &end) >= 0;
 	}
 #undef EPS
 
-	DEBUG ({
-		int i;
-		DEBUG ({
-			g_debug ("Paginated in %f seconds:\n", g_timer_elapsed (timer, NULL));
+	if (done) 
+	{
+		PROFILE ({	
+			g_debug ("Paginated in %f seconds:\n", g_timer_elapsed (pagination_timer, NULL));
+
+			g_timer_destroy (pagination_timer);
+			pagination_timer = NULL;
 		});
-		for (i = 0; i < compositor->priv->pages->len; i += 1)
-		{
-			gint offset;
-			GtkTextIter iter;
+	
+		DEBUG ({
+			int i;
 
-			offset = g_array_index (compositor->priv->pages, int, i);
-			gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (compositor->priv->buffer), &iter, offset);
+			for (i = 0; i < compositor->priv->pages->len; i += 1)
+			{
+				gint offset;
+				GtkTextIter iter;
 
-			DEBUG ({
+				offset = g_array_index (compositor->priv->pages, int, i);
+				gtk_text_buffer_get_iter_at_offset (GTK_TEXT_BUFFER (compositor->priv->buffer), &iter, offset);
+
 				g_debug ("  page %d starts at line %d (offset %d)\n", i, gtk_text_iter_get_line (&iter), offset); 
-			});
-		}
-	});
+			}
+		});
 
-	g_timer_destroy (timer);
+		compositor->priv->state = DONE;
 
-	compositor->priv->state = DONE;
-
-	compositor->priv->n_pages = compositor->priv->pages->len;
-
-	return FALSE;
+		compositor->priv->n_pages = compositor->priv->pages->len;
+		
+		/* Remove the pagination mark */
+		gtk_text_buffer_delete_mark (GTK_TEXT_BUFFER (compositor->priv->buffer),
+					     compositor->priv->pagination_mark);
+		compositor->priv->pagination_mark = NULL;
+	}
+	
+	return (done != FALSE);
 }
 
-gint
+/**
+ * gtk_source_print_compositor_get_pagination_progress:
+ * @compositor: a #GtkSourcePrintCompositor.
+ *
+ * Returns the current fraction of the document pagination that has been completed.
+ *
+ * Return value: a fraction from 0.0 to 1.0 inclusive
+ *
+ * Since: 2.2
+ */
+gdouble
 gtk_source_print_compositor_get_pagination_progress (GtkSourcePrintCompositor *compositor)
 {
-	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), -1);
-
-	g_return_val_if_fail (compositor->priv->state == PAGINATING ||
-			      compositor->priv->state == DONE, -1);
-
-	// FIXME: returns paginated lines or characters
+	GtkTextIter current;
 	
-	return compositor->priv->n_pages;	
+	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), 0.0);
+
+	if (compositor->priv->state == INIT)
+		return 0.0;
+		
+	if (compositor->priv->state == DONE)
+		return 1.0;
+	
+	g_return_val_if_fail (compositor->priv->pagination_mark != NULL, 0.0);
+	
+	gtk_text_buffer_get_iter_at_mark (GTK_TEXT_BUFFER (compositor->priv->buffer),
+					  &current,
+					  compositor->priv->pagination_mark);
+	
+	return (gdouble) gtk_text_iter_get_offset (&current) / 
+	       (gdouble) gtk_text_buffer_get_char_count (GTK_TEXT_BUFFER (compositor->priv->buffer));
 }
 
 static void
@@ -3097,6 +3159,15 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 		{
 			GtkTextIter line_end;
 
+			if (!gtk_text_iter_starts_line (&start)) 
+			{
+				/* This happens only if the first line of the page 
+				   is the continuation of the last line of the previous page.
+				   In this case the line numbers must not be print
+				 */
+				line_number = -1;
+			}
+
 			line_end = start;
 			gtk_text_iter_forward_to_line_end (&line_end);
 
@@ -3113,7 +3184,7 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 		baseline_offset = 0;
 
 		/* print the line number if needed */
-		if (line_is_numbered (compositor, line_number))
+		if ((line_number >= 0) && line_is_numbered (compositor, line_number))
 		{
 			PangoLayoutIter *iter;
 			double baseline;

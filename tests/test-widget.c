@@ -807,6 +807,10 @@ open_file_cb (GtkAction *action, gpointer user_data)
 	gtk_widget_destroy (chooser);
 }
 
+#define NON_BLOCKING_PAGINATION
+
+#ifndef NON_BLOCKING_PAGINATION
+
 static void
 begin_print (GtkPrintOperation        *operation, 
 	     GtkPrintContext          *context,
@@ -820,6 +824,35 @@ begin_print (GtkPrintOperation        *operation,
 	n_pages = gtk_source_print_compositor_get_n_pages (compositor);
 	gtk_print_operation_set_n_pages (operation, n_pages);
 }
+
+#else
+
+static gboolean
+paginate (GtkPrintOperation        *operation, 
+	  GtkPrintContext          *context,
+	  GtkSourcePrintCompositor *compositor)
+{
+	g_print ("Pagination progress: %.2f %%\n", gtk_source_print_compositor_get_pagination_progress (compositor) * 100.0);
+	
+	if (gtk_source_print_compositor_paginate (compositor, context))
+	{
+		gint n_pages;
+
+		g_assert (gtk_source_print_compositor_get_pagination_progress (compositor) == 1.0);
+		g_print ("Pagination progress: %.2f %%\n", gtk_source_print_compositor_get_pagination_progress (compositor) * 100.0);
+		        
+		n_pages = gtk_source_print_compositor_get_n_pages (compositor);
+		gtk_print_operation_set_n_pages (operation, n_pages);
+
+
+		
+		return TRUE;
+	}
+     
+	return FALSE;
+}
+
+#endif
 
 #define ENABLE_CUSTOM_OVERLAY
 
@@ -964,9 +997,14 @@ print_file_cb (GtkAction *action, gpointer user_data)
 	gtk_print_operation_set_job_name (operation, basename);
 	
 	gtk_print_operation_set_show_progress (operation, TRUE);
-	
+
+#ifndef NON_BLOCKING_PAGINATION	
   	g_signal_connect (G_OBJECT (operation), "begin-print", 
-			  G_CALLBACK (begin_print), compositor);		          
+			  G_CALLBACK (begin_print), compositor);
+#else
+  	g_signal_connect (G_OBJECT (operation), "paginate", 
+			  G_CALLBACK (paginate), compositor);
+#endif
 	g_signal_connect (G_OBJECT (operation), "draw-page", 
 			  G_CALLBACK (draw_page), compositor);
 	g_signal_connect (G_OBJECT (operation), "end-print", 

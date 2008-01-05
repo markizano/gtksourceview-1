@@ -4,7 +4,7 @@
  * This file is part of GtkSourceView 
  *
  * Copyright (C) 2003  Gustavo Giráldez 
- * Copyright (C) 2007  Paolo Maggi
+ * Copyright (C) 2007-2008  Paolo Maggi and Paolo Borelli
  *
  * GtkSourceView is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -142,43 +142,31 @@ void			  gtk_source_print_compositor_set_print_footer	(GtkSourcePrintCompositor 
 									 gboolean                  print);
 gboolean		  gtk_source_print_compositor_get_print_footer	(GtkSourcePrintCompositor *compositor);
 
-
 /* format strings are strftime like */
 void			  gtk_source_print_compositor_set_header_format	(GtkSourcePrintCompositor *compositor,
 									 gboolean                  separator,
 									 const gchar              *left,
 									 const gchar              *center,
 									 const gchar              *right);
-/* TODO: add get_header_format */
 
 void			  gtk_source_print_compositor_set_footer_format	(GtkSourcePrintCompositor *compositor,
 									 gboolean                  separator,
 									 const gchar              *left,
 									 const gchar              *center,
 									 const gchar              *right);
-/* TODO: add get_footer_format */
-									  
-/* TODO: set/get style scheme ??? */
-/* TODO: print right margin hint??? */
 
-/* Returns the number of pages. Returns -1 until the document has been completely paginated */
 gint			  gtk_source_print_compositor_get_n_pages	(GtkSourcePrintCompositor *compositor);
 
-/* Returns TRUE if the document has been completely paginated. otherwise FALSE. 
-   It paginates the document in small chunks and so it must be called multiple times to paginate the entire
-   document. It has been designed to be called in the ::paginate handler. If you don't need to do pagination in 
-   chunks, you can simply do it all in the ::begin-print handler */
 gboolean		  gtk_source_print_compositor_paginate		(GtkSourcePrintCompositor *compositor,
 									 GtkPrintContext          *context);
-/* Returns the number of already paginated lines */
-gint			  gtk_source_print_compositor_get_pagination_progress
+
+gdouble			  gtk_source_print_compositor_get_pagination_progress
 									(GtkSourcePrintCompositor *compositor);
 
 void			  gtk_source_print_compositor_draw_page		(GtkSourcePrintCompositor *compositor,
 									 GtkPrintContext          *context,
 									 gint                      page_nr);
 
-/* TODO: do we need to add other functions to support print previewing? */
 G_END_DECLS
 
 #endif /* __GTK_SOURCE_PRINT_COMPOSITOR_H__ */
