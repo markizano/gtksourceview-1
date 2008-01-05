@@ -7,7 +7,7 @@
  * Copyright (C) 2003  Gustavo Giráldez
  * Copyright (C) 2004  Red Hat, Inc.
  * Copyright (C) 2001-2007  Paolo Maggi
- * Copyright (C) 2008  Paolo Maggi and Paolo Borelli
+ * Copyright (C) 2008  Paolo Maggi, Paolo Borelli and Yevgen Muntyan
  *
  * GtkSourceView is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -2751,6 +2751,7 @@ gdouble
 gtk_source_print_compositor_get_pagination_progress (GtkSourcePrintCompositor *compositor)
 {
 	GtkTextIter current;
+	gint char_count;
 	
 	g_return_val_if_fail (GTK_IS_SOURCE_PRINT_COMPOSITOR (compositor), 0.0);
 
@@ -2759,15 +2760,18 @@ gtk_source_print_compositor_get_pagination_progress (GtkSourcePrintCompositor *c
 		
 	if (compositor->priv->state == DONE)
 		return 1.0;
-	
+		
+	char_count = gtk_text_buffer_get_char_count (GTK_TEXT_BUFFER (compositor->priv->buffer));
+	if (char_count == 0)
+		return 1.0;
+		
 	g_return_val_if_fail (compositor->priv->pagination_mark != NULL, 0.0);
 	
 	gtk_text_buffer_get_iter_at_mark (GTK_TEXT_BUFFER (compositor->priv->buffer),
 					  &current,
 					  compositor->priv->pagination_mark);
 	
-	return (gdouble) gtk_text_iter_get_offset (&current) / 
-	       (gdouble) gtk_text_buffer_get_char_count (GTK_TEXT_BUFFER (compositor->priv->buffer));
+	return (gdouble) gtk_text_iter_get_offset (&current) / (gdouble) char_count;
 }
 
 static void
