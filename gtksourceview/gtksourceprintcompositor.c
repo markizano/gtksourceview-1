@@ -2416,12 +2416,81 @@ set_pango_layouts_width (GtkSourcePrintCompositor *compositor)
 	}
 }
 
-/* Returns TRUE if the document has been completely paginated. otherwise FALSE. 
-   It paginates the document in small chunks and so it must be called multiple times to paginate the entire
-   document. It has been designed to be called in the ::paginate handler. If you don't need to do pagination in 
-   chunks, you can simply do it all in the ::begin-print handler. If you want
+/* If you want
    to use the ::paginate signal to perform pagination in async way, it is suggested to
    ensure the buffer is not modified until pagination terminates. */
+
+/**
+ * gtk_source_print_compositor_paginate:
+ * @compositor: a #GtkSourcePrintCompositor.
+ * @context: the #GtkPrintContext whose parameters (e.g. paper size, print margins, etc.) 
+ * are used by the the @compositor to paginate the document.
+ *
+ * Paginate the document associated with the @compositor.
+ *
+ * In order to support non-blocking pagination, document is paginated in small chunks.
+ * Each time gtk_source_print_compositor_paginate() is invoked, a chunk of the document 
+ * is paginated. To paginate the entire document, gtk_source_print_compositor_paginate() 
+ * must be invoked multiple times.
+ * It returns %TRUE if the document has been completely paginated, otherwise it returns %FALSE.
+ *
+ * This method has been designed to be invoked in the handler of the #GtkPrintOperation::paginate signal,
+ * as shown in the following example:
+ *
+ * <informalexample><programlisting>
+ * // Signal handler for the GtkPrintOperation::paginate signal
+ * 
+ * static gboolean
+ * paginate (GtkPrintOperation *operation,
+ *           GtkPrintContext   *context,
+ *           gpointer           user_data)
+ * {
+ *     GtkSourcePrintCompositor *compositor;
+ *
+ *     compositor = GTK_SOURCE_PRINT_COMPOSITOR (user_data);
+ *
+ *     if (gtk_source_print_compositor_paginate (compositor, context))
+ *     {
+ *         gint n_pages;
+ *         
+ *         n_pages = gtk_source_print_compositor_get_n_pages (compositor);
+ *         gtk_print_operation_set_n_pages (operation, n_pages);
+ *
+ *         return TRUE;
+ *     }
+ *      
+ *     return FALSE;
+ * }
+ * </programlisting></informalexample>
+ *
+ * If you don't need to do pagination in chunks, you can simply do it all in the 
+ * #GtkPrintOperation::begin-print handler, and set the number of pages from there, like
+ * in the following example:
+ *
+ * <informalexample><programlisting>
+ * // Signal handler for the GtkPrintOperation::begin-print signal
+ * 
+ * static void
+ * begin_print (GtkPrintOperation *operation,
+ *              GtkPrintContext   *context,
+ *              gpointer           user_data)
+ * {
+ *     GtkSourcePrintCompositor *compositor;
+ *     gint n_pages;
+ *
+ *     compositor = GTK_SOURCE_PRINT_COMPOSITOR (user_data);
+ *
+ *     while (!gtk_source_print_compositor_paginate (compositor, context));
+ * 
+ *     n_pages = gtk_source_print_compositor_get_n_pages (compositor);
+ *     gtk_print_operation_set_n_pages (operation, n_pages);
+ * }
+ * </programlisting></informalexample>
+ *
+ * Return value: %TRUE if the document has been completely paginated, %FALSE otherwise.
+ *
+ * Since: 2.2
+ */
 gboolean
 gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 				      GtkPrintContext          *context)
