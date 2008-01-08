@@ -2337,6 +2337,25 @@ get_iter_attrs (GtkSourcePrintCompositor *compositor,
 	return attrs;
 }
 
+static gboolean
+is_empty_line (const gchar *text)
+{
+	if (*text != '\0')
+	{
+		const gchar *p;
+
+		for (p = text; p != NULL; p = g_utf8_next_char (p))
+		{
+			if (!g_unichar_isspace (*p))
+			{
+				return FALSE;
+			}
+		}
+	}
+
+	return TRUE;
+}
+
 static void
 layout_paragraph (GtkSourcePrintCompositor *compositor,
 		  GtkTextIter              *start,
@@ -2345,6 +2364,19 @@ layout_paragraph (GtkSourcePrintCompositor *compositor,
 	gchar *text;
 
 	text = gtk_text_iter_get_slice (start, end);
+
+	/* If it is an empty line (or it just contains tabs) pango has problems:
+	 * see for instance comment #22 and #23 on bug #143874 and bug #457990.
+	 * We just hack around it by inserting a space... not elegant but
+	 * works :-) */
+	if (gtk_text_iter_ends_line (start) ||
+	    is_empty_line (text))
+	{
+		pango_layout_set_text (compositor->priv->layout, " ", 1);
+		g_free (text);
+		return;
+	}
+
 	pango_layout_set_text (compositor->priv->layout, text, -1);
 	g_free (text);
 
@@ -3057,7 +3089,7 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 	g_return_if_fail (GTK_IS_PRINT_CONTEXT (context));
 
 	compositor->priv->current_page = page_nr;
-	
+
 	cr = gtk_print_context_get_cairo_context (context);
 	cairo_set_source_rgb (cr, 0, 0, 0);
 	cairo_translate (cr, 
@@ -3147,41 +3179,31 @@ gtk_source_print_compositor_draw_page (GtkSourcePrintCompositor *compositor,
 
 	while (gtk_text_iter_compare (&start, &end) < 0)
 	{
+		GtkTextIter line_end;
 		gint line_number;
 		double line_height;
 		double baseline_offset;
 
-		line_number = gtk_text_iter_get_line (&start);
+		line_end = start;
+		if (!gtk_text_iter_ends_line (&line_end))
+			gtk_text_iter_forward_to_line_end (&line_end);
+		if (gtk_text_iter_compare (&line_end, &end) > 0)
+			line_end = end;
 
-		/* print the paragraph */
-		if (gtk_text_iter_ends_line (&start))
+		if (gtk_text_iter_starts_line (&start)) 
 		{
-			pango_layout_set_text (compositor->priv->layout, "", 0);
-			pango_layout_set_attributes (compositor->priv->layout, NULL);
+			line_number = gtk_text_iter_get_line (&start);
 		}
 		else
 		{
-			GtkTextIter line_end;
-
-			if (!gtk_text_iter_starts_line (&start)) 
-			{
-				/* This happens only if the first line of the page 
-				   is the continuation of the last line of the previous page.
-				   In this case the line numbers must not be print
-				 */
-				line_number = -1;
-			}
-
-			line_end = start;
-			gtk_text_iter_forward_to_line_end (&line_end);
-
-			if (gtk_text_iter_compare (&line_end, &end) > 0)
-				line_end = end;
-
-			layout_paragraph (compositor,
-					  &start,
-					  &line_end);
+			/* This happens only if the first line of the page 
+			 * is the continuation of the last line of the previous page.
+			 * In this case the line numbers must not be print
+			 */
+			line_number = -1;
 		}
+
+		layout_paragraph (compositor, &start, &line_end);
 
 		get_layout_size (compositor->priv->layout, NULL, &line_height);
 
