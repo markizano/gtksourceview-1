@@ -2552,7 +2552,9 @@ gtk_source_print_compositor_paginate (GtkSourcePrintCompositor *compositor,
 	if (compositor->priv->state == INIT)
 	{
 		PROFILE ({
-			g_assert (pagination_timer == NULL);
+			if (pagination_timer != NULL)
+				g_timer_destroy (pagination_timer);
+				
 			pagination_timer = g_timer_new ();
 		});
 		
